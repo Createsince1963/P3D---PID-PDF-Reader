@@ -1,0 +1,4 @@
+# Build-Umgebung fuer build_exe.bat (.venv_build)
+-r requirements.txt
+pyinstaller==6.21.0
+pyinstaller-hooks-contrib==2026.6

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P3D PDF Reader</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="topband">
+  <div class="brand"><span class="brand-name">P3D PDF Reader</span><span class="brand-sub">Web</span></div>
+  <div class="top-info" id="topInfo"></div>
+</header>
+
+<nav class="ribbon" id="ribbon">
+  <div class="group">
+    <div class="group-body">
+      <button class="rb primary" data-cmd="scan" title="Quellordner des Servers einlesen (F5)"><span class="ico">⟳</span>Quellordner scannen</button>
+      <button class="rb" data-cmd="upload" title="PDFs von diesem PC hochladen und einlesen (auch per Ziehen ins Fenster)"><span class="ico">⇪</span>PDFs hochladen</button>
+      <button class="rb toggle" data-cmd="pipes" title="Rohrleitungsnummern beim nächsten Scan/Upload mit einlesen (Typ „Rohrleitung“)"><span class="ico">═</span>Rohrleitungen</button>
+      <button class="rb" data-cmd="clear" title="Eingelesene PDFs aus der Liste entfernen"><span class="ico">✕</span>Liste leeren</button>
+    </div>
+    <div class="group-title">1 Einlesen</div>
+  </div>
+  <div class="group">
+    <div class="group-body">
+      <button class="rb" data-cmd="prev" title="Vorige Fundstelle (Umschalt+F3)"><span class="ico">◀</span>Fundstelle zurück</button>
+      <button class="rb" data-cmd="next" title="Nächste Fundstelle (F3)"><span class="ico">▶</span>Fundstelle weiter</button>
+      <button class="rb toggle" data-cmd="dups" title="Nur Tags mit Anzahl &gt; 1 zeigen"><span class="ico">⧉</span>Nur doppelte Tags</button>
+      <button class="rb" data-cmd="reset" title="Alle Filter zurücksetzen"><span class="ico">⌫</span>Filter zurücksetzen</button>
+    </div>
+    <div class="group-title">2 Prüfen</div>
+  </div>
+  <div class="group">
+    <div class="group-body">
+      <button class="rb" data-cmd="bulk" title="Redline-PDFs und Review-Excel für markierte oder alle PDFs (ZIP)"><span class="ico">☰</span>Review Auswahl/Bulk</button>
+      <button class="rb" data-cmd="redline" title="Redline-PDF der gewählten PDF (es gilt der Tabellenfilter)"><span class="ico">✎</span>Redline-PDF</button>
+      <button class="rb" data-cmd="review" title="Review-Excel der gewählten PDF (es gilt der Tabellenfilter)"><span class="ico">▦</span>Review-Excel</button>
+    </div>
+    <div class="group-title">3 Review / Redline</div>
+  </div>
+  <div class="group">
+    <div class="group-body">
+      <button class="rb" data-cmd="exportXlsx" title="Blätter Dateien und Tags über alle PDFs"><span class="ico">▤</span>Export Excel</button>
+      <button class="rb" data-cmd="exportCsv" title="Tags und _Dateien.csv (;, UTF-8 mit BOM) als ZIP"><span class="ico">≡</span>Export CSV</button>
+    </div>
+    <div class="group-title">4 Export</div>
+  </div>
+  <div class="group">
+    <div class="group-body">
+      <button class="rb" data-cmd="help" title="Kurzanleitung"><span class="ico">?</span>Hilfe</button>
+    </div>
+    <div class="group-title">Hilfe</div>
+  </div>
+</nav>
+
+<div class="sheet-tabs" id="sheetTabs">
+  <button class="sheet-tab active" data-sheet="pid">PID-Tags</button>
+  <button class="sheet-tab" data-sheet="all">Alle Tags</button>
+</div>
+
+<main class="sheet-host">
+  <section class="sheet active" id="sheet-pid">
+    <div class="sheet-head">
+      <span class="sheet-title">PID-Tags</span>
+      <input class="sheet-filter" id="pidFilter" type="search" placeholder="Filter über das ganze Blatt …">
+      <span class="sheet-note" id="pidNote"></span>
+    </div>
+    <div class="pid-layout" id="pidLayout">
+      <div class="pid-left">
+        <div class="pane" id="paneFiles">
+          <div class="pane-head"><span class="pane-title">Dateien</span>
+            <div class="strip">
+              <button class="tb" data-cmd="selectAll">Alle markieren</button>
+              <button class="tb" data-cmd="bulk">Review markierte …</button>
+              <button class="tb" data-cmd="exportXlsx">Excel</button>
+            </div>
+          </div>
+          <div class="table" id="tblFiles"></div>
+        </div>
+        <div class="splitter h" data-split="left"></div>
+        <div class="pane" id="paneTags">
+          <div class="pane-head"><span class="pane-title" id="tagsTitle">Tags der gewählten PDF</span>
+            <div class="strip">
+              <button class="tb toggle" data-cmd="dups">Nur doppelte</button>
+              <button class="tb" data-cmd="reset">Filter zurücksetzen</button>
+              <button class="tb" data-cmd="prev" title="Umschalt+F3">◀</button>
+              <button class="tb" data-cmd="next" title="F3">▶ Fundstelle</button>
+              <button class="tb" data-cmd="review">Excel</button>
+              <button class="tb" data-cmd="redline">Redline</button>
+            </div>
+          </div>
+          <div class="table" id="tblTags"></div>
+        </div>
+      </div>
+      <div class="splitter v" data-split="main"></div>
+      <div class="pane pid-right">
+        <div class="pane-head"><span class="pane-title" id="viewerTitle">PDF-Viewer</span>
+          <div class="strip">
+            <button class="tb" data-cmd="fit" title="Ganze Seite (Doppelklick)">Einpassen</button>
+            <button class="tb" data-cmd="zoomIn">Zoom +</button>
+            <button class="tb" data-cmd="zoomOut">Zoom −</button>
+            <button class="tb" data-cmd="rotate">Drehen</button>
+            <button class="tb" data-cmd="mono" id="monoBtn" title="PDF schwarz-weiß anzeigen (nur Ansicht, die PDF bleibt unverändert)">Monochrom</button>
+            <span class="pager"><button class="tb" data-cmd="pagePrev">◀</button><span id="pageLabel">–</span><button class="tb" data-cmd="pageNext">▶</button></span>
+            <button class="tb" data-cmd="prev">◀</button>
+            <button class="tb" data-cmd="next">▶ Fundstelle</button>
+            <button class="tb" data-cmd="redline">Redline</button>
+            <button class="tb" data-cmd="openPdf" title="Original-PDF in neuem Browser-Tab öffnen">Öffnen</button>
+          </div>
+        </div>
+        <div class="viewer" id="viewer"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sheet" id="sheet-all">
+    <div class="sheet-head">
+      <span class="sheet-title">Alle Tags</span>
+      <input class="sheet-filter" id="allFilter" type="search" placeholder="Filter über das ganze Blatt …">
+      <span class="sheet-note">Doppelklick öffnet die PDF beim Tag</span>
+    </div>
+    <div class="pane full"><div class="table" id="tblAll"></div></div>
+  </section>
+</main>
+
+<footer class="statusbar"><span id="status">Bereit.</span><span id="statusRight"></span></footer>
+
+<input type="file" id="fileInput" accept=".pdf,application/pdf" multiple hidden>
+<div class="drop-hint" id="dropHint">PDFs hier ablegen zum Hochladen</div>
+<div class="modal-back" id="modalBack"><div class="modal" id="modal"></div></div>
+
+<script src="app.js"></script>
+</body>
+</html>

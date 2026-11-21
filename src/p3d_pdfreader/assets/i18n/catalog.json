@@ -1,0 +1,665 @@
+{
+ "_info": "Schluessel = deutscher Originaltext (Standardsprache). Je Eintrag en/fr. Fehlende Texte bleiben deutsch.",
+ "Menüband": {
+  "P&ID-PDF-Reader": {
+   "en": "P&ID PDF Reader",
+   "fr": "Lecteur PDF P&ID"
+  },
+  "1  Einlesen": {
+   "en": "1  Import",
+   "fr": "1  Importer"
+  },
+  "2  Prüfen": {
+   "en": "2  Check",
+   "fr": "2  Contrôler"
+  },
+  "3  Review / Redline": {
+   "en": "3  Review / Redline",
+   "fr": "3  Revue / Redline"
+  },
+  "4  Export": {
+   "en": "4  Export",
+   "fr": "4  Export"
+  },
+  "Ansicht": {
+   "en": "View",
+   "fr": "Affichage"
+  },
+  "Einstellungen": {
+   "en": "Settings",
+   "fr": "Paramètres"
+  },
+  "Hilfe": {
+   "en": "Help",
+   "fr": "Aide"
+  },
+  "Quellordner\nscannen": {
+   "en": "Scan source\nfolders",
+   "fr": "Analyser les\ndossiers source"
+  },
+  "Quellordner scannen": {
+   "en": "Scan source folders",
+   "fr": "Analyser les dossiers source"
+  },
+  "Ordner\nöffnen …": {
+   "en": "Open\nfolder …",
+   "fr": "Ouvrir un\ndossier …"
+  },
+  "Ordner öffnen …": {
+   "en": "Open folder …",
+   "fr": "Ouvrir un dossier …"
+  },
+  "Dateien\nöffnen …": {
+   "en": "Open\nfiles …",
+   "fr": "Ouvrir des\nfichiers …"
+  },
+  "Dateien öffnen …": {
+   "en": "Open files …",
+   "fr": "Ouvrir des fichiers …"
+  },
+  "Rohr-\nleitungen": {
+   "en": "Pipe\nlines",
+   "fr": "Tuyau-\nteries"
+  },
+  "Rohrleitungsnummern mit einlesen": {
+   "en": "Include pipe line numbers",
+   "fr": "Inclure les numéros de ligne"
+  },
+  "Rohrleitungsnummern (z. B. TFHR_SS01_001_1\") als Typ „Rohrleitung“ in die Tag-Liste übernehmen – waagerecht und senkrecht beschriftet. Umschalten liest die PDFs neu ein.": {
+   "en": "Add pipe line numbers (e.g. TFHR_SS01_001_1\") to the tag list as type “Rohrleitung” – labelled horizontally or vertically. Switching re-reads the PDFs.",
+   "fr": "Ajouter les numéros de ligne (p. ex. TFHR_SS01_001_1\") à la liste des tags, type « Rohrleitung » – écrits horizontalement ou verticalement. Le changement relit les PDF."
+  },
+  "Fundstelle\nzurück": {
+   "en": "Previous\noccurrence",
+   "fr": "Occurrence\nprécédente"
+  },
+  "Fundstelle zurück": {
+   "en": "Previous occurrence",
+   "fr": "Occurrence précédente"
+  },
+  "Fundstelle\nweiter": {
+   "en": "Next\noccurrence",
+   "fr": "Occurrence\nsuivante"
+  },
+  "Fundstelle weiter": {
+   "en": "Next occurrence",
+   "fr": "Occurrence suivante"
+  },
+  "Nur doppelte\nTags": {
+   "en": "Duplicate\ntags only",
+   "fr": "Tags en double\nseulement"
+  },
+  "Nur doppelte Tags": {
+   "en": "Duplicate tags only",
+   "fr": "Tags en double seulement"
+  },
+  "Filter\nzurücksetzen": {
+   "en": "Reset\nfilters",
+   "fr": "Réinitialiser\nles filtres"
+  },
+  "Filter zurücksetzen": {
+   "en": "Reset filters",
+   "fr": "Réinitialiser les filtres"
+  },
+  "Tabelle\nbearbeiten": {
+   "en": "Edit\ntable",
+   "fr": "Modifier\nle tableau"
+  },
+  "Tabelle bearbeiten": {
+   "en": "Edit table",
+   "fr": "Modifier le tableau"
+  },
+  "Review\nspeichern": {
+   "en": "Save\nreview",
+   "fr": "Enregistrer\nla revue"
+  },
+  "Review speichern": {
+   "en": "Save review",
+   "fr": "Enregistrer la revue"
+  },
+  "Review\nAuswahl/Bulk …": {
+   "en": "Review\nselection/bulk …",
+   "fr": "Revue\nsélection/lot …"
+  },
+  "Review Auswahl/Bulk …": {
+   "en": "Review selection/bulk …",
+   "fr": "Revue sélection/lot …"
+  },
+  "Redline-PDF\ngewählte PDF": {
+   "en": "Redline PDF\nselected PDF",
+   "fr": "PDF redline\nPDF choisi"
+  },
+  "Redline-PDF gewählte PDF": {
+   "en": "Redline PDF selected PDF",
+   "fr": "PDF redline PDF choisi"
+  },
+  "Review-Excel\ngewählte PDF": {
+   "en": "Review Excel\nselected PDF",
+   "fr": "Excel de revue\nPDF choisi"
+  },
+  "Review-Excel gewählte PDF": {
+   "en": "Review Excel selected PDF",
+   "fr": "Excel de revue PDF choisi"
+  },
+  "Export\nExcel …": {
+   "en": "Export\nExcel …",
+   "fr": "Exporter\nExcel …"
+  },
+  "Export Excel …": {
+   "en": "Export Excel …",
+   "fr": "Exporter Excel …"
+  },
+  "Export\nCSV …": {
+   "en": "Export\nCSV …",
+   "fr": "Exporter\nCSV …"
+  },
+  "Export CSV …": {
+   "en": "Export CSV …",
+   "fr": "Exporter CSV …"
+  },
+  "Export-\nordner": {
+   "en": "Export\nfolder",
+   "fr": "Dossier\nd'export"
+  },
+  "Export- ordner": {
+   "en": "Export folder",
+   "fr": "Dossier d'export"
+  },
+  "PID-Tags": {
+   "en": "P&ID tags",
+   "fr": "Tags P&ID"
+  },
+  "Alle Tags": {
+   "en": "All tags",
+   "fr": "Tous les tags"
+  },
+  "Viewer\n2. Monitor": {
+   "en": "Viewer\n2nd monitor",
+   "fr": "Visionneuse\n2e écran"
+  },
+  "Viewer 2. Monitor": {
+   "en": "Viewer 2nd monitor",
+   "fr": "Visionneuse 2e écran"
+  },
+  "Tabellen-\nVorschau …": {
+   "en": "Table\npreview …",
+   "fr": "Aperçu du\ntableau …"
+  },
+  "Tabellen- Vorschau …": {
+   "en": "Table preview …",
+   "fr": "Aperçu du tableau …"
+  },
+  "Pfade": {
+   "en": "Paths",
+   "fr": "Chemins"
+  },
+  "Tag-\nMuster": {
+   "en": "Tag\npatterns",
+   "fr": "Modèles\nde tags"
+  },
+  "Tag- Muster": {
+   "en": "Tag patterns",
+   "fr": "Modèles de tags"
+  },
+  "Tag-Muster": {
+   "en": "Tag patterns",
+   "fr": "Modèles de tags"
+  },
+  "Handbuch": {
+   "en": "Manual",
+   "fr": "Manuel"
+  },
+  "Info": {
+   "en": "About",
+   "fr": "À propos"
+  },
+  "Sprache": {
+   "en": "Language",
+   "fr": "Langue"
+  },
+  "Sprache der Oberfläche: Deutsch, English, Français": {
+   "en": "User interface language: Deutsch, English, Français",
+   "fr": "Langue de l'interface : Deutsch, English, Français"
+  }
+ },
+ "Blätter": {
+  "Plant-3D-PDF-Plots: Dateien, Tags je PDF und Seitenvorschau": {
+   "en": "Plant 3D PDF plots: files, tags per PDF and page preview",
+   "fr": "Tracés PDF Plant 3D : fichiers, tags par PDF et aperçu"
+  },
+  "Tags aller gescannten PDFs": {
+   "en": "Tags of all scanned PDFs",
+   "fr": "Tags de tous les PDF analysés"
+  },
+  "Dateien": {
+   "en": "Files",
+   "fr": "Fichiers"
+  },
+  "Tags": {
+   "en": "Tags",
+   "fr": "Tags"
+  },
+  "Tags der gewählten PDF": {
+   "en": "Tags of the selected PDF",
+   "fr": "Tags du PDF choisi"
+  },
+  "Tags aller PDFs": {
+   "en": "Tags of all PDFs",
+   "fr": "Tags de tous les PDF"
+  },
+  "In dieser Tabelle filtern …": {
+   "en": "Filter this table …",
+   "fr": "Filtrer ce tableau …"
+  },
+  "{0} / {1} Zeilen": {
+   "en": "{0} / {1} rows",
+   "fr": "{0} / {1} lignes"
+  },
+  "Blatt schließen": {
+   "en": "Close sheet",
+   "fr": "Fermer la feuille"
+  },
+  "Hilfe zu dieser Ansicht (F1)": {
+   "en": "Help for this view (F1)",
+   "fr": "Aide pour cette vue (F1)"
+  },
+  "QUELLE": {
+   "en": "SOURCE",
+   "fr": "SOURCE"
+  },
+  "PDFS": {
+   "en": "PDFS",
+   "fr": "PDF"
+  },
+  "TAGS": {
+   "en": "TAGS",
+   "fr": "TAGS"
+  },
+  "FEHLER": {
+   "en": "ERRORS",
+   "fr": "ERREURS"
+  },
+  "Alle markieren": {
+   "en": "Select all",
+   "fr": "Tout sélectionner"
+  },
+  "Alle PDFs der Liste markieren": {
+   "en": "Select all PDFs in the list",
+   "fr": "Sélectionner tous les PDF de la liste"
+  },
+  "Review markierte …": {
+   "en": "Review selected …",
+   "fr": "Revue de la sélection …"
+  },
+  "Markierte PDFs prüfen: Redline-PDF, Excel je PDF, Gesamt-Excel": {
+   "en": "Review selected PDFs: redline PDF, Excel per PDF, overall Excel",
+   "fr": "Contrôler les PDF sélectionnés : PDF redline, Excel par PDF, Excel global"
+  },
+  "Excel": {
+   "en": "Excel",
+   "fr": "Excel"
+  },
+  "Dateiliste als Excel sichern": {
+   "en": "Save file list as Excel",
+   "fr": "Enregistrer la liste des fichiers en Excel"
+  },
+  "Bearbeiten": {
+   "en": "Edit",
+   "fr": "Modifier"
+  },
+  "Speichern": {
+   "en": "Save",
+   "fr": "Enregistrer"
+  },
+  "Speichern *": {
+   "en": "Save *",
+   "fr": "Enregistrer *"
+  },
+  "Bearbeiten-Modus: Review, Änderung, Neuer Wert, Bemerkung, WPO eintragen (Datum und User werden automatisch gesetzt)": {
+   "en": "Edit mode: enter Review, Change, New value, Remark, WPO (date and user are set automatically)",
+   "fr": "Mode édition : saisir Revue, Modification, Nouvelle valeur, Remarque, WPO (date et utilisateur automatiques)"
+  },
+  "Review-Einträge dieser PDF speichern (Strg+S)": {
+   "en": "Save the review entries of this PDF (Ctrl+S)",
+   "fr": "Enregistrer les entrées de revue de ce PDF (Ctrl+S)"
+  },
+  "Nur doppelte": {
+   "en": "Duplicates only",
+   "fr": "Doublons seulement"
+  },
+  "Nur Tags zeigen, die mehrfach in der PDF vorkommen (gelb)": {
+   "en": "Show only tags that occur more than once on a page (yellow)",
+   "fr": "N'afficher que les tags présents plusieurs fois sur une page (jaune)"
+  },
+  "Fundstelle": {
+   "en": "Occurrence",
+   "fr": "Occurrence"
+  },
+  "Nächste Fundstelle (F3)": {
+   "en": "Next occurrence (F3)",
+   "fr": "Occurrence suivante (F3)"
+  },
+  "Vorherige Fundstelle (Umschalt+F3)": {
+   "en": "Previous occurrence (Shift+F3)",
+   "fr": "Occurrence précédente (Maj+F3)"
+  },
+  "Nächste Fundstelle (F3, oder erneut auf den Tag klicken)": {
+   "en": "Next occurrence (F3, or click the tag again)",
+   "fr": "Occurrence suivante (F3, ou cliquer de nouveau sur le tag)"
+  },
+  "Tags der PDF als Excel sichern (Name: PDF + Zeitstempel)": {
+   "en": "Save the PDF's tags as Excel (name: PDF + timestamp)",
+   "fr": "Enregistrer les tags du PDF en Excel (nom : PDF + horodatage)"
+  },
+  "Redline": {
+   "en": "Redline",
+   "fr": "Redline"
+  },
+  "Redline-PDF mit den sichtbaren Tags": {
+   "en": "Redline PDF with the visible tags",
+   "fr": "PDF redline avec les tags visibles"
+  },
+  "Tabelle als Excel sichern (sichtbare Spalten und gefilterte Zeilen)\nDateiname: PDF-Name bzw. Tabellenname + Zeitstempel": {
+   "en": "Save table as Excel (visible columns and filtered rows)\nFile name: PDF or table name + timestamp",
+   "fr": "Enregistrer le tableau en Excel (colonnes visibles, lignes filtrées)\nNom : nom du PDF ou du tableau + horodatage"
+  },
+  "{0} doppelte Tag(s) gelb hinterlegt": {
+   "en": "{0} duplicate tag(s) highlighted yellow",
+   "fr": "{0} tag(s) en double surlignés en jaune"
+  },
+  "Rechtsklick: Subtabs aus": {
+   "en": "Right-click: subtabs off",
+   "fr": "Clic droit : désactiver les sous-onglets"
+  },
+  "Subtabs aus (zurück zur Gesamttabelle)": {
+   "en": "Subtabs off (back to the full table)",
+   "fr": "Désactiver les sous-onglets (tableau complet)"
+  },
+  "Filter - {0}\nTippen filtert nach Inhalt, Doppelklick wählt exakte Werte.": {
+   "en": "Filter - {0}\nTyping filters by content, double-click selects exact values.",
+   "fr": "Filtre - {0}\nSaisir filtre le contenu, double-clic choisit des valeurs exactes."
+  }
+ },
+ "Spalten": {
+  "PDF": {
+   "en": "PDF",
+   "fr": "PDF"
+  },
+  "Zeichnungsnr.": {
+   "en": "Drawing no.",
+   "fr": "N° de plan"
+  },
+  "Erstellt (PDF)": {
+   "en": "Created (PDF)",
+   "fr": "Créé (PDF)"
+  },
+  "Ersteller": {
+   "en": "Author",
+   "fr": "Auteur"
+  },
+  "Checked": {
+   "en": "Checked",
+   "fr": "Vérifié"
+  },
+  "Rev": {
+   "en": "Rev",
+   "fr": "Rév"
+  },
+  "Rev-Datum": {
+   "en": "Rev date",
+   "fr": "Date rév"
+  },
+  "Rev-Text": {
+   "en": "Rev text",
+   "fr": "Texte rév"
+  },
+  "Plot-Benutzer": {
+   "en": "Plot user",
+   "fr": "Utilisateur du tracé"
+  },
+  "Anzahl Tags": {
+   "en": "Tag count",
+   "fr": "Nombre de tags"
+  },
+  "Fehler": {
+   "en": "Error",
+   "fr": "Erreur"
+  },
+  "Typ": {
+   "en": "Type",
+   "fr": "Type"
+  },
+  "Tag": {
+   "en": "Tag",
+   "fr": "Tag"
+  },
+  "Anzahl": {
+   "en": "Count",
+   "fr": "Nombre"
+  },
+  "Seiten": {
+   "en": "Pages",
+   "fr": "Pages"
+  },
+  "Review": {
+   "en": "Review",
+   "fr": "Revue"
+  },
+  "Änderung": {
+   "en": "Change",
+   "fr": "Modification"
+  },
+  "Neuer Wert": {
+   "en": "New value",
+   "fr": "Nouvelle valeur"
+  },
+  "Bemerkung": {
+   "en": "Remark",
+   "fr": "Remarque"
+  },
+  "WPO": {
+   "en": "WPO",
+   "fr": "WPO"
+  },
+  "Datum": {
+   "en": "Date",
+   "fr": "Date"
+  },
+  "User": {
+   "en": "User",
+   "fr": "Utilisateur"
+  }
+ },
+ "PDF-Viewer": {
+  "Einpassen": {
+   "en": "Fit",
+   "fr": "Ajuster"
+  },
+  "Ganze Seite zeigen (Doppelklick in die Vorschau)": {
+   "en": "Show whole page (double-click in the preview)",
+   "fr": "Afficher la page entière (double-clic dans l'aperçu)"
+  },
+  "Vergrößern (Mausrad)": {
+   "en": "Zoom in (mouse wheel)",
+   "fr": "Agrandir (molette)"
+  },
+  "Verkleinern (Mausrad)": {
+   "en": "Zoom out (mouse wheel)",
+   "fr": "Réduire (molette)"
+  },
+  "Drehen": {
+   "en": "Rotate",
+   "fr": "Pivoter"
+  },
+  "Ansicht 90° nach links drehen": {
+   "en": "Rotate view 90° left",
+   "fr": "Pivoter la vue de 90° à gauche"
+  },
+  "Ansicht 90° nach rechts drehen": {
+   "en": "Rotate view 90° right",
+   "fr": "Pivoter la vue de 90° à droite"
+  },
+  "Seite –": {
+   "en": "Page –",
+   "fr": "Page –"
+  },
+  "Seite {0} / {1}": {
+   "en": "Page {0} / {1}",
+   "fr": "Page {0} / {1}"
+  },
+  "Vorherige Seite (Bild ↑)": {
+   "en": "Previous page (Page ↑)",
+   "fr": "Page précédente (Page ↑)"
+  },
+  "Nächste Seite (Bild ↓)": {
+   "en": "Next page (Page ↓)",
+   "fr": "Page suivante (Page ↓)"
+  },
+  "Redline-PDF der gewählten PDF (sichtbare Tags)": {
+   "en": "Redline PDF of the selected PDF (visible tags)",
+   "fr": "PDF redline du PDF choisi (tags visibles)"
+  },
+  "Öffnen": {
+   "en": "Open",
+   "fr": "Ouvrir"
+  },
+  "PDF im Standardprogramm öffnen": {
+   "en": "Open PDF in the default program",
+   "fr": "Ouvrir le PDF dans le programme par défaut"
+  },
+  "2. Monitor": {
+   "en": "2nd monitor",
+   "fr": "2e écran"
+  },
+  "PDF-Viewer in eigenem Fenster auf dem zweiten Monitor zeigen": {
+   "en": "Show the PDF viewer in its own window on the second monitor",
+   "fr": "Afficher la visionneuse dans une fenêtre sur le deuxième écran"
+  },
+  "PDF-Viewer ist auf dem zweiten Monitor.": {
+   "en": "The PDF viewer is on the second monitor.",
+   "fr": "La visionneuse PDF est sur le deuxième écran."
+  },
+  "Viewer zurückholen": {
+   "en": "Bring viewer back",
+   "fr": "Rapatrier la visionneuse"
+  },
+  "P3D PDF Reader – PDF-Viewer": {
+   "en": "P3D PDF Reader – PDF viewer",
+   "fr": "P3D PDF Reader – visionneuse PDF"
+  }
+ },
+ "Dialoge": {
+  "Review / Audit": {
+   "en": "Review / audit",
+   "fr": "Revue / audit"
+  },
+  "PDFs": {
+   "en": "PDFs",
+   "fr": "PDF"
+  },
+  "Markierte PDFs ({0})": {
+   "en": "Selected PDFs ({0})",
+   "fr": "PDF sélectionnés ({0})"
+  },
+  "Alle gescannten PDFs ({0})": {
+   "en": "All scanned PDFs ({0})",
+   "fr": "Tous les PDF analysés ({0})"
+  },
+  "Mehrere PDFs in der Dateiliste mit Strg- oder Umschalt-Klick markieren.": {
+   "en": "Select several PDFs in the file list with Ctrl- or Shift-click.",
+   "fr": "Sélectionner plusieurs PDF avec Ctrl- ou Maj-clic dans la liste."
+  },
+  "Ausgaben": {
+   "en": "Outputs",
+   "fr": "Sorties"
+  },
+  "Redline-PDF je PDF (Kommentar an jeder Fundstelle, doppelte Tags orange)": {
+   "en": "Redline PDF per PDF (comment at every occurrence, duplicate tags orange)",
+   "fr": "PDF redline par PDF (commentaire à chaque occurrence, doublons en orange)"
+  },
+  "Review-Excel je PDF (Pos.-Nr., Review-Kommentar, Prüfstatus, Bemerkung)": {
+   "en": "Review Excel per PDF (item no., review comment, status, remark)",
+   "fr": "Excel de revue par PDF (n° de pos., commentaire, statut, remarque)"
+  },
+  "Review-Excel gesamt über alle gewählten PDFs": {
+   "en": "Overall review Excel for all selected PDFs",
+   "fr": "Excel de revue global pour tous les PDF choisis"
+  },
+  "Eigenen Unterordner „Review_<Zeitstempel>“ anlegen": {
+   "en": "Create a subfolder \"Review_<timestamp>\"",
+   "fr": "Créer un sous-dossier « Review_<horodatage> »"
+  },
+  "Zielordner": {
+   "en": "Target folder",
+   "fr": "Dossier cible"
+  },
+  "Review starten": {
+   "en": "Start review",
+   "fr": "Lancer la revue"
+  },
+  "Pfade verwalten": {
+   "en": "Manage paths",
+   "fr": "Gérer les chemins"
+  },
+  "PDF-Quellordner (werden beim Scan durchsucht, inkl. Unterordner)": {
+   "en": "PDF source folders (searched when scanning, including subfolders)",
+   "fr": "Dossiers source PDF (analysés avec leurs sous-dossiers)"
+  },
+  "Hinzufügen": {
+   "en": "Add",
+   "fr": "Ajouter"
+  },
+  "Entfernen": {
+   "en": "Remove",
+   "fr": "Supprimer"
+  },
+  "Im Explorer": {
+   "en": "In Explorer",
+   "fr": "Dans l'Explorateur"
+  },
+  "Export und Speicherorte": {
+   "en": "Export and storage locations",
+   "fr": "Export et emplacements"
+  },
+  "Exportordner": {
+   "en": "Export folder",
+   "fr": "Dossier d'export"
+  },
+  "Datenordner": {
+   "en": "Data folder",
+   "fr": "Dossier de données"
+  },
+  "Konfiguration": {
+   "en": "Configuration",
+   "fr": "Configuration"
+  },
+  "Logs": {
+   "en": "Logs",
+   "fr": "Journaux"
+  },
+  "Datenordner über Umgebungsvariable P3D_PDFREADER_HOME änderbar.": {
+   "en": "The data folder can be changed with the environment variable P3D_PDFREADER_HOME.",
+   "fr": "Le dossier de données se change via la variable d'environnement P3D_PDFREADER_HOME."
+  },
+  "Review-Einträge": {
+   "en": "Review entries",
+   "fr": "Entrées de revue"
+  },
+  "Verwerfen": {
+   "en": "Discard",
+   "fr": "Ignorer"
+  },
+  "Abbrechen": {
+   "en": "Cancel",
+   "fr": "Annuler"
+  },
+  "Nur gefilterte ({0})": {
+   "en": "Filtered only ({0})",
+   "fr": "Filtrés seulement ({0})"
+  },
+  "Alle Tags ({0})": {
+   "en": "All tags ({0})",
+   "fr": "Tous les tags ({0})"
+  }
+ }
+}
