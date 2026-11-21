@@ -36,8 +36,11 @@ def _group_titles(ribbon) -> list[str]:
 def test_group_heads_on_top_and_settings_after_einlesen(window):
     groups = _group_titles(window.ribbon)
     titles = [g.title.text() for g in groups]
-    assert titles.index("Einstellungen") == titles.index("1  Einlesen") + 1
-    assert titles.index("2  Prüfen") == titles.index("Einstellungen") + 1
+    # Nutzervorgabe 2026-11-21: Einstellungen in der Gruppe Projekt, Ansicht vor Pruefen, neu nummeriert
+    assert titles == ["Projekt", "1  Einlesen", "2  Ansicht", "3  Prüfen", "4  Review / Redline", "5  Export", "Hilfe"]
+    project = groups[0]
+    keys = [k for k, b in window.ribbon.buttons.items() if project.isAncestorOf(b)]
+    assert keys == ["project_mode", "project_pick", "project_defs", "paths", "patterns"]
     for group in groups:
         assert group.layout().indexOf(group.title) == 0
         assert group.title.objectName() == "RibbonGroupHead"

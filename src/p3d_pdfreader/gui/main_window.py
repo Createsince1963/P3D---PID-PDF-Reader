@@ -20,7 +20,7 @@ from main_gui_kit.buttons import ButtonKind, action_button
 from main_gui_kit.preview import DataPreviewDialog
 from main_gui_kit.tables import (MultiColumnFilterProxy, TableAdminBar, TableDataModel, configure_table_view,
                                  table_zoom_slider)
-from main_gui_kit.theme import ThemeManager
+from main_gui_kit.theme import LIGHT, ThemeManager
 
 from .. import i18n, paths
 from ..constants import APP_NAME
@@ -28,7 +28,7 @@ from ..core import export, redline, review
 from ..core.extract import PdfResult
 from ..core.project_defs import CHECK_HEADERS, ProjectDB, is_fault_status
 from ..core.review_store import CHANGE_VALUES, EDIT_FIELDS, FIELDS, REVIEW_VALUES, ReviewStore, status_hits
-from . import appearance, last_paths, table_views
+from . import appearance, icons, last_paths, table_views
 from .design import NOTE_QSS
 from .paths_dialog import PathsDialog, open_in_explorer
 from . import project_dialog
@@ -585,8 +585,9 @@ class MainWindow(QMainWindow):
 
     # --- Menueband -----------------------------------------------------------------------------------------------
     def _build_ribbon(self) -> Ribbon:
-        """Menueband nach Arbeitsschritten: 1 Einlesen -> 2 Pruefen -> 3 Review/Redline -> 4 Export; dann Ansicht,
-        Hilfe. Einstellungen stehen direkt nach 1 Einlesen; jede Gruppe hat eine dunkelblaue Ueberschrift. Jede Funktion als Symbol (Glyphen-Ergaenzung in ``toolstrip``)."""
+        """Menueband: Projekt (mit den Einstellungen Pfade/Tag-Muster), dann die Arbeitsschritte 1 Einlesen -> 2 Ansicht
+        -> 3 Pruefen -> 4 Review/Redline -> 5 Export, zuletzt Hilfe (Nutzervorgabe 2026-11-21). Jede Gruppe hat eine
+        dunkelblaue Ueberschrift. Jede Funktion als Symbol (Glyphen-Ergaenzung in ``toolstrip``)."""
         r = Ribbon("P&ID-PDF-Reader")
         # Projekt: Modus ein/aus (Standard ohne Projektdefinitionen), Projekt waehlen, Verwaltung der Definitionen
         g = r.group("Projekt")
@@ -600,6 +601,9 @@ class MainWindow(QMainWindow):
         g.large("project_defs", "Projekt-\ndefinitionen …", "defs", self.edit_project_definitions)
         r.buttons["project_defs"].setToolTip("Projektdefinitionen verwalten: Codelisten, Listen, Tag-Strukturen, "
                                              "Prüfregeln, Excel, Übernahme aus Tag Compliance")
+        # Einstellungen gehoeren zur Gruppe Projekt (Nutzervorgabe 2026-11-21)
+        g.large("paths", "Pfade", "settings", self.edit_paths)
+        g.large("patterns", "Tag-\nMuster", "header", lambda: open_in_explorer(paths.patterns_file()))
         g = r.group("1  Einlesen")
         g.large("scan", "Quellordner\nscannen", "scan", lambda: self.scan(None))
         g.large("folder", "Ordner\nöffnen …", "folder", self._pick_folder)
@@ -611,11 +615,12 @@ class MainWindow(QMainWindow):
         self.pipe_action.setChecked(bool(last_paths.get_value(PIPES_KEY, False)))
         g.large("pipes", "Rohr-\nleitungen", "pipe", lambda: None, self.pipe_menu)
         r.buttons["pipes"].setToolTip(PIPES_TIP)
-        # Einstellungen direkt nach dem Einlesen (Nutzervorgabe 2026-11-21)
-        g = r.group("Einstellungen")
-        g.large("paths", "Pfade", "settings", self.edit_paths)
-        g.large("patterns", "Tag-\nMuster", "header", lambda: open_in_explorer(paths.patterns_file()))
-        g = r.group("2  Prüfen")
+        g = r.group("2  Ansicht")
+        g.large("sheet_tags", "PID-Tags", "start", lambda: self.tabs.setCurrentWidget(self.page))
+        g.large("sheet_all", "Alle Tags", "reports", self.show_all_tags)
+        g.large("monitor", "Viewer\n2. Monitor", "monitor", self.page.viewer.monitor_button.toggle)
+        g.large("preview", "Tabellen-\nVorschau …", "columns", self.show_table_preview)
+        g = r.group("3  Prüfen")
         g.large("prev", "Fundstelle\nzurück", "prev", self.page.previous_occurrence)
         g.large("next", "Fundstelle\nweiter", "next", self.page.next_occurrence)
         g.large("dups", "Nur doppelte\nTags", "duplicates", self.page.dup_button.toggle)
@@ -623,19 +628,14 @@ class MainWindow(QMainWindow):
         g.large("filter_reset", "Filter\nzurücksetzen", "filter_reset", self._clear_filters)
         g.large("edit", "Tabelle\nbearbeiten", "rename", self.page.edit_button.toggle)
         g.large("save", "Review\nspeichern", "write", self.page.save_review)
-        g = r.group("3  Review / Redline")
+        g = r.group("4  Review / Redline")
         g.large("review", "Review\nAuswahl/Bulk …", "review", self.review)
         g.large("redline", "Redline-PDF\ngewählte PDF", "redline", self.redline_current)
         g.large("review_xlsx", "Review-Excel\ngewählte PDF", "excel_out", self.review_excel_current)
-        g = r.group("4  Export")
+        g = r.group("5  Export")
         g.large("xlsx", "Export\nExcel …", "excel_out", lambda: self.export("xlsx"))
         g.large("csv", "Export\nCSV …", "csv_out", lambda: self.export("csv"))
         g.large("open_exports", "Export-\nordner", "folder", lambda: open_in_explorer(paths.exports_dir()))
-        g = r.group("Ansicht")
-        g.large("sheet_tags", "PID-Tags", "start", lambda: self.tabs.setCurrentWidget(self.page))
-        g.large("sheet_all", "Alle Tags", "reports", self.show_all_tags)
-        g.large("monitor", "Viewer\n2. Monitor", "monitor", self.page.viewer.monitor_button.toggle)
-        g.large("preview", "Tabellen-\nVorschau …", "columns", self.show_table_preview)
         g = r.group("Hilfe")
         g.large("help", "Handbuch", "help", self.show_help)
         g.large("about", "Info", "info", self.show_about)
@@ -1027,6 +1027,9 @@ class MainWindow(QMainWindow):
         self.checker = self.project.checker() if on else None
         self.ribbon.buttons["project_mode"].setChecked(on)
         self.ribbon.set_text("project_mode", "Projekt-\nmodus: an" if on else "Projekt-\nmodus: aus")
+        # Symbol gruen, solange der Projektmodus an ist (Kit-Farbe ``ok``, Nutzervorgabe 2026-11-21)
+        self.ribbon.buttons["project_mode"].setIcon(icons.glyph_icon("project_mode", LIGHT.ok, 32) if on
+                                                    else icons.ribbon_icon("project_mode", 32))
         self.ribbon.set_enabled("deviations", on)
         self.page.fault_button.setEnabled(on)
         if not on:

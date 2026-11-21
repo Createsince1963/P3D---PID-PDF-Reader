@@ -14,6 +14,8 @@ a("Menüband", [
     ("P&ID-PDF-Reader", "P&ID PDF Reader", "Lecteur PDF P&ID"),
     ("1  Einlesen", "1  Import", "1  Importer"), ("2  Prüfen", "2  Check", "2  Contrôler"),
     ("3  Review / Redline", "3  Review / Redline", "3  Revue / Redline"), ("4  Export", "4  Export", "4  Export"),
+    ("2  Ansicht", "2  View", "2  Affichage"), ("3  Prüfen", "3  Check", "3  Contrôler"),
+    ("4  Review / Redline", "4  Review / Redline", "4  Revue / Redline"), ("5  Export", "5  Export", "5  Export"),
     ("Ansicht", "View", "Affichage"), ("Einstellungen", "Settings", "Paramètres"), ("Hilfe", "Help", "Aide"),
     ("Quellordner\nscannen", "Scan source\nfolders", "Analyser les\ndossiers source"),
     ("Quellordner scannen", "Scan source folders", "Analyser les dossiers source"),

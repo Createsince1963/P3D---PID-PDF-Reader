@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.14 – 2026-11-21
+- **Menüband neu geordnet:** Projekt (jetzt mit den Einstellungen Pfade und Tag-Muster) → 1 Einlesen → **2 Ansicht** → 3 Prüfen → 4 Review / Redline → 5 Export → Hilfe. Die eigene Gruppe „Einstellungen“ entfällt; „Ansicht“ steht vor „Prüfen“, die Gruppen sind neu nummeriert (Übersetzungen EN/FR ergänzt).
+- **Projektmodus an = grünes Symbol** (Kit-Farbe `ok`); aus = Standardsymbol.
+- Handbuch (Menüband-Nachbau, Schnellstart, Hilfebilder neu erzeugt) und README angepasst.
+- Tests: Gruppenreihenfolge, Knöpfe der Gruppe Projekt, Symbolfarbe beim Umschalten.
+
 ## 1.0.13 – 2026-11-21
 - **Projektdefinitionen wie in P3D Tag Compliance** (Vorlage: Fenster „Project definitions“, `pidtag_gui.py` + `linetag_defs_tiles.py`; neues Modul `gui\project_tiles.py`):
   - **Rechtsklick in eine Zelle:** Zeile hinzufügen, Zeile(n) duplizieren/löschen, Nach Code A–Z sortieren, Kopieren, Einfügen, Inhalt löschen, Nur Zeilen mit „Wert“ zeigen, Filter zurücksetzen, Kachel-Editor ein/aus, Ansicht nach Excel …, Rückgängig/Wiederholen.

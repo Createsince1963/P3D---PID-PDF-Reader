@@ -23,7 +23,7 @@ Ein PC oder Server startet den Web-Server, Kollegen öffnen die Adresse im Brows
   - Alternativ `start_web_server.bat` (ohne Argumente im Netzwerk erreichbar, Port 8765) oder `python -m p3d_pdfreader.web --host 0.0.0.0 --port 8765 [--source "\\server\freigabe\PID Plots"]`.
   - Beim ersten Start fragt Windows eventuell nach einer Firewall-Freigabe für Python.
 - **PDFs einlesen:**
-  - „Quellordner scannen“ (F5) liest die Quellordner des **Server-PCs**: `config\paths.json`, im Desktop-Tool unter Einstellungen › Pfade, plus `--source`. UNC-Freigaben sind möglich.
+  - „Quellordner scannen“ (F5) liest die Quellordner des **Server-PCs**: `config\paths.json`, im Desktop-Tool unter Projekt › Pfade, plus `--source`. UNC-Freigaben sind möglich.
   - „PDFs hochladen“ oder PDFs ins Browserfenster ziehen liest Dateien vom PC des Kollegen.
   - „Rohrleitungen“ schaltet das Einlesen der Rohrleitungsnummern ein.
 - **Funktionen wie in der Desktop-App:**
@@ -48,13 +48,12 @@ Ein PC oder Server startet den Web-Server, Kollegen öffnen die Adresse im Brows
 ## Arbeitsablauf (Menüband)
 | Gruppe | Funktionen |
 |---|---|
-| **Projekt** | Projektmodus an/aus, Projekt wählen (aus Tag Compliance übernehmen, öffnen, neu), Projektdefinitionen … |
+| **Projekt** | Projektmodus an/aus (an = Symbol grün), Projekt wählen (aus Tag Compliance übernehmen, öffnen, neu), Projektdefinitionen …, Einstellungen: Pfade, Tag-Muster |
 | **1 Einlesen** | Quellordner scannen (F5), Ordner öffnen, Dateien öffnen |
-| **Einstellungen** | Pfade, Tag-Muster |
-| **2 Prüfen** | Fundstelle zurück / weiter (Umschalt+F3 / F3), Nur doppelte Tags, Filter zurücksetzen |
-| **3 Review / Redline** | Review Auswahl/Bulk, Redline-PDF der gewählten PDF, Review-Excel der gewählten PDF |
-| **4 Export** | Export Excel, Export CSV, Exportordner öffnen |
-| **Ansicht** | Blätter „PID-Tags“ und „Alle Tags“, Viewer auf 2. Monitor, Tabellen-Vorschau |
+| **2 Ansicht** | Blätter „PID-Tags“ und „Alle Tags“, Viewer auf 2. Monitor, Tabellen-Vorschau |
+| **3 Prüfen** | Fundstelle zurück / weiter (Umschalt+F3 / F3), Nur doppelte Tags, Filter zurücksetzen |
+| **4 Review / Redline** | Review Auswahl/Bulk, Redline-PDF der gewählten PDF, Review-Excel der gewählten PDF |
+| **5 Export** | Export Excel, Export CSV, Exportordner öffnen |
 | **Hilfe** | Handbuch (interaktive HTML-Datei `assets\help\handbuch.html`), Info, **Sprache** (Deutsch / English / Français, wirkt sofort, wird gemerkt) |
 
 Jede Gruppe hat oben eine dunkelblaue Überschrift. Die direkten Funktionen sitzen zusätzlich als Tab-Buttons in Leisten über den Bereichen:
@@ -123,7 +122,7 @@ Die Ansicht jeder Tabelle wird automatisch gemerkt. Benannte Ansichten verwaltes
 | Rohrleitung (optional: Menüband › Rohrleitungen) | Regex `pipe_line` (`TFHR_SS01_001_1"`, `PFC_ST10_015_1/2"`), waagerecht und senkrecht; getrennte Teile (`… 1/2"`, `_205_1`) werden zusammengesetzt |
 | Gedrehte Plots | Wortpositionen werden in die sichtbare Lage umgerechnet (/Rotate 90/180/270) |
 
-Die Muster stehen in `data\config\tag_patterns.json` und werden beim ersten Start angelegt. Unter **Einstellungen › Tag-Muster** lassen sich Regex und Ausschlussliste für Kürzel anpassen, z. B. `MIN`, `HALF`, `SHORT`.
+Die Muster stehen in `data\config\tag_patterns.json` und werden beim ersten Start angelegt. Unter **Projekt › Tag-Muster** lassen sich Regex und Ausschlussliste für Kürzel anpassen, z. B. `MIN`, `HALF`, `SHORT`.
 
 Hinweis: Equipment steht oft zusätzlich in der Equipment-Tabelle am Blattfuß. Es erscheint dann als doppelter Tag, was gewollt sein kann.
 
@@ -134,7 +133,7 @@ Hinweis: Equipment steht oft zusätzlich in der Equipment-Tabelle am Blattfuß. 
   - `config\table_views.json`: gemerkte Tabellenansichten
   - `config\tag_patterns.json`
   - `logs\`, `exports\`
-- **Pfade-Dialog** (**Einstellungen › Pfade**): Quellordner hinzufügen oder entfernen (✓/✗ = vorhanden), Exportordner wählen, Speicherorte öffnen.
+- **Pfade-Dialog** (**Projekt › Pfade**): Quellordner hinzufügen oder entfernen (✓/✗ = vorhanden), Exportordner wählen, Speicherorte öffnen.
 - Pfade werden über `resolve()` normalisiert, das Subst-Laufwerk A: wird dabei zu C:. Es gibt keine festen Laufwerksbuchstaben.
 
 ## Aufbau

@@ -186,6 +186,21 @@ def _equipment_pdf(path: Path) -> Path:
     return path
 
 
+def _icon_green(button) -> bool:
+    """Hat das Symbol des Knopfs ueberwiegend gruene Pixel (Projektmodus an)?"""
+    image = button.icon().pixmap(32, 32).toImage()
+    green = other = 0
+    for x in range(image.width()):
+        for y in range(image.height()):
+            c = image.pixelColor(x, y)
+            if c.alpha() > 128:
+                if c.green() > c.red() + 40 and c.green() > c.blue() + 20:
+                    green += 1
+                else:
+                    other += 1
+    return green > other
+
+
 def test_gui_project_mode_toggle(tmp_path, monkeypatch):
     """Menueband: Projektmodus an -> Pruefspalten sichtbar, Abweichung rot; aus -> Standard wie bisher; gemerkt."""
     from PySide6.QtWidgets import QApplication
@@ -239,13 +254,15 @@ def test_gui_project_mode_toggle(tmp_path, monkeypatch):
     w.page.fault_button.setChecked(False)
     w.page._only_duplicates()
     assert {r[1]: r[CHECK_COL] for r in w.page.tags.rows()}["111XYZ01"] == OK
+    assert _icon_green(w.ribbon.buttons["project_mode"])                         # Symbol gruen, solange an
     w.ribbon.buttons["project_mode"].click()                                     # aus
     wait()
     assert w.checker is None and w.page.tags.table.isColumnHidden(CHECK_COL)
     assert "VHXXX" not in {r[1] for r in w.page.tags.rows()}
+    assert not _icon_green(w.ribbon.buttons["project_mode"])
     w.ribbon.buttons["project_mode"].click()                                     # wieder an (Projekt ist gemerkt)
     wait()
-    assert w.checker is not None
+    assert w.checker is not None and _icon_green(w.ribbon.buttons["project_mode"])
     w.close()
     w2 = MainWindow(app, "test")
     assert w2.checker is not None and w2.project.name == "P1"                    # Modus und Projekt gemerkt
