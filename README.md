@@ -36,18 +36,28 @@ Ein PC oder Server startet den Web-Server, Kollegen öffnen die Adresse im Brows
 - **Sicherheit:** Der Browser kann keine Pfade angeben. Gelesen wird nur, was in einem Quellordner liegt oder hochgeladen wurde. Es gibt keine Anmeldung: Wer die Adresse im Netz erreicht, kann das Tool nutzen. Den Server deshalb nur im Firmennetz betreiben.
 - **Noch nicht in der Web-Version:** Review-Spalten bearbeiten (Bearbeiten-Modus), Tabellenansichten speichern, Viewer auf 2. Monitor, Einstellungen (Pfade, Tag-Muster) im Browser, Sprachwahl. Diese Einstellungen erfolgen am Server-PC im Desktop-Tool.
 
+## Projektmodus (Projektdefinitionen wie P3D Tag Compliance)
+- **Aus (Standard):** das Tool arbeitet wie bisher mit den Tag-Mustern, ohne Projektregeln.
+- **An:** Jeder Tag wird gegen die Projektdefinitionen geprüft. Neue Spalten „Projekt-Prüfung“ (OK / Fehler) und „Projekt-Hinweis“, Filter „Nur Abweichungen“, Abweichungen im Viewer rot (außer Review „OK“ / „Nicht relevant“), Prüfspalten auch in Export und Review-Excel.
+- **Projekt wählen:** „Aus Tag Compliance übernehmen …“ liest die `pidtag_project.db` von P3D Tag Compliance (nur lesend) und legt ein Projekt in `<Datenordner>\projects` an. Alternativ Projekt öffnen oder neu anlegen.
+- **Projektdefinitionen …:** Codelisten, Listen, Tag-Strukturen und -Segmente, Notizen, Trennzeichen-Regel und die **PDF-Prüfregeln** (PDF-Tag-Typ → Tag-Struktur) bearbeiten; Listen anlegen, Spalten, Liste aus Excel; Excel-Export/-Import im Blattformat von Tag Compliance; „Tag testen“.
+- **Segment-Quellen:** Tabelle (`def_function_codes`), Liste mit Spalte (`list:media|Medium Code (Fluid)`), `const:TEXT`, `seq:3` (laufende Nummer), `free`. Ein Tag ist OK, wenn er zu einer Struktur seines Typs passt; sonst nennt der Hinweis das erste nicht passende Segment oder die Trennzeichen-Regel.
+- **Befunde (Spalte „Projekt-Prüfung“, kombinierbar mit „ + “):** „Regelfehler Projektdefinition“ (Trennzeichen oder Aufbau), „Code fehlt in Projektdefinition“ (Code nicht in der Liste), „Code unvollständig“ (Platzhalter `?`, X statt Ziffern wie `XXX`, `SSXX`, `ST1X`), dazu „mehrfach vorhanden“, wenn der Tag auf einer Seite mehrfach steht. Platzhalter-Tags werden nur im Projektmodus eingelesen.
+- Noch nicht in der Web-Version.
+
 ## Arbeitsablauf (Menüband)
 | Gruppe | Funktionen |
 |---|---|
+| **Projekt** | Projektmodus an/aus, Projekt wählen (aus Tag Compliance übernehmen, öffnen, neu), Projektdefinitionen … |
 | **1 Einlesen** | Quellordner scannen (F5), Ordner öffnen, Dateien öffnen |
+| **Einstellungen** | Pfade, Tag-Muster |
 | **2 Prüfen** | Fundstelle zurück / weiter (Umschalt+F3 / F3), Nur doppelte Tags, Filter zurücksetzen |
 | **3 Review / Redline** | Review Auswahl/Bulk, Redline-PDF der gewählten PDF, Review-Excel der gewählten PDF |
 | **4 Export** | Export Excel, Export CSV, Exportordner öffnen |
 | **Ansicht** | Blätter „PID-Tags“ und „Alle Tags“, Viewer auf 2. Monitor, Tabellen-Vorschau |
-| **Einstellungen** | Pfade, Tag-Muster |
-| **Hilfe** | Handbuch (diese Datei), Info, **Sprache** (Deutsch / English / Français, wirkt sofort, wird gemerkt) |
+| **Hilfe** | Handbuch (interaktive HTML-Datei `assets\help\handbuch.html`), Info, **Sprache** (Deutsch / English / Français, wirkt sofort, wird gemerkt) |
 
-Die direkten Funktionen sitzen zusätzlich als Tab-Buttons in Leisten über den Bereichen:
+Jede Gruppe hat oben eine dunkelblaue Überschrift. Die direkten Funktionen sitzen zusätzlich als Tab-Buttons in Leisten über den Bereichen:
 - **Dateien:** Alle markieren, Review markierte …, Excel
 - **Tags:** Nur doppelte, Filter zurücksetzen, ◀ ▶ Fundstelle, Excel, Redline
 - **PDF-Viewer:** Einpassen, Zoom ±, Drehen, ◀ ▶ Fundstelle, Redline, Öffnen (im Standardprogramm), 2. Monitor
@@ -76,6 +86,11 @@ Alle Tabellen folgen dem Standard aus `main_gui_kit`:
 - dunkelblauer Tabellenkopf
 
 Die Ansicht jeder Tabelle wird automatisch gemerkt. Benannte Ansichten verwaltest du über *Save / Load / Reset Layout*. Das **Excel-Symbol** oben links in der Tabelle sichert die sichtbare Ansicht als Excel oder CSV. Der Dateiname ist vorbelegt mit PDF- oder Tabellenname und Zeitstempel, z. B. `SGOPS-…-EQPM-001_Tags_2026-11-20_14-29.xlsx`.
+
+**Rechtsklick (wie P3D XCHANGE):**
+- **Zelle:** Kopieren, Zeile kopieren (mit/ohne Überschriften), nur diesen Wert zeigen, Filter der Spalte / alle Filter zurücksetzen, Spalten …, Nach Excel …
+- **Excel-Symbol:** Dialog „Spalten …“ (verschieben, ein-/ausblenden, Standard)
+- **Spaltenkopf:** ausblenden, verschieben, Ausrichtung, Ansicht zurücksetzen, Teilreiter
 
 ## Review / Redline
 - **Redline-PDF:** eine Kopie der PDF, das Original bleibt unverändert.

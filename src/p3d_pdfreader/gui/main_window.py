@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from PySide6.QtCore import QModelIndex, Qt, QThread
+from PySide6.QtCore import QModelIndex, Qt, QThread, QTimer
 from PySide6.QtGui import QBrush, QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QApplication, QComboBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu,
                                QMessageBox, QSplitter, QStatusBar, QStyledItemDelegate, QTabBar, QTableView,
@@ -26,17 +26,21 @@ from .. import i18n, paths
 from ..constants import APP_NAME
 from ..core import export, redline, review
 from ..core.extract import PdfResult
+from ..core.project_defs import CHECK_HEADERS, ProjectDB, is_fault_status
 from ..core.review_store import CHANGE_VALUES, EDIT_FIELDS, FIELDS, REVIEW_VALUES, ReviewStore, status_hits
 from . import appearance, last_paths, table_views
 from .design import NOTE_QSS
 from .paths_dialog import PathsDialog, open_in_explorer
+from . import project_dialog
 from .controls import indicator_qss
 from .icons import excel_icon
 from .progress import ProgressDialog
 from .review_dialog import ReviewDialog
 from .ribbon import Ribbon
+from .ribbon_heads import apply_group_heads
 from .sheet import SheetHeader, configure_subtabs, mark_active_filters, table_header_qss
 from .table_export import export_table_view, install_excel_corner
+from .table_menu import install_table_menus
 from .toolstrip import ToolStrip
 from .viewer_panel import ViewerPanel
 from .worker import ScanWorker
@@ -47,9 +51,16 @@ PIPES_TIP = ("Rohrleitungsnummern (z. B. TFHR_SS01_001_1\") als Typ „Rohrleitu
 
 FILE_COLS = ["PDF", "Zeichnungsnr.", "Erstellt (PDF)", "Ersteller", "Checked", "Rev", "Rev-Datum", "Rev-Text",
              "Plot-Benutzer", "Anzahl Tags", "Fehler"]
-TAG_COLS = ["Typ", "Tag", "Anzahl", "Seiten", *FIELDS]   # FIELDS: Review, Änderung, Neuer Wert, Bemerkung, WPO, Datum, User
+# FIELDS: Review, Änderung, Neuer Wert, Bemerkung, WPO, Datum, User; CHECK_HEADERS: Projekt-Prüfung, Projekt-Hinweis
+# (nur im Projektmodus sichtbar)
+TAG_COLS = ["Typ", "Tag", "Anzahl", "Seiten", *CHECK_HEADERS, *FIELDS]
 FIRST_FIELD = TAG_COLS.index(FIELDS[0])
-ALL_TAG_COLS = ["PDF", "Zeichnungsnr.", "Typ", "Tag", "Anzahl"]
+CHECK_COL = TAG_COLS.index(CHECK_HEADERS[0])
+ALL_TAG_COLS = ["PDF", "Zeichnungsnr.", "Typ", "Tag", "Anzahl", *CHECK_HEADERS]
+ALL_CHECK_COL = ALL_TAG_COLS.index(CHECK_HEADERS[0])
+PROJECT_MODE_KEY, PROJECT_DB_KEY = "project_mode", "project_db"     # config/state.json
+PROJECT_TIP = ("Projektmodus: Tags werden gegen die Projektdefinitionen geprüft (Codelisten und Tag-Strukturen wie in "
+               "P3D Tag Compliance). Aus = Standardmodus ohne Projektdefinitionen.")
 
 
 class DuplicateModel(TableDataModel):
@@ -198,7 +209,10 @@ class DataTable(QWidget):
         mark_active_filters(self.table.horizontalHeader())
         configure_subtabs(self.table)
         add_subtab_off_menu(self.table)
-        install_excel_corner(self.table, title)
+        excel = install_excel_corner(self.table, title)
+        # Rechtsklick wie P3D XCHANGE: Zellenmenue (Kopieren, Filtern, Spalten …) und Excel-Symbol > Spalten …
+        install_table_menus(self.table, excel, on_clear_all=self.clear_filters, on_filter=self._count,
+                            on_export=lambda: export_table_view(self.table, title))
         lay.addWidget(self.table, 1)
         bottom = QHBoxLayout()
         self.admin = TableAdminBar(self.table, table_views.store(), "named|" + key)
@@ -285,7 +299,8 @@ class TagsSheet(Sheet):
         self._store_result: PdfResult | None = None
         self.edit_mode = False
         self.tags = DataTable("tags", "Tags der gewählten PDF", TAG_COLS, count_col=2, model_factory=lambda h, rows, c, p:
-                              ReviewModel(h, rows, c, p, store=self.store, edit_mode=self.edit_mode))
+                              ReviewModel(h, rows, c, p, store=self.store, edit_mode=self.edit_mode,
+                                          first_field=FIRST_FIELD))
         self.tags.table.setItemDelegateForColumn(FIRST_FIELD, ChoiceDelegate(REVIEW_VALUES, False, self.tags.table))
         self.tags.table.setItemDelegateForColumn(FIRST_FIELD + 1, ChoiceDelegate(CHANGE_VALUES, True, self.tags.table))
         strip = ToolStrip("Tags")
@@ -298,6 +313,9 @@ class TagsSheet(Sheet):
         strip.separator()
         self.dup_button = strip.add("duplicates", "Nur doppelte", "duplicates", self._only_duplicates,
                                     "Nur Tags zeigen, die mehrfach in der PDF vorkommen (gelb)", checkable=True)
+        self.fault_button = strip.add("deviations", "Nur Abweichungen", "deviations", self._only_duplicates,
+                                      "Projektmodus: nur Tags mit Befund zeigen (Code unvollständig, Code fehlt, Regelfehler)",
+                                      checkable=True)
         strip.add("filter_reset", "Filter zurücksetzen", "filter_reset", self.reset_tag_filters)
         strip.separator()
         strip.add("prev", "", "prev", self.previous_occurrence, "Vorherige Fundstelle (Umschalt+F3)")
@@ -342,15 +360,25 @@ class TagsSheet(Sheet):
         result = self._store_result
         if result is None:
             return []
+        checker = self.win.checker
         return [[t.type, t.tag, t.count, t.pages_text,
+                 *(checker.columns(t.type, t.tag, t.count) if checker else ["", ""]),
                  *(self.store.values(t.type, t.tag) if self.store else [""] * len(FIELDS))]
                 for t in result.tags]
 
     def _only_duplicates(self, on: bool | None = None) -> None:
+        """Tag-Tabelle neu fuellen; Filter "Nur doppelte" und (Projektmodus) "Nur Abweichungen"."""
         on = self.dup_button.isChecked() if on is None else on
-        rows = self._tag_rows()
-        self.tags.set_rows([r for r in rows if r[2] > 1] if on else rows)
+        faults = self.fault_button.isChecked() and self.win.checker is not None
+        rows = [r for r in self._tag_rows() if (not on or r[2] > 1) and (not faults or is_fault_status(r[CHECK_COL]))]
+        self.tags.set_rows(rows)
+        self.win.apply_project_columns()
         self._hit = None
+
+    def show_status(self) -> None:
+        """Rahmen im Viewer: gruen korrekt, rot Review "Korrektur erforderlich" oder (Projektmodus) Abweichung."""
+        result = self._store_result
+        self.preview.show_status(*status_hits(result.tags if result else [], self.store, self.win.checker))
 
     # --- Bearbeiten-Modus / Speichern -----------------------------------------------------------------------------
     def set_edit_mode(self, on: bool) -> None:
@@ -372,8 +400,7 @@ class TagsSheet(Sheet):
         dirty = bool(self.store and self.store.dirty)
         self.save_button.setEnabled(dirty)
         self.save_button.setText(i18n.tr("Speichern *" if dirty else "Speichern"))
-        result = self._store_result
-        self.preview.show_status(*status_hits(result.tags if result else [], self.store))
+        self.show_status()
 
     def save_review(self) -> bool:
         if not (self.store and self.store.dirty):
@@ -411,6 +438,7 @@ class TagsSheet(Sheet):
 
     def reset_tag_filters(self) -> None:
         self.dup_button.setChecked(False)
+        self.fault_button.setChecked(False)
         self.tags.clear_filters()
 
     def current_result(self) -> PdfResult | None:
@@ -440,7 +468,7 @@ class TagsSheet(Sheet):
         self._store_changed()
         self.tags.proxy.sourceModel().dataChanged.connect(self._store_changed)
         self.preview.show_pdf(result.path if result else None)
-        self.preview.show_status(*status_hits(result.tags if result else [], self.store))
+        self.show_status()
         if result:
             self.preview.show_duplicates([t.hits for t in result.tags if t.duplicate])
         dups = sum(1 for t in result.tags if t.duplicate) if result else 0
@@ -524,6 +552,9 @@ class MainWindow(QMainWindow):
         self._thread: QThread | None = None
         self._worker: ScanWorker | None = None
         self._progress: ProgressDialog | None = None
+        self.project: ProjectDB | None = None          # Projektmodus: geoeffnete Projekt-Datenbank
+        self.checker = None                            # Projektmodus: Pruefung (project_defs.Checker), sonst None
+        self._scan_placeholders = False                # letzter Scan mit Platzhalter-Tags (nur Projektmodus)
 
         central = QWidget()
         root = QVBoxLayout(central)
@@ -548,14 +579,27 @@ class MainWindow(QMainWindow):
             self.tabs.tabBar().setTabButton(0, side, None)
         QShortcut(QKeySequence("F5"), self, activated=lambda: self.scan(None))
         QShortcut(QKeySequence.Save, self, activated=self.page.save_review)
+        self._restore_project()
         self._update_bands()
         self.statusBar().showMessage(f"Datenordner: {paths.home_dir()}", 8000)
 
     # --- Menueband -----------------------------------------------------------------------------------------------
     def _build_ribbon(self) -> Ribbon:
         """Menueband nach Arbeitsschritten: 1 Einlesen -> 2 Pruefen -> 3 Review/Redline -> 4 Export; dann Ansicht,
-        Einstellungen, Hilfe. Jede Funktion als Symbol (Glyphen-Ergaenzung in ``toolstrip``)."""
+        Hilfe. Einstellungen stehen direkt nach 1 Einlesen; jede Gruppe hat eine dunkelblaue Ueberschrift. Jede Funktion als Symbol (Glyphen-Ergaenzung in ``toolstrip``)."""
         r = Ribbon("P&ID-PDF-Reader")
+        # Projekt: Modus ein/aus (Standard ohne Projektdefinitionen), Projekt waehlen, Verwaltung der Definitionen
+        g = r.group("Projekt")
+        g.large("project_mode", "Projekt-\nmodus: aus", "project_mode", self.toggle_project_mode)
+        r.buttons["project_mode"].setCheckable(True)
+        r.buttons["project_mode"].setToolTip(PROJECT_TIP)
+        self.project_menu = QMenu(self)
+        self.project_menu.aboutToShow.connect(self._fill_project_menu)
+        g.large("project_pick", "Projekt\nwählen", "project", lambda: None, self.project_menu)
+        r.buttons["project_pick"].setToolTip("Projekt anlegen, öffnen oder aus P3D Tag Compliance übernehmen")
+        g.large("project_defs", "Projekt-\ndefinitionen …", "defs", self.edit_project_definitions)
+        r.buttons["project_defs"].setToolTip("Projektdefinitionen verwalten: Codelisten, Listen, Tag-Strukturen, "
+                                             "Prüfregeln, Excel, Übernahme aus Tag Compliance")
         g = r.group("1  Einlesen")
         g.large("scan", "Quellordner\nscannen", "scan", lambda: self.scan(None))
         g.large("folder", "Ordner\nöffnen …", "folder", self._pick_folder)
@@ -567,10 +611,15 @@ class MainWindow(QMainWindow):
         self.pipe_action.setChecked(bool(last_paths.get_value(PIPES_KEY, False)))
         g.large("pipes", "Rohr-\nleitungen", "pipe", lambda: None, self.pipe_menu)
         r.buttons["pipes"].setToolTip(PIPES_TIP)
+        # Einstellungen direkt nach dem Einlesen (Nutzervorgabe 2026-11-21)
+        g = r.group("Einstellungen")
+        g.large("paths", "Pfade", "settings", self.edit_paths)
+        g.large("patterns", "Tag-\nMuster", "header", lambda: open_in_explorer(paths.patterns_file()))
         g = r.group("2  Prüfen")
         g.large("prev", "Fundstelle\nzurück", "prev", self.page.previous_occurrence)
         g.large("next", "Fundstelle\nweiter", "next", self.page.next_occurrence)
         g.large("dups", "Nur doppelte\nTags", "duplicates", self.page.dup_button.toggle)
+        g.large("deviations", "Nur Projekt-\nabweichungen", "deviations", self.page.fault_button.toggle)
         g.large("filter_reset", "Filter\nzurücksetzen", "filter_reset", self._clear_filters)
         g.large("edit", "Tabelle\nbearbeiten", "rename", self.page.edit_button.toggle)
         g.large("save", "Review\nspeichern", "write", self.page.save_review)
@@ -587,9 +636,6 @@ class MainWindow(QMainWindow):
         g.large("sheet_all", "Alle Tags", "reports", self.show_all_tags)
         g.large("monitor", "Viewer\n2. Monitor", "monitor", self.page.viewer.monitor_button.toggle)
         g.large("preview", "Tabellen-\nVorschau …", "columns", self.show_table_preview)
-        g = r.group("Einstellungen")
-        g.large("paths", "Pfade", "settings", self.edit_paths)
-        g.large("patterns", "Tag-\nMuster", "header", lambda: open_in_explorer(paths.patterns_file()))
         g = r.group("Hilfe")
         g.large("help", "Handbuch", "help", self.show_help)
         g.large("about", "Info", "info", self.show_about)
@@ -603,6 +649,7 @@ class MainWindow(QMainWindow):
         self.lang_menu.aboutToShow.connect(self._mark_language)
         g.large("language", "Sprache", "language", lambda: None, self.lang_menu)
         r.buttons["language"].setToolTip("Sprache der Oberfläche: Deutsch, English, Français")
+        apply_group_heads(r)                                # dunkelblaue Gruppenueberschriften oben
         return r
 
     # --- Blaetter ------------------------------------------------------------------------------------------------
@@ -622,6 +669,7 @@ class MainWindow(QMainWindow):
 
     def _clear_filters(self) -> None:
         self.page.dup_button.setChecked(False)
+        self.page.fault_button.setChecked(False)
         for table in (self.page.files, self.page.tags, self.all_page.tags):
             table.clear_filters()
 
@@ -630,8 +678,11 @@ class MainWindow(QMainWindow):
         tags = sum(len(r.tags) for r in self.results)
         errors = sum(1 for r in self.results if r.error)
         t = i18n.tr
-        band = (f"{t('QUELLE')}  {source}   {t('PDFS')}  {len(self.results)}   {t('TAGS')}  {tags}   "
-                f"{t('FEHLER')}  {errors}")
+        band = (f"{t('PROJEKT')}  {self.project_label()}   {t('QUELLE')}  {source}   {t('PDFS')}  "
+                f"{len(self.results)}   {t('TAGS')}  {tags}   {t('FEHLER')}  {errors}")
+        if self.checker is not None:
+            faults = sum(1 for r in self.results for x in r.tags if self.checker.is_fault(x.type, x.tag))
+            band += f"   {t('ABWEICHUNGEN')}  {faults}"
         self.page.set_band(band)
         self.all_page.set_band(band)
 
@@ -643,7 +694,14 @@ class MainWindow(QMainWindow):
         rows = [[r[0], r[1], r[2], r[3], r[5], r[7], r[8], r[9], r[11], r[15], r[17]]
                 for r in export.file_rows(self.results)]
         self.page.files.set_rows(rows)
-        self.all_page.tags.set_rows([r[:5] for r in export.tag_rows(self.results)])
+        self._refresh_tags()
+
+    def _refresh_tags(self) -> None:
+        """Blatt "Alle Tags", Pruefspalten und Kopfband (Dateiliste und Auswahl bleiben)."""
+        checker = self.checker
+        self.all_page.tags.set_rows([r[:5] + (checker.columns(r[2], r[3], r[4]) if checker else ["", ""])
+                                     for r in export.tag_rows(self.results)])
+        self.apply_project_columns()
         self._update_bands()
 
     # --- Scan ----------------------------------------------------------------------------------------------------
@@ -689,7 +747,8 @@ class MainWindow(QMainWindow):
         self._progress.layout().addWidget(cancel, 0, Qt.AlignRight)
         QApplication.setOverrideCursor(Qt.WaitCursor)
         self._thread = QThread(self)
-        self._worker = ScanWorker([Path(s) for s in sources], self.pipes_enabled())
+        self._scan_placeholders = self.checker is not None
+        self._worker = ScanWorker([Path(s) for s in sources], self.pipes_enabled(), self._scan_placeholders)
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
         self._worker.progress.connect(self._on_progress)
@@ -732,11 +791,12 @@ class MainWindow(QMainWindow):
         if kind == "xlsx":
             path = last_paths.save_file(self, "Export Excel", f"{name}.xlsx", "Excel (*.xlsx)", paths.exports_dir())
             if path:
-                export.write_xlsx(path, self.results)
+                export.write_xlsx(path, self.results, self.checker)
         else:
             path = last_paths.save_file(self, "Export CSV (Tags)", f"{name}.csv", "CSV (*.csv)", paths.exports_dir())
             if path:
-                export.write_csv(path, export.TAG_HEADERS, export.tag_rows(self.results))
+                export.write_csv(path, export.tag_headers(False, self.checker),
+                                 export.tag_rows(self.results, False, self.checker))
                 export.write_csv(Path(path).with_name(Path(path).stem + "_Dateien.csv"), export.FILE_HEADERS,
                                  export.file_rows(self.results))
         if path:
@@ -783,7 +843,9 @@ class MainWindow(QMainWindow):
             return visible
         box = QMessageBox(QMessageBox.Question, title,
                           f"In der Tag-Tabelle ist ein Filter aktiv: {len(visible)} von {len(result.tags)} Tags sichtbar"
-                          + (" (Nur doppelte)" if self.page.dup_button.isChecked() else "") + ".\n\nWelche Tags ausgeben?",
+                          + (" (Nur doppelte)" if self.page.dup_button.isChecked() else "")
+                          + (" (Nur Abweichungen)" if self.page.fault_button.isChecked() else "")
+                          + ".\n\nWelche Tags ausgeben?",
                           parent=self)
         only = box.addButton(f"Nur gefilterte ({len(visible)})", QMessageBox.AcceptRole)
         every = box.addButton(f"Alle Tags ({len(result.tags)})", QMessageBox.AcceptRole)
@@ -811,7 +873,7 @@ class MainWindow(QMainWindow):
         if not path:
             return
         try:
-            review.write_review_xlsx(path, [result], {result.path: tags})
+            review.write_review_xlsx(path, [result], {result.path: tags}, checker=self.checker)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Review-Excel", f"Review-Excel konnte nicht geschrieben werden:\n{exc}")
             return
@@ -862,7 +924,7 @@ class MainWindow(QMainWindow):
                         (opts.redline, "Redline", lambda r=result: redline.write_redline(
                             r, folder / f"{r.path.stem}_Redline_{stamp}.pdf")),
                         (opts.excel_each, "Review-Excel", lambda r=result: review.write_review_xlsx(
-                            folder / f"{r.path.stem}_Review_{stamp}.xlsx", [r]))):
+                            folder / f"{r.path.stem}_Review_{stamp}.xlsx", [r], checker=self.checker))):
                     if not enabled:
                         continue
                     try:
@@ -874,7 +936,8 @@ class MainWindow(QMainWindow):
                     tick(f"{kind}: {label}")
             if opts.excel_total:
                 try:
-                    review.write_review_xlsx(folder / f"PID_Review_gesamt_{stamp}.xlsx", todo)
+                    review.write_review_xlsx(folder / f"PID_Review_gesamt_{stamp}.xlsx", todo,
+                                             checker=self.checker)
                     files += 1
                 except Exception as exc:  # noqa: BLE001
                     failed.append(f"Gesamt-Excel: {exc}")
@@ -901,6 +964,131 @@ class MainWindow(QMainWindow):
 
     def edit_paths(self) -> None:
         PathsDialog(self).exec()
+
+    # --- Projektmodus ---------------------------------------------------------------------------------------------
+    def project_label(self) -> str:
+        if self.checker is not None and self.project is not None:
+            return self.project.name
+        return i18n.tr("Standard (ohne Projektdefinitionen)")
+
+    def _restore_project(self) -> None:
+        """Projektmodus und Projekt vom letzten Mal (config/state.json); fehlt die Datei, startet der Standardmodus."""
+        path = str(last_paths.get_value(PROJECT_DB_KEY, "") or "")
+        if path and Path(path).is_file():
+            try:
+                self.project = ProjectDB(path)
+            except Exception:  # noqa: BLE001 - defekte Datenbank: Standardmodus
+                self.project = None
+        self._set_mode(bool(last_paths.get_value(PROJECT_MODE_KEY, False)) and self.project is not None, quiet=True)
+
+    def toggle_project_mode(self) -> None:
+        """Menueband: Projektmodus ein/aus. Ohne Projekt wird zuerst eines gewaehlt (uebernehmen, oeffnen, anlegen)."""
+        on = self.ribbon.buttons["project_mode"].isChecked()
+        if on and self.project is None:
+            if not self._choose_project():
+                self._set_mode(False, quiet=True)
+            return
+        self._set_mode(on)
+
+    def _choose_project(self) -> bool:
+        """Projekt waehlen und Projektmodus einschalten. False = abgebrochen."""
+        box = QMessageBox(QMessageBox.Question, "Projektmodus",
+                          "Für den Projektmodus ist noch kein Projekt gewählt.\n\nProjektdefinitionen aus "
+                          "P3D Tag Compliance übernehmen, ein vorhandenes Projekt öffnen oder ein neues anlegen?",
+                          parent=self)
+        take = box.addButton("Aus Tag Compliance …", QMessageBox.AcceptRole)
+        open_ = box.addButton("Projekt öffnen …", QMessageBox.AcceptRole)
+        new = box.addButton("Neues Projekt …", QMessageBox.AcceptRole)
+        box.addButton("Abbrechen", QMessageBox.RejectRole)
+        box.setDefaultButton(take)
+        box.exec()
+        action = {take: project_dialog.import_project, open_: project_dialog.open_project,
+                  new: project_dialog.new_project}.get(box.clickedButton())
+        path = action(self) if action else None
+        return bool(path) and self.activate_project(path)
+
+    def activate_project(self, path) -> bool:
+        """Projekt-Datenbank oeffnen, merken und den Projektmodus einschalten."""
+        try:
+            db = ProjectDB(path)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Projekt", f"Projekt konnte nicht geöffnet werden:\n{exc}")
+            return False
+        if self.project is not None:
+            self.project.close()
+        self.project = db
+        last_paths.set_value(PROJECT_DB_KEY, str(db.path))
+        self._set_mode(True)
+        return True
+
+    def _set_mode(self, on: bool, quiet: bool = False) -> None:
+        """Projektmodus setzen (an nur mit Projekt) und Tabellen, Viewer-Rahmen und Kopfband neu aufbauen."""
+        on = bool(on and self.project is not None)
+        self.checker = self.project.checker() if on else None
+        self.ribbon.buttons["project_mode"].setChecked(on)
+        self.ribbon.set_text("project_mode", "Projekt-\nmodus: an" if on else "Projekt-\nmodus: aus")
+        self.ribbon.set_enabled("deviations", on)
+        self.page.fault_button.setEnabled(on)
+        if not on:
+            self.page.fault_button.setChecked(False)
+        last_paths.set_value(PROJECT_MODE_KEY, on)
+        if self.results and self.sources and on != self._scan_placeholders and self._thread is None:
+            self.scan(list(self.sources))           # Platzhalter-Tags (X/?) gibt es nur im Projektmodus: neu einlesen
+        else:
+            self._refresh_tags()
+            if self.page._store_result is not None:
+                self.page._only_duplicates()
+            self.page.show_status()
+        if not quiet and self._thread is None:
+            missing = f" – Tag-Strukturen fehlen: {', '.join(self.checker.missing)}" if on and self.checker.missing else ""
+            self.statusBar().showMessage(f"Projektmodus an: {self.project.name}{missing}" if on else
+                                         "Projektmodus aus: Standard ohne Projektdefinitionen", 10000)
+
+    def apply_project_columns(self) -> None:
+        """Pruefspalten nur im Projektmodus zeigen; im Standardmodus ausgeblendet (Tabellen wie bisher). Zusaetzlich
+        verzoegert, weil das Kit die gemerkte Tabellenansicht nach jedem neuen Modell verzoegert wiederherstellt."""
+        def apply() -> None:
+            on = self.checker is not None
+            for table, first in ((self.page.tags.table, CHECK_COL), (self.all_page.tags.table, ALL_CHECK_COL)):
+                for c in (first, first + 1):
+                    if table.isColumnHidden(c) == on:
+                        table.setColumnHidden(c, not on)
+        apply()
+        QTimer.singleShot(0, apply)
+
+    def _fill_project_menu(self) -> None:
+        m = self.project_menu
+        m.clear()
+        m.addAction("Aus Tag Compliance übernehmen …", lambda: self._pick(project_dialog.import_project))
+        m.addAction("Projekt öffnen …", lambda: self._pick(project_dialog.open_project))
+        m.addAction("Neues Projekt …", lambda: self._pick(project_dialog.new_project))
+        m.addSeparator()
+        current = self.project.path if self.project else None
+        found = sorted(paths.projects_dir().glob("*.db"), key=lambda f: f.name.casefold())
+        for f in found:
+            action = m.addAction(f.stem, lambda f=f: self.activate_project(f))
+            action.setCheckable(True)
+            action.setChecked(current is not None and paths.same_path(f, current))
+            action.setProperty("i18n_skip", True)
+        if not found:
+            m.addAction("(noch keine Projekte)").setEnabled(False)
+        m.addSeparator()
+        m.addAction("Projektordner öffnen", lambda: open_in_explorer(paths.projects_dir()))
+
+    def _pick(self, action) -> None:
+        path = action(self)
+        if path:
+            self.activate_project(path)
+
+    def edit_project_definitions(self) -> None:
+        """Verwaltung der Projektdefinitionen; nach Aenderungen wird die Pruefung neu aufgebaut."""
+        if self.project is None and not self._choose_project():
+            return
+        dlg = project_dialog.ProjectDefinitionsDialog(self.project, self)
+        dlg.exec()
+        if dlg.changed:
+            self._set_mode(self.checker is not None, quiet=True)
+            self.statusBar().showMessage("Projektdefinitionen gespeichert – Prüfung aktualisiert.", 8000)
 
     # --- Sprache --------------------------------------------------------------------------------------------------
     def _mark_language(self) -> None:
@@ -932,15 +1120,19 @@ class MainWindow(QMainWindow):
                                 f"Tool: {paths.tool_root()}\nPython: {os.sys.version.split()[0]}")
 
     def show_help(self) -> None:
-        readme = paths.tool_root() / "README.md"
-        if readme.is_file():
-            os.startfile(str(readme))  # noqa: S606
+        """Interaktives Handbuch (``assets/help/handbuch.html``, im Browser); ohne die Datei die README."""
+        handbook = Path(__file__).resolve().parent.parent / "assets" / "help" / "handbuch.html"
+        target = handbook if handbook.is_file() else paths.tool_root() / "README.md"
+        if target.is_file():
+            os.startfile(str(target))  # noqa: S606
 
     def closeEvent(self, event) -> None:
         if not self.page.confirm_unsaved():
             event.ignore()
             return
         self.page.viewer.close_window()
+        if self.project is not None:
+            self.project.close()
         if self._worker:
             self._worker.cancel()
         if self._thread:

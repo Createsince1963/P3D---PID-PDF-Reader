@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P3D PDF Reader – Handbuch</title>
+<style>
+/* Farben nur aus gui/design.py, appearance.py (Tabellenkopf) und main_gui_kit/theme.py (Akzent) */
+:root{--head:#1F4E79;--headline:#2F6AA3;--accent:#2F80ED;--txt:#1B2B4A;--muted:#44546A;--subtle:#6B7C93;
+--border:#DDE3EC;--band:#EEF3FA;--card:#FFFFFF;--err:#C62828;--link:#1565C0;--dup:#FFF2B3}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.5 "Segoe UI",Arial,sans-serif;color:var(--txt);background:var(--band)}
+header{background:var(--head);color:#fff;padding:12px 20px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:5;flex-wrap:wrap}
+header h1{font-size:18px;margin:0;font-weight:600}
+header .ver{opacity:.8;font-size:12px}
+header input{margin-left:auto;min-width:220px;flex:0 1 320px;padding:6px 10px;border:1px solid var(--headline);border-radius:3px;font:inherit}
+.wrap{display:flex;max-width:1400px;margin:0 auto}
+nav{width:230px;flex:none;padding:16px 8px 16px 16px;position:sticky;top:56px;align-self:flex-start;max-height:calc(100vh - 56px);overflow:auto}
+nav a{display:block;padding:4px 8px;color:var(--muted);text-decoration:none;border-left:3px solid transparent;font-size:13px}
+nav a:hover{background:var(--card)}
+nav a.on{border-left-color:var(--accent);color:var(--txt);font-weight:600;background:var(--card)}
+main{flex:1;min-width:0;padding:16px 20px 60px}
+section{background:var(--card);border:1px solid var(--border);border-radius:4px;margin:0 0 16px;padding:4px 20px 16px}
+section.hidden{display:none}
+h2{font-size:17px;color:var(--head);border-bottom:2px solid var(--headline);padding-bottom:4px;margin:14px 0 10px}
+h3{font-size:14px;margin:16px 0 6px;color:var(--txt)}
+p,li{color:var(--txt)} li{margin:2px 0}
+code,kbd{font-family:Consolas,monospace;font-size:12.5px;background:var(--band);border:1px solid var(--border);border-radius:3px;padding:0 4px}
+kbd{box-shadow:inset 0 -1px 0 var(--border)}
+.note{color:var(--subtle);font-size:12.5px}
+table.t{border-collapse:collapse;width:100%;margin:6px 0}
+table.t th{background:var(--head);color:#fff;text-align:left;font-weight:600;padding:5px 8px;border-right:1px solid var(--headline)}
+table.t td{border-bottom:1px solid var(--border);padding:5px 8px;vertical-align:top}
+mark{background:var(--dup);padding:0}
+/* Menueband-Nachbau */
+.ribbon{display:flex;gap:0;overflow-x:auto;border:1px solid var(--border);background:var(--card);padding:6px 4px;border-radius:3px}
+.grp{display:flex;flex-direction:column;padding:0 4px;border-right:1px solid var(--border);flex:none}
+.grp:last-child{border-right:none}
+.grp .gh{background:var(--head);color:#fff;font-size:11px;font-weight:600;text-align:center;padding:2px 6px;border-radius:2px;margin-bottom:4px;white-space:nowrap}
+.grp .btns{display:flex;gap:2px}
+.rb{display:flex;flex-direction:column;align-items:center;width:74px;padding:4px 2px;border:1px solid transparent;border-radius:3px;background:none;cursor:pointer;font:11px/1.2 "Segoe UI",Arial,sans-serif;color:var(--txt);white-space:pre-line;text-align:center}
+.rb img{width:30px;height:30px;margin-bottom:3px}
+.rb:hover{background:var(--band);border-color:var(--border)}
+.rb.on{background:var(--band);border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.detail{display:flex;gap:14px;align-items:flex-start;margin-top:10px;padding:12px 14px;border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:3px;background:var(--band);min-height:84px}
+.detail img{width:48px;height:48px;flex:none}
+.detail h4{margin:0 0 4px;font-size:15px}
+.detail .grpname{font-size:11px;color:#fff;background:var(--head);border-radius:2px;padding:1px 6px;margin-left:6px;vertical-align:middle;font-weight:600}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:8px 0}
+.step{border:1px solid var(--border);border-radius:4px;padding:10px 12px;background:var(--card);cursor:pointer}
+.step:hover{border-color:var(--accent)}
+.step b{display:block;color:var(--head);margin-bottom:4px}
+.step img{width:22px;height:22px;vertical-align:middle;margin-right:4px}
+/* Kontextmenue-Demo */
+.demo{position:relative;user-select:none}
+.demo table.t td{cursor:context-menu}
+.demo tr.sel td{background:var(--band)}
+.cmenu{position:absolute;display:none;background:var(--card);border:1px solid var(--border);box-shadow:0 4px 14px rgba(27,43,74,.18);min-width:270px;z-index:4;padding:4px 0;font-size:13px}
+.cmenu div{padding:4px 18px;cursor:default}
+.cmenu div:hover{background:var(--accent);color:#fff}
+.cmenu hr{border:0;border-top:1px solid var(--border);margin:4px 0}
+.cmenu span{float:right;color:var(--subtle);padding-left:16px}
+.cmenu div:hover span{color:#fff}
+.explain{margin-top:8px;padding:8px 12px;border-left:4px solid var(--accent);background:var(--band);min-height:38px}
+details{border:1px solid var(--border);border-radius:3px;margin:6px 0;background:var(--card)}
+details summary{cursor:pointer;padding:6px 10px;font-weight:600;color:var(--head)}
+details > div{padding:0 12px 8px}
+.shot{max-width:100%;border:1px solid var(--border);border-radius:3px}
+.empty{display:none;padding:20px;color:var(--subtle)}
+@media (max-width:860px){nav{display:none}main{padding:12px}}
+@media print{header,nav,.cmenu{display:none}section{break-inside:avoid;border:none}body{background:#fff}}
+</style>
+</head>
+<body>
+<header>
+  <h1>P3D PDF Reader – Handbuch</h1><span class="ver">ab Version 1.0.11</span>
+  <input id="q" type="search" placeholder="Im Handbuch suchen … (z. B. Redline, F3, Filter)" aria-label="Suchen">
+</header>
+<div class="wrap">
+<nav id="toc"></nav>
+<main>
+<p class="empty" id="empty">Kein Abschnitt enthält diesen Suchbegriff.</p>
+
+<section id="start" data-title="Schnellstart">
+<h2>Schnellstart</h2>
+<p>Der P3D PDF Reader liest PDF-Plots von P&amp;IDs aus AutoCAD Plant 3D, listet alle PID-Tags je PDF, erkennt doppelte Tags und erzeugt Redline-PDFs und Review-Excel. Die Original-PDFs werden <b>nur gelesen</b>.</p>
+<p class="note">Klick auf einen Schritt springt zum Knopf im Menüband.</p>
+<div class="steps">
+  <div class="step" data-go="scan"><b>1 · Einlesen</b><img src="img/scan.png" alt="">Quellordner scannen (<kbd>F5</kbd>) oder Ordner/Dateien öffnen.</div>
+  <div class="step" data-go="next"><b>2 · Prüfen</b><img src="img/next.png" alt="">Tag wählen, Fundstellen mit <kbd>F3</kbd> durchgehen, „Nur doppelte Tags“.</div>
+  <div class="step" data-go="redline"><b>3 · Review / Redline</b><img src="img/redline.png" alt="">Redline-PDF und Review-Excel für die gewählte PDF oder im Bulk.</div>
+  <div class="step" data-go="xlsx"><b>4 · Export</b><img src="img/xlsx.png" alt="">Alle Dateien und Tags als Excel oder CSV.</div>
+</div>
+</section>
+
+<section id="ribbon" data-title="Menüband">
+<h2>Menüband</h2>
+<p>Jede Gruppe hat eine dunkelblaue Überschrift. <b>Klick auf einen Knopf</b> zeigt darunter, was er tut. Die Einstellungen stehen direkt nach „1 Einlesen“.</p>
+<div class="ribbon" id="rib"></div>
+<div class="detail" id="det"><div class="note">Knopf im Menüband anklicken …</div></div>
+<h3>Leisten über den Bereichen</h3>
+<ul>
+  <li><b>Dateien:</b> Alle markieren, Review markierte …, Excel</li>
+  <li><b>Tags:</b> Bearbeiten, Speichern, Nur doppelte, Filter zurücksetzen, ◀ ▶ Fundstelle, Excel, Redline</li>
+  <li><b>PDF-Viewer:</b> Einpassen, Zoom ±, Drehen, Seite ◀ ▶, ◀ ▶ Fundstelle, Redline, Öffnen (Standardprogramm), 2. Monitor</li>
+</ul>
+</section>
+
+<section id="sheet" data-title="Blatt „PID-Tags“">
+<h2>Blatt „PID-Tags“</h2>
+<ol>
+  <li><b>Dateien</b> – eine Zeile je PDF: Zeichnungsnr., Erstellt (PDF), Ersteller, Checked, Rev, Rev-Datum, Rev-Text, Plot-Benutzer, Anzahl Tags, Fehler. Mehrere PDFs mit <kbd>Strg</kbd>- oder <kbd>Umschalt</kbd>-Klick markieren (z. B. für den Review).</li>
+  <li><b>Tags der gewählten PDF</b> – Typ, Tag, Anzahl und Review-Spalten. Zeilen mit Anzahl &gt; 1 (doppelte Tags) sind <mark>gelb</mark> hinterlegt.</li>
+  <li><b>PDF-Viewer</b> – Fundstellen doppelter Tags sind gelb hinterlegt.</li>
+</ol>
+<h3>Fundstellen</h3>
+<ul>
+  <li><b>Eine Fundstelle:</b> Klick oder Pfeiltasten markieren den Tag und zoomen darauf.</li>
+  <li><b>Mehrere Fundstellen:</b> erster Klick zeigt die ganze Seite mit nummerierten Rahmen; jeder weitere Klick (oder <kbd>F3</kbd>) springt zur nächsten, nach der letzten kommt die Übersicht. Oben links steht z. B. „151ISO01: Fundstelle 2 / 6“.</li>
+</ul>
+<h3>Viewer</h3>
+<p>Mausrad zoomt, Ziehen verschiebt, Doppelklick zeigt die ganze Seite. Plots mit Seitendrehung erscheinen automatisch richtig herum, „Drehen“ dreht zusätzlich in 90°-Schritten. <b>2. Monitor</b> setzt den Viewer in ein eigenes Fenster; „Viewer zurückholen“ holt ihn zurück.</p>
+<p>Das Blatt <b>„Alle Tags“</b> zeigt die Tags aller eingelesenen PDFs in einer Tabelle.</p>
+</section>
+
+<section id="tables" data-title="Tabellen &amp; Rechtsklick">
+<h2>Tabellen &amp; Rechtsklick</h2>
+<p>Alle Tabellen haben den Standard von P3D XCHANGE: Filter je Spalte (Doppelklick = Wertauswahl), Filter über das ganze Blatt, Sortierung, Zoom und gemerkte Ansichten (<i>Save / Load / Reset Layout</i>).</p>
+<h3>Rechtsklick – ausprobieren</h3>
+<p class="note">Rechtsklick (oder langer Druck) auf eine Zelle der Beispieltabelle öffnet das Menü wie in der App; ein Klick auf einen Eintrag erklärt ihn.</p>
+<div class="demo" id="demo">
+<table class="t">
+  <thead><tr><th>Typ</th><th>Tag</th><th>Anzahl</th><th>Review</th></tr></thead>
+  <tbody>
+    <tr><td>Equipment</td><td>111PMP01</td><td>1</td><td>OK</td></tr>
+    <tr><td>Instrument</td><td>TIT-130</td><td>2</td><td>Offen</td></tr>
+    <tr><td>Armatur</td><td>VH340</td><td>1</td><td></td></tr>
+  </tbody>
+</table>
+<div class="cmenu" id="cm"></div>
+</div>
+<div class="explain" id="cmx">…</div>
+<h3>Rechtsklick-Stellen im Überblick</h3>
+<table class="t">
+  <thead><tr><th>Wo</th><th>Funktionen</th></tr></thead>
+  <tbody>
+    <tr><td>Zelle</td><td>Kopieren (<kbd>Strg</kbd>+<kbd>C</kbd>), Zeile kopieren, Zeile mit Überschriften kopieren, Nur „Wert“ in „Spalte“ zeigen, Filter der Spalte zurücksetzen, Alle Filter zurücksetzen, Spalten …, Nach Excel …</td></tr>
+    <tr><td>Spaltenkopf</td><td>Spalte ausblenden, alle Spalten zeigen, Spalte an den Anfang/ans Ende, mehrere markierte Spalten verschieben (<kbd>Strg</kbd>+Klick), Ausrichtung, Ansicht zurücksetzen, Teilreiter aus dieser Spalte erstellen / entfernen</td></tr>
+    <tr><td><img src="img/excel.png" alt="" style="width:16px;vertical-align:middle"> Excel-Symbol (Tabellenecke)</td><td>Klick: sichtbare Ansicht als Excel/CSV sichern · Rechtsklick: <b>Spalten …</b> (Reihenfolge, Ein-/Ausblenden, „Standard“ = wie eingelesen)</td></tr>
+    <tr><td>Teilreiter-Leiste</td><td>Teilreiter aus (zurück zur Gesamttabelle)</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section id="review" data-title="Review / Redline">
+<h2>Review / Redline</h2>
+<h3>Redline-PDF</h3>
+<ul>
+  <li>Kopie der PDF, das Original bleibt unverändert. An jeder Fundstelle Rahmen und <b>Pos.-Nr.</b>, normale Tags rot, doppelte orange.</li>
+  <li>Jede Fundstelle trägt einen PDF-Kommentar (Pos., Typ, Tag, „Fundstelle n / m“) – sichtbar in Acrobat, Bluebeam, PDF-XChange.</li>
+  <li>Es gilt der Tabellenfilter: mit „Nur doppelte“ entsteht ein Redline nur mit den doppelten Tags.</li>
+</ul>
+<h3>Review-Excel</h3>
+<p>Blatt „Review“ mit einer Zeile je Fundstelle: Pos.-Nr. (wie im Redline; im Bulk <code>&lt;PDF-Nr&gt;.&lt;Pos&gt;</code>), PDF, Zeichnungsnr., Rev, Typ, Tag, Fundstelle, Anzahl, Doppelt, Review-Kommentar, <b>Prüfstatus</b> (Offen, OK, Korrektur erforderlich, Klärung, Nicht relevant), Bemerkung, Geprüft von/am. Dazu Blätter „Dateien“ und „Info“.</p>
+<h3>Review Auswahl/Bulk</h3>
+<p>Markierte oder alle PDFs; Ausgaben ankreuzen (Redline je PDF, Review-Excel je PDF, Review-Excel gesamt); Zielordner, optional Unterordner <code>Review_&lt;Zeitstempel&gt;</code>.</p>
+<h3>Tabelle bearbeiten</h3>
+<p>„Tabelle bearbeiten“ schaltet die Review-Spalten der Tag-Tabelle zum Bearbeiten frei; „Review speichern“ (<kbd>Strg</kbd>+<kbd>S</kbd>) sichert sie.</p>
+</section>
+
+<section id="project" data-title="Projektmodus">
+<h2>Projektmodus</h2>
+<ul>
+  <li><b>Aus (Standard):</b> Arbeit mit den Tag-Mustern, ohne Projektregeln.</li>
+  <li><b>An:</b> Jeder Tag wird gegen die Projektdefinitionen geprüft. Spalten „Projekt-Prüfung“ und „Projekt-Hinweis“, Filter „Nur Projektabweichungen“, Abweichungen im Viewer rot.</li>
+  <li><b>Projekt wählen:</b> aus P3D Tag Compliance übernehmen (<code>pidtag_project.db</code>, nur lesend), öffnen oder neu anlegen.</li>
+  <li><b>Befunde</b> (kombinierbar mit „ + “): Regelfehler Projektdefinition, Code fehlt in Projektdefinition, Code unvollständig (Platzhalter <code>?</code>, <code>XXX</code>), mehrfach vorhanden.</li>
+</ul>
+</section>
+
+<section id="export" data-title="Export">
+<h2>Export</h2>
+<ul>
+  <li><b>Export Excel:</b> Blätter „Dateien“ und „Tags“ über alle PDFs.</li>
+  <li><b>Export CSV:</b> Tags plus <code>_Dateien.csv</code>, Trennzeichen <code>;</code>, UTF-8 mit BOM.</li>
+  <li><b>Excel-Symbol</b> in jeder Tabelle: sichtbare Ansicht, Dateiname mit PDF-/Tabellenname und Zeitstempel.</li>
+</ul>
+</section>
+
+<section id="keys" data-title="Tastenkürzel">
+<h2>Tastenkürzel</h2>
+<table class="t"><thead><tr><th>Taste</th><th>Funktion</th></tr></thead><tbody>
+<tr><td><kbd>F5</kbd></td><td>Quellordner scannen</td></tr>
+<tr><td><kbd>F3</kbd> / <kbd>Umschalt</kbd>+<kbd>F3</kbd></td><td>Fundstelle weiter / zurück</td></tr>
+<tr><td><kbd>Strg</kbd>+<kbd>S</kbd></td><td>Review speichern</td></tr>
+<tr><td><kbd>Strg</kbd>+<kbd>C</kbd> (Rechtsklick › Kopieren)</td><td>markierte Zellen als Text kopieren (in Excel einfügbar)</td></tr>
+<tr><td>Doppelklick Filterfeld</td><td>Wertauswahl der Spalte</td></tr>
+</tbody></table>
+</section>
+
+<section id="detect" data-title="Erkennung &amp; Pfade">
+<h2>Erkennung &amp; Pfade</h2>
+<details><summary>Welche Felder werden woher gelesen?</summary><div>
+<table class="t"><thead><tr><th>Feld</th><th>Quelle</th></tr></thead><tbody>
+<tr><td>Erstellt</td><td>PDF-Metadaten (Plotzeitpunkt)</td></tr>
+<tr><td>Ersteller</td><td>Schriftfeld <code>DRAWN:</code> → letzte Revisionszeile → PDF-Author → Plot-Benutzer</td></tr>
+<tr><td>Checked, Zeichnungsnr., Rev</td><td>Schriftfeld und letzte Revisionszeile</td></tr>
+<tr><td>Instrument</td><td>Kürzel in der Blase plus Nummer darunter (<code>TIT-130</code>)</td></tr>
+<tr><td>Equipment / Armatur / Volltag</td><td>Tag-Muster (<code>111PMP01</code>, <code>VH340</code>, <code>203-17-111-TZIT-011</code>)</td></tr>
+<tr><td>Rohrleitung (optional)</td><td>Menüband › Rohrleitungen; waagerecht und senkrecht</td></tr>
+</tbody></table></div></details>
+<details><summary>Wo liegen meine Daten?</summary><div>
+<p>Datenordner: <code>%P3D_PDFREADER_HOME%</code>, sonst <code>&lt;Tool&gt;\data</code>, als EXE <code>%LOCALAPPDATA%\P3D_PDFREADER</code>. Darin <code>config\paths.json</code> (Quell-/Exportordner), <code>config\state.json</code>, <code>config\table_views.json</code>, <code>config\tag_patterns.json</code>, <code>logs\</code>, <code>exports\</code>.</p>
+<p>Einstellungen › <b>Pfade</b>: Quellordner hinzufügen/entfernen, Exportordner wählen. Einstellungen › <b>Tag-Muster</b>: Regex und Ausschlussliste anpassen.</p></div></details>
+<details><summary>Warum erscheint Equipment doppelt?</summary><div>
+<p>Equipment steht oft zusätzlich in der Equipment-Tabelle am Blattfuß und zählt dann als doppelter Tag – das kann gewollt sein.</p></div></details>
+</section>
+</main>
+</div>
+<script>
+const R = [
+ ["Projekt", [
+  ["project_mode","Projekt-\nmodus","Schaltet die Prüfung gegen Projektdefinitionen ein oder aus. Aus = Standardmodus ohne Projektregeln. Beim Umschalten werden geladene PDFs neu eingelesen."],
+  ["project_pick","Projekt\nwählen","Projekt anlegen, öffnen oder aus P3D Tag Compliance übernehmen (pidtag_project.db wird nur gelesen)."],
+  ["project_defs","Projekt-\ndefinitionen …","Codelisten, Listen, Tag-Strukturen, PDF-Prüfregeln bearbeiten; Excel-Export/-Import; „Tag testen“."]]],
+ ["1  Einlesen", [
+  ["scan","Quellordner\nscannen","Liest alle PDFs der Quellordner (inkl. Unterordner) ein. Taste F5."],
+  ["folder","Ordner\nöffnen …","Einen beliebigen Ordner mit PDF-Plots einlesen."],
+  ["files","Dateien\nöffnen …","Einzelne PDF-Dateien wählen und einlesen."],
+  ["pipes","Rohr-\nleitungen","Menü: Rohrleitungsnummern (z. B. TFHR_SS01_001_1\") mit in die Tag-Liste übernehmen. Wird gemerkt; Umschalten liest neu ein."]]],
+ ["Einstellungen", [
+  ["paths","Pfade","Quellordner und Exportordner verwalten, Speicherorte öffnen."],
+  ["patterns","Tag-\nMuster","Öffnet tag_patterns.json: Regex je Tag-Typ und Ausschlussliste für Kürzel."]]],
+ ["2  Prüfen", [
+  ["prev","Fundstelle\nzurück","Vorherige Fundstelle des gewählten Tags. Umschalt+F3."],
+  ["next","Fundstelle\nweiter","Nächste Fundstelle des gewählten Tags; nach der letzten die Übersicht. F3."],
+  ["dups","Nur doppelte\nTags","Zeigt nur Tags, die mehrfach in der PDF stehen."],
+  ["deviations","Nur Projekt-\nabweichungen","Nur Tags mit Befund der Projekt-Prüfung (nur im Projektmodus aktiv)."],
+  ["filter_reset","Filter\nzurücksetzen","Blattfilter, Spaltenfilter, Wertauswahl und „Nur …“-Schalter in allen Tabellen zurücksetzen."],
+  ["edit","Tabelle\nbearbeiten","Review-Spalten der Tag-Tabelle bearbeiten (Review, Änderung, Neuer Wert, Bemerkung …)."],
+  ["save","Review\nspeichern","Review-Einträge sichern. Strg+S."]]],
+ ["3  Review / Redline", [
+  ["review","Review\nAuswahl/Bulk …","Redline-PDF, Review-Excel je PDF und gesamt für markierte oder alle PDFs erzeugen."],
+  ["redline","Redline-PDF\ngewählte PDF","Kopie der gewählten PDF mit Rahmen, Pos.-Nr. und Kommentar je Fundstelle (Tabellenfilter gilt)."],
+  ["review_xlsx","Review-Excel\ngewählte PDF","Excel mit einer Zeile je Fundstelle, Prüfstatus-Auswahlliste und Bemerkung."]]],
+ ["4  Export", [
+  ["xlsx","Export\nExcel …","Dateien und Tags aller PDFs als Excel."],
+  ["csv","Export\nCSV …","Tags als CSV (;) plus _Dateien.csv."],
+  ["open_exports","Export-\nordner","Öffnet den Exportordner im Explorer."]]],
+ ["Ansicht", [
+  ["sheet_tags","PID-Tags","Wechselt zum Blatt „PID-Tags“."],
+  ["sheet_all","Alle Tags","Öffnet das Blatt mit den Tags aller PDFs."],
+  ["monitor","Viewer\n2. Monitor","PDF-Viewer in eigenem Fenster (z. B. auf dem zweiten Bildschirm). Wird gemerkt."],
+  ["preview","Tabellen-\nVorschau …","Vorschau der aktuellen Tabelle."]]],
+ ["Hilfe", [
+  ["help","Handbuch","Öffnet dieses Handbuch."],
+  ["about","Info","Version und Programminformationen."],
+  ["language","Sprache","Oberfläche auf Deutsch, English oder Français; wirkt sofort und wird gemerkt."]]]
+];
+const rib = document.getElementById("rib"), det = document.getElementById("det"), buttons = {};
+for (const [g, items] of R) {
+  const grp = document.createElement("div"); grp.className = "grp";
+  grp.innerHTML = `<div class="gh">${g}</div>`;
+  const row = document.createElement("div"); row.className = "btns";
+  for (const [key, label, text] of items) {
+    const b = document.createElement("button"); b.className = "rb"; b.type = "button";
+    b.innerHTML = `<img src="img/${key}.png" alt="">${label}`;
+    b.title = label.replace("\n", " ");
+    b.onclick = () => show(key);
+    buttons[key] = {b, g, label, text}; row.appendChild(b);
+  }
+  grp.appendChild(row); rib.appendChild(grp);
+}
+function show(key) {
+  for (const k in buttons) buttons[k].b.classList.toggle("on", k === key);
+  const x = buttons[key];
+  det.innerHTML = `<img src="img/${key}.png" alt=""><div><h4>${x.label.replace("\n", " ")}<span class="grpname">${x.g}</span></h4>${x.text}</div>`;
+}
+document.querySelectorAll(".step").forEach(s => s.onclick = () => {
+  document.getElementById("ribbon").scrollIntoView({behavior: "smooth"}); show(s.dataset.go);
+});
+
+/* Kontextmenue-Demo */
+const cm = document.getElementById("cm"), cmx = document.getElementById("cmx"), demo = document.getElementById("demo");
+const heads = [...demo.querySelectorAll("th")].map(th => th.textContent);
+function openMenu(td, x, y) {
+  demo.querySelectorAll("tr").forEach(r => r.classList.remove("sel"));
+  td.parentElement.classList.add("sel");
+  const v = td.textContent || "(leer)", col = heads[td.cellIndex];
+  const items = [
+    ["Kopieren", "Strg+C", "Kopiert die markierten Zellen als Text (Tabulator-getrennt) – direkt in Excel einfügbar."],
+    ["Zeile kopieren", "", "Kopiert alle sichtbaren Zellen der Zeile in der angezeigten Spaltenreihenfolge."],
+    ["Zeile mit Überschriften kopieren", "", "Wie „Zeile kopieren“, mit einer Kopfzeile darüber."], null,
+    [`Nur „${v}“ in „${col}“ zeigen`, "", `Setzt die Wertauswahl der Spalte „${col}“ auf genau „${v}“. Das Filterfeld zeigt dann „1 / n“.`],
+    [`Filter von „${col}“ zurücksetzen`, "", "Entfernt Text- und Wertfilter dieser einen Spalte (nur aktiv, wenn sie gefiltert ist)."],
+    ["Alle Filter zurücksetzen", "", "Blattfilter, alle Spaltenfilter und Wertauswahlen der Tabelle zurücksetzen."], null,
+    ["Spalten …", "", "Dialog: Spalten verschieben (Nach oben/unten), ein- oder ausblenden, „Standard“ = wie eingelesen. Auch per Rechtsklick auf das Excel-Symbol."],
+    ["Nach Excel …", "", "Sichert die sichtbare Ansicht (gefilterte Zeilen, sichtbare Spalten) als Excel oder CSV."]
+  ];
+  cm.innerHTML = "";
+  for (const it of items) {
+    if (!it) { cm.appendChild(document.createElement("hr")); continue; }
+    const d = document.createElement("div");
+    d.innerHTML = `${it[0]}${it[1] ? `<span>${it[1]}</span>` : ""}`;
+    d.onclick = () => { cmx.innerHTML = `<b>${it[0]}</b> – ${it[2]}`; cm.style.display = "none"; };
+    cm.appendChild(d);
+  }
+  const r = demo.getBoundingClientRect();
+  cm.style.display = "block";
+  cm.style.left = Math.min(x - r.left, r.width - cm.offsetWidth) + "px";
+  cm.style.top = (y - r.top) + "px";
+}
+demo.addEventListener("contextmenu", e => {
+  const td = e.target.closest("td"); if (!td) return;
+  e.preventDefault(); openMenu(td, e.clientX, e.clientY);
+});
+let press;
+demo.addEventListener("touchstart", e => { const td = e.target.closest("td"); if (!td) return;
+  const t = e.touches[0]; press = setTimeout(() => openMenu(td, t.clientX, t.clientY), 550); }, {passive: true});
+demo.addEventListener("touchend", () => clearTimeout(press));
+document.addEventListener("click", e => { if (!cm.contains(e.target)) cm.style.display = "none"; });
+document.addEventListener("keydown", e => { if (e.key === "Escape") cm.style.display = "none"; });
+
+/* Inhaltsverzeichnis, Suche, aktiver Abschnitt */
+const sections = [...document.querySelectorAll("main section")], toc = document.getElementById("toc");
+for (const s of sections) {
+  const a = document.createElement("a"); a.href = "#" + s.id; a.innerHTML = s.dataset.title; a.dataset.id = s.id; toc.appendChild(a);
+}
+const links = [...toc.querySelectorAll("a")];
+const io = new IntersectionObserver(entries => entries.forEach(en => {
+  if (en.isIntersecting) links.forEach(a => a.classList.toggle("on", a.dataset.id === en.target.id));
+}), {rootMargin: "-60px 0px -70% 0px"});
+sections.forEach(s => io.observe(s));
+const originals = new Map(), LIVE = new Set(["start", "ribbon", "tables"]);   // interaktiv: nicht umschreiben
+function unmark(s) { if (originals.has(s)) s.innerHTML = originals.get(s); }
+document.getElementById("q").addEventListener("input", e => {
+  const q = e.target.value.trim().toLowerCase(); let shown = 0;
+  for (const s of sections) {
+    if (!LIVE.has(s.id)) unmark(s);
+    const hit = !q || s.textContent.toLowerCase().includes(q) ||
+      (s.id === "ribbon" && R.some(([g, it]) => it.some(i => (i[1] + i[2]).toLowerCase().includes(q))));
+    s.classList.toggle("hidden", !hit);
+    links.find(a => a.dataset.id === s.id).style.display = hit ? "" : "none";
+    if (hit) shown++;
+    if (hit && q && !LIVE.has(s.id)) {
+      if (!originals.has(s)) originals.set(s, s.innerHTML);
+      const re = new RegExp("(" + q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "gi");
+      const walk = document.createTreeWalker(s, NodeFilter.SHOW_TEXT); const nodes = [];
+      while (walk.nextNode()) if (re.test(walk.currentNode.nodeValue)) nodes.push(walk.currentNode);
+      for (const n of nodes) { const span = document.createElement("span");
+        span.innerHTML = n.nodeValue.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])).replace(re, "<mark>$1</mark>");
+        n.replaceWith(span); }
+    }
+  }
+  if (q) { const k = Object.keys(buttons).find(k => (buttons[k].label + buttons[k].text).toLowerCase().includes(q)); if (k) show(k); }
+  document.getElementById("empty").style.display = shown ? "none" : "block";
+});
+</script>
+</body>
+</html>

@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .extract import PdfResult, Tag
 
+from .project_defs import CHECK_HEADERS, is_fault_status
 from .review_store import CHANGE_VALUES, FIELDS, REVIEW_VALUES, ReviewStore
 
 STATUS_VALUES = tuple(v for v in REVIEW_VALUES if v)
@@ -51,9 +52,17 @@ def positions(tags: list[Tag]) -> list[ReviewPosition]:
     return out
 
 
-def review_rows(result: PdfResult, tags: list[Tag] | None = None) -> list[list]:
+def review_headers(checker=None) -> list[str]:
+    """Spalten der Review-Excel; im Projektmodus nach "Doppelt" die Projekt-Pruefung."""
+    if checker is None:
+        return list(REVIEW_HEADERS)
+    i = REVIEW_HEADERS.index("Doppelt") + 1
+    return REVIEW_HEADERS[:i] + CHECK_HEADERS + REVIEW_HEADERS[i:]
+
+
+def review_rows(result: PdfResult, tags: list[Tag] | None = None, checker=None) -> list[list]:
     """Eine Zeile je Fundstelle; Review-Spalten aus dem gespeicherten Review der PDF (Bearbeiten-Modus).
-    Ohne gespeicherten Review-Wert bekommen doppelte Tags "Offen"."""
+    Ohne gespeicherten Review-Wert bekommen doppelte Tags "Offen". ``checker``: Projekt-Pruefung (Projektmodus)."""
     store = ReviewStore(result.path)
     rows = []
     for p in positions(result.tags if tags is None else tags):
@@ -61,12 +70,15 @@ def review_rows(result: PdfResult, tags: list[Tag] | None = None) -> list[list]:
         if not values[0] and p.total > 1:
             values[0] = "Offen"
         rows.append([p.pos, result.name, result.drawing_no, result.revision, p.tag.type, p.tag.tag, p.page + 1,
-                     f"{p.occurrence}/{p.total}", p.total, "Ja" if p.total > 1 else "", p.comment,
+                     f"{p.occurrence}/{p.total}", p.total, "Ja" if p.total > 1 else "",
+                     *(checker.columns(p.tag.type, p.tag.tag, p.tag.count) if checker is not None else []),
+                     p.comment,
                      round(p.rect[0], 1), round(p.rect[1], 1), *values])
     return rows
 
 
-def write_review_xlsx(path: str | Path, results: list[PdfResult], tags_by_pdf: dict | None = None) -> Path:
+def write_review_xlsx(path: str | Path, results: list[PdfResult], tags_by_pdf: dict | None = None,
+                      checker=None) -> Path:
     """Review-Excel: Blatt "Review" (eine Zeile je Fundstelle: Pos.-Nr., Review-Kommentar, Review als Auswahlliste,
     Aenderung, Neuer Wert, Bemerkung, WPO, zuletzt Datum und User), Blatt "Dateien", Blatt "Info".
     Alle Blaetter als Excel-Datentabelle mit autofit; doppelte Tags gelb."""
@@ -83,17 +95,18 @@ def write_review_xlsx(path: str | Path, results: list[PdfResult], tags_by_pdf: d
     ws.title = "Review"
     rows = []
     for result in results:
-        rows.extend(review_rows(result, (tags_by_pdf or {}).get(result.path)))
+        rows.extend(review_rows(result, (tags_by_pdf or {}).get(result.path), checker))
     if len(results) > 1:                                      # Pos.-Nr. je PDF eindeutig: "<PDF-Nr>.<Pos>"
         pdf_no = {r.name: i for i, r in enumerate(results, start=1)}
         for row in rows:
             row[0] = f"{pdf_no[row[1]]}.{row[0]}"
-    write_table(ws, REVIEW_HEADERS, rows, "Review", used)
-    col = {h: i + 1 for i, h in enumerate(REVIEW_HEADERS)}
+    headers = review_headers(checker)
+    write_table(ws, headers, rows, "Review", used)
+    col = {h: i + 1 for i, h in enumerate(headers)}
     dup_fill = PatternFill("solid", fgColor="FFF2CC")
     for r in range(2, len(rows) + 2):
         if ws.cell(r, col["Doppelt"]).value == "Ja":
-            for c in range(1, len(REVIEW_HEADERS) + 1):
+            for c in range(1, len(headers) + 1):
                 ws.cell(r, c).fill = dup_fill
     if rows:
         for header, values in (("Review", REVIEW_VALUES), ("Änderung", CHANGE_VALUES)):
@@ -109,6 +122,10 @@ def write_review_xlsx(path: str | Path, results: list[PdfResult], tags_by_pdf: d
                  ["Pos.-Nr.", "gleiche Nummer wie im Redline-PDF (Kommentar 'Pos. n')"],
                  ["Review", ", ".join(v for v in REVIEW_VALUES if v)],
                  ["Änderung", ", ".join(v for v in CHANGE_VALUES if v)]]
+    if checker is not None:
+        info_rows += [["Projekt", checker.project],
+                      ["Projekt-Befunde (Fundstellen)",
+                       sum(1 for r in rows if is_fault_status(r[col[CHECK_HEADERS[0]] - 1]))]]
     write_table(wb.create_sheet("Info"), ["Eintrag", "Wert"], info_rows, "Info", used)
     path = Path(path)
     wb.save(path)

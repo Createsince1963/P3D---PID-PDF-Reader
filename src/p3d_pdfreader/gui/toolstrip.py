@@ -18,6 +18,7 @@ icons.GLYPHS.update({
     "zoom_in": "⊕", "zoom_out": "⊖", "fit": "⤢", "prev": "◀", "next": "▶", "monitor": "⧉", "dock": "⊟",
     "pdf_open": "⎘", "redline": "✎", "duplicates": "⚑", "filter_reset": "⊘", "review": "➤", "folder": "▤",
     "files": "⇧", "scan": "⟳", "excel_out": "⇩", "csv_out": "⇩", "info": "ⓘ", "help": "?", "pipe": "═", "mono": "◐",
+    "project_mode": "◉", "defs": "☷", "deviations": "✗",
 })
 
 

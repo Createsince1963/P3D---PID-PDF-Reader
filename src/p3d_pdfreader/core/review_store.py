@@ -21,17 +21,22 @@ AUTO_FIELDS = ["Datum", "User"]
 FIELDS = EDIT_FIELDS + AUTO_FIELDS
 REVIEW_VALUES = ["", "Offen", "OK", "Korrektur erforderlich", "Klärung", "Nicht relevant"]
 REVIEW_FAULTY = ("Korrektur erforderlich",)        # Viewer: rot umrandet, alle anderen Tags gruen
+REVIEW_ACCEPTED = ("OK", "Nicht relevant")          # Projektmodus: Abweichung vom Reviewer angenommen -> gruen
 CHANGE_VALUES = ["", "Keine", "Tag ändern", "Tag ergänzen", "Tag löschen", "Position prüfen", "Doppelten Tag auflösen"]
 
 
-def status_hits(tags, store=None) -> tuple[list, list]:
+def status_hits(tags, store=None, checker=None) -> tuple[list, list]:
     """Alle Fundstellen nach Review-Status: (korrekt, fehlerhaft), je Tag eine Liste [(Seite, Rechteck)].
-    Fehlerhaft = Review "Korrektur erforderlich"; alle anderen gefundenen Tags (auch ohne Review) gelten als korrekt."""
+    Fehlerhaft = Review "Korrektur erforderlich"; im Projektmodus (``checker``) zusaetzlich Tags, die nicht zur
+    Projektdefinition passen - ausser der Review hat sie als "OK" oder "Nicht relevant" angenommen.
+    Alle anderen gefundenen Tags (auch ohne Review) gelten als korrekt."""
     ok, faulty = [], []
     entries = store.entries if store is not None else {}
     for t in tags:
         review = entries.get(key(t.type, t.tag), {}).get("Review", "")
-        (faulty if review in REVIEW_FAULTY else ok).append(list(t.hits))
+        bad = review in REVIEW_FAULTY or (checker is not None and review not in REVIEW_ACCEPTED
+                                          and checker.is_fault(t.type, t.tag))
+        (faulty if bad else ok).append(list(t.hits))
     return ok, faulty
 
 

@@ -145,6 +145,20 @@ a("Dialoge", [
     ("Nur gefilterte ({0})", "Filtered only ({0})", "Filtrés seulement ({0})"), ("Alle Tags ({0})", "All tags ({0})", "Tous les tags ({0})"),
 ])
 
+a("Tabellen-Kontextmenü", [
+    ("Kopieren", "Copy", "Copier"), ("Zeile kopieren", "Copy row", "Copier la ligne"),
+    ("Zeile mit Überschriften kopieren", "Copy row with headers", "Copier la ligne avec les en-têtes"),
+    ("Nach diesem Wert filtern", "Filter by this value", "Filtrer sur cette valeur"),
+    ("Filter dieser Spalte zurücksetzen", "Reset this column's filter", "Réinitialiser le filtre de cette colonne"),
+    ("Alle Filter zurücksetzen", "Reset all filters", "Réinitialiser tous les filtres"),
+    ("Spalten …", "Columns …", "Colonnes …"), ("Nach Excel …", "To Excel …", "Vers Excel …"),
+    ("Spalten", "Columns", "Colonnes"), ("Spalte", "Column", "Colonne"), ("Anzeigen", "Show", "Afficher"),
+    ("Nach oben", "Move up", "Monter"), ("Nach unten", "Move down", "Descendre"), ("Standard", "Default", "Par défaut"),
+    ("Übernehmen", "Apply", "Appliquer"), ("Ja", "Yes", "Oui"), ("Nein", "No", "Non"),
+    ("Rechtsklick: Spalten …", "Right-click: Columns …", "Clic droit : Colonnes …"),
+    ("Projekt", "Project", "Projet"),
+])
+
 data = {"_info": "Schluessel = deutscher Originaltext (Standardsprache). Je Eintrag en/fr. Fehlende Texte bleiben deutsch."}
 data.update(T)
 out = Path(sys.argv[1])

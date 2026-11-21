@@ -46,6 +46,25 @@ class Patterns:
     by_type: dict[str, re.Pattern]
     revision_date: re.Pattern
     pipe_line: re.Pattern
+    # Platzhalter-Varianten (Projektmodus): Ziffern duerfen X oder ? sein, z. B. AV_TL02_XXX_2", VHXXX, 111PMP0?
+    ph_number: re.Pattern | None = None
+    ph_by_type: dict | None = None
+    ph_pipe_line: re.Pattern | None = None
+
+    def placeholder_type(self, text: str) -> str | None:
+        """Typ eines Platzhalter-Tags (nur wenn der normale Typ nicht passt und X/? vorkommt), sonst None."""
+        if not self.ph_by_type or not has_placeholder(text):
+            return None
+        return next((t for t, rx in self.ph_by_type.items() if rx.match(text)), None)
+
+
+def has_placeholder(text: str) -> bool:
+    return "?" in text or "X" in text
+
+
+def placeholder(rx: re.Pattern) -> re.Pattern:
+    """Variante eines Musters, in der jede Ziffer auch X oder ? sein darf (Platzhalter statt Nummer)."""
+    return re.compile(rx.pattern.replace(r"\d", r"[\dX?]"))
 
 
 def load(config_file: Path | None = None) -> Patterns:
@@ -63,7 +82,7 @@ def load(config_file: Path | None = None) -> Patterns:
                                                     | set(user.get("instrument_exclude", []) or []))
         except (OSError, ValueError):
             pass
-    return Patterns(
+    pat = Patterns(
         letters=re.compile(data["instrument_letters"]),
         number=re.compile(data["instrument_number"]),
         exclude=frozenset(str(x).upper() for x in data["instrument_exclude"]),
@@ -76,6 +95,10 @@ def load(config_file: Path | None = None) -> Patterns:
         revision_date=re.compile(data["revision_date"]),
         pipe_line=re.compile(data["pipe_line"]),
     )
+    pat.ph_number = placeholder(pat.number)
+    pat.ph_by_type = {t: placeholder(rx) for t, rx in pat.by_type.items()}
+    pat.ph_pipe_line = placeholder(pat.pipe_line)
+    return pat
 
 
 def write_defaults(config_file: Path) -> None:

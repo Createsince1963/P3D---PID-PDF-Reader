@@ -248,7 +248,8 @@ class PdfPreview(QGraphicsView):
         if self._doc is None:
             return
         for groups, color, tip in ((self._status_groups[0], LIGHT.ok, "gefundener Tag"),
-                                   (self._status_groups[1], LIGHT.err, "Review: Korrektur erforderlich")):
+                                   (self._status_groups[1], LIGHT.err,
+                                    "fehlerhaft: Review „Korrektur erforderlich“ oder Projekt-Befund")):
             pen = QPen(QColor(color), 2)
             pen.setCosmetic(True)
             for hits in groups:

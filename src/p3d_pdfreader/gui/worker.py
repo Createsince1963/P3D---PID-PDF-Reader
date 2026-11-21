@@ -13,10 +13,11 @@ class ScanWorker(QObject):
     result = Signal(object)
     finished = Signal(bool)
 
-    def __init__(self, sources, pipes: bool = False):
+    def __init__(self, sources, pipes: bool = False, placeholders: bool = False):
         super().__init__()
         self.sources = list(sources)
         self.pipes = pipes          # Rohrleitungsnummern mit einlesen
+        self.placeholders = placeholders    # Projektmodus: Platzhalter-Tags (X/? statt Ziffern) mit einlesen
         self._cancel = False
 
     def cancel(self) -> None:
@@ -29,5 +30,5 @@ class ScanWorker(QObject):
             if self._cancel:
                 break
             self.progress.emit(i, len(files), path.name)
-            self.result.emit(read_pdf(path, pat, self.pipes))
+            self.result.emit(read_pdf(path, pat, self.pipes, self.placeholders))
         self.finished.emit(self._cancel)

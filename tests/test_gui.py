@@ -77,13 +77,15 @@ def test_edit_mode_save_and_excel_table(app, tmp_path, monkeypatch):
         app.processEvents()
     page = w.page
     proxy = page.tags.proxy
-    index = proxy.index(0, 4)                                # Spalte "Review" (nach Typ, Tag, Anzahl, Seiten)
+    from p3d_pdfreader.gui.main_window import FIRST_FIELD
+    f = FIRST_FIELD                                          # Spalte "Review" (nach Typ, Tag, Anzahl, Seiten, Projekt-Spalten)
+    index = proxy.index(0, f)
     assert not proxy.setData(index, "OK")                    # ohne Bearbeiten-Modus nicht editierbar
     page.edit_button.setChecked(True)
     assert proxy.setData(index, "OK")
-    assert proxy.setData(proxy.index(0, 8), "WPO-4711")      # Spalte "WPO"
+    assert proxy.setData(proxy.index(0, f + 4), "WPO-4711")      # Spalte "WPO"
     row = [proxy.index(0, c).data() for c in range(proxy.columnCount())]
-    assert row[4] == "OK" and row[8] == "WPO-4711" and row[9] and row[10]    # Datum, User automatisch
+    assert row[f] == "OK" and row[f + 4] == "WPO-4711" and row[f + 5] and row[f + 6]    # Datum, User automatisch
     assert page.save_button.isEnabled()
     assert page.save_review()
     stored = ReviewStore(SAMPLE).values(row[0], row[1])

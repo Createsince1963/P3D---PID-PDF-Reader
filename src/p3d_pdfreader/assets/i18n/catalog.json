@@ -661,5 +661,83 @@
    "en": "All tags ({0})",
    "fr": "Tous les tags ({0})"
   }
+ },
+ "Tabellen-Kontextmenü": {
+  "Kopieren": {
+   "en": "Copy",
+   "fr": "Copier"
+  },
+  "Zeile kopieren": {
+   "en": "Copy row",
+   "fr": "Copier la ligne"
+  },
+  "Zeile mit Überschriften kopieren": {
+   "en": "Copy row with headers",
+   "fr": "Copier la ligne avec les en-têtes"
+  },
+  "Nach diesem Wert filtern": {
+   "en": "Filter by this value",
+   "fr": "Filtrer sur cette valeur"
+  },
+  "Filter dieser Spalte zurücksetzen": {
+   "en": "Reset this column's filter",
+   "fr": "Réinitialiser le filtre de cette colonne"
+  },
+  "Alle Filter zurücksetzen": {
+   "en": "Reset all filters",
+   "fr": "Réinitialiser tous les filtres"
+  },
+  "Spalten …": {
+   "en": "Columns …",
+   "fr": "Colonnes …"
+  },
+  "Nach Excel …": {
+   "en": "To Excel …",
+   "fr": "Vers Excel …"
+  },
+  "Spalten": {
+   "en": "Columns",
+   "fr": "Colonnes"
+  },
+  "Spalte": {
+   "en": "Column",
+   "fr": "Colonne"
+  },
+  "Anzeigen": {
+   "en": "Show",
+   "fr": "Afficher"
+  },
+  "Nach oben": {
+   "en": "Move up",
+   "fr": "Monter"
+  },
+  "Nach unten": {
+   "en": "Move down",
+   "fr": "Descendre"
+  },
+  "Standard": {
+   "en": "Default",
+   "fr": "Par défaut"
+  },
+  "Übernehmen": {
+   "en": "Apply",
+   "fr": "Appliquer"
+  },
+  "Ja": {
+   "en": "Yes",
+   "fr": "Oui"
+  },
+  "Nein": {
+   "en": "No",
+   "fr": "Non"
+  },
+  "Rechtsklick: Spalten …": {
+   "en": "Right-click: Columns …",
+   "fr": "Clic droit : Colonnes …"
+  },
+  "Projekt": {
+   "en": "Project",
+   "fr": "Projet"
+  }
  }
 }

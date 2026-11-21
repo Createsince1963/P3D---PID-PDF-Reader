@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pymupdf
 
-from .patterns import PIPE, Patterns, load
+from .patterns import PIPE, Patterns, has_placeholder, load
 
 TITLE_LABELS = ("DESIGNED:", "DRAWN:", "CHECKED:", "DATE:", "SCALE:")
 _MONTHS = {m: i for i, m in enumerate(("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV",
@@ -198,18 +198,22 @@ def _line_key(w) -> tuple:
     return (w[5], w[6]) if len(w) > 7 else (id(w), 0)
 
 
-def _pipe_lines(words, pat: Patterns) -> list[tuple[str, tuple]]:
+def _pipe_lines(words, pat: Patterns, placeholders: bool = False) -> list[tuple[str, tuple]]:
     """Rohrleitungsnummern einer Seite: [(Nummer, Rechteck)].
 
     PyMuPDF liefert die Woerter je Textzeile in Schreibrichtung - fuer waagerechte und senkrechte Labels gleich. Folgt
     in derselben Zeile ein Teil mit ``_`` (``_205_1``) wird er direkt angehaengt, eine Bruch-Nennweite (``1/2"``) nach
     ``…_1`` mit Leerzeichen (1 1/2"). Gesucht wird der laengste passende Anfang ab jedem Wort."""
     found: list[tuple[str, tuple]] = []
+
+    def is_pipe(t: str) -> bool:
+        return bool(pat.pipe_line.match(t)) or (placeholders and pat.ph_pipe_line is not None
+                                                 and has_placeholder(t) and bool(pat.ph_pipe_line.match(t)))
     i = 0
     while i < len(words):
         w = words[i]
         text, rect, best = w[4], list(w[:4]), None
-        if pat.pipe_line.match(text):
+        if is_pipe(text):
             best = (text, tuple(rect), i)
         j = i + 1
         while j < len(words) and _line_key(words[j]) == _line_key(w):
@@ -222,7 +226,7 @@ def _pipe_lines(words, pat: Patterns) -> list[tuple[str, tuple]]:
                 break
             rect = [min(rect[0], words[j][0]), min(rect[1], words[j][1]),
                     max(rect[2], words[j][2]), max(rect[3], words[j][3])]
-            if pat.pipe_line.match(text):
+            if is_pipe(text):
                 best = (text, tuple(rect), j)
             j += 1
         if best:
@@ -233,9 +237,10 @@ def _pipe_lines(words, pat: Patterns) -> list[tuple[str, tuple]]:
     return found
 
 
-def _tags(words, pat: Patterns, pipes: bool = False) -> list[tuple[str, str, tuple]]:
+def _tags(words, pat: Patterns, pipes: bool = False, placeholders: bool = False) -> list[tuple[str, str, tuple]]:
     """Fundstellen einer Seite: [(Typ, Tag, Rechteck)]. Deckungsgleicher Text (im Plot doppelt uebereinander
-    gezeichnet, z. B. Inhalt + eingebettetes Formular-XObject) zaehlt nur einmal."""
+    gezeichnet, z. B. Inhalt + eingebettetes Formular-XObject) zaehlt nur einmal. ``placeholders`` (Projektmodus):
+    auch Tags mit X/? statt Ziffern (z. B. VHXXX, AV_TL02_XXX_2") - die Projekt-Pruefung meldet sie als unvollstaendig."""
     found: list[tuple[str, str, tuple]] = []
 
     def add(tag: str, typ: str, w) -> None:
@@ -245,13 +250,16 @@ def _tags(words, pat: Patterns, pipes: bool = False) -> list[tuple[str, str, tup
         found.append((typ, tag, rect))
 
     if pipes:
-        for tag, rect in _pipe_lines(words, pat):
+        for tag, rect in _pipe_lines(words, pat, placeholders):
             add(tag, PIPE, rect)
-    numbers = [w for w in words if pat.number.match(w[4])]
+    numbers = [w for w in words if pat.number.match(w[4])
+               or (placeholders and pat.ph_number is not None and has_placeholder(w[4]) and pat.ph_number.match(w[4]))]
     used = set()
     for w in words:
         text = w[4]
         typ = next((t for t, rx in pat.by_type.items() if rx.match(text)), None)
+        if typ is None and placeholders:
+            typ = pat.placeholder_type(text)
         if typ:
             add(text, typ, w)
             continue
@@ -291,8 +299,10 @@ def visible_words(page) -> list[tuple]:
     return out
 
 
-def read_pdf(path: str | Path, patterns: Patterns | None = None, pipes: bool = False) -> PdfResult:
-    """PDF lesen. ``pipes``: Rohrleitungsnummern als Typ "Rohrleitung" mit in die Tag-Liste aufnehmen."""
+def read_pdf(path: str | Path, patterns: Patterns | None = None, pipes: bool = False,
+             placeholders: bool = False) -> PdfResult:
+    """PDF lesen. ``pipes``: Rohrleitungsnummern als Typ "Rohrleitung" mit in die Tag-Liste aufnehmen.
+    ``placeholders`` (Projektmodus): auch Platzhalter-Tags mit X/? statt Ziffern."""
     path = Path(path)
     result = PdfResult(path=path)
     pat = patterns or load()
@@ -312,7 +322,7 @@ def read_pdf(path: str | Path, patterns: Patterns | None = None, pipes: bool = F
                 words = visible_words(page)
                 if page.number == 0:
                     _title_block(result, words, page.rect.width, page.rect.height, pat)
-                for typ, tag, rect in _tags(words, pat, pipes):
+                for typ, tag, rect in _tags(words, pat, pipes, placeholders):
                     key = (typ, tag)
                     if key not in merged:
                         merged[key] = Tag(tag, typ, 1, rect[0], rect[1], rect)

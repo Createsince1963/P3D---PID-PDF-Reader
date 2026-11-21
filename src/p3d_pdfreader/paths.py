@@ -54,6 +54,11 @@ def exports_dir() -> Path:
     return _ensure(home_dir() / "exports")
 
 
+def projects_dir() -> Path:
+    """Ablage der Projekt-Datenbanken (Projektmodus); Projekte koennen auch an anderer Stelle liegen (Projekt oeffnen)."""
+    return _ensure(home_dir() / "projects")
+
+
 def patterns_file() -> Path:
     return config_dir() / "tag_patterns.json"
 

@@ -1,8 +1,43 @@
 # Changelog
 
+## 1.0.11 – 2026-11-21
+- **Menüband:** Jede Gruppe hat oben eine **dunkelblaue Überschrift** (Farbe des Tabellenkopfs, folgt der Akzentfarbe). `ribbon.py` (Kopie aus XCHANGE) bleibt unverändert; neues Modul `gui\ribbon_heads.py`.
+- **Gruppe „Einstellungen“** (Pfade, Tag-Muster) steht jetzt direkt nach „1 Einlesen“, vor „2 Prüfen“.
+- **Rechtsklick in Tabellen wie P3D XCHANGE** (`gui\table_menu.py`), in allen Tabellen (Dateien, Tags, Alle Tags):
+  - **Zelle:** Kopieren (markierte Zellen, Tabulator-getrennt), Zeile kopieren, Zeile mit Überschriften kopieren, Nur „Wert“ in „Spalte“ zeigen, Filter der Spalte zurücksetzen, Alle Filter zurücksetzen, Spalten …, Nach Excel ….
+  - **Excel-Symbol (Tabellenecke), Rechtsklick:** Dialog **„Spalten …“** wie XCHANGE (Nach oben/unten, Anzeigen Ja/Nein, „Standard“ = wie eingelesen).
+  - Spaltenkopf-Menü (Kit) unverändert.
+- **Handbuch als interaktive HTML-Datei** (`assets\help\handbuch.html`, öffnet über Hilfe › Handbuch im Browser): klickbarer Nachbau des Menübands mit den App-Symbolen und Erklärung je Knopf, Schnellstart, Rechtsklick-Demo, Suche mit Hervorhebung, Inhaltsverzeichnis. Die Symbole erzeugt `tools\make_help_images.py` direkt aus der App (neue PNG-Symbole in `assets\icons` kommen beim erneuten Ausführen automatisch mit). Ohne HTML-Datei öffnet weiterhin die README.
+- Übersetzungen EN/FR für die neuen Menütexte (`tools\make_i18n_catalog.py`, Katalog neu erzeugt).
+- Tests: `test_ribbon_menus.py` (Gruppenköpfe oben, Reihenfolge, Zellenmenü, Wertfilter, Spalten-Dialog).
+
+## 1.0.10 – 2026-11-21
+- **Projekt-Prüfung mit benannten Befunden** (Spalte „Projekt-Prüfung“; mehrere Befunde werden mit „ + “ verbunden, es wird immer alles gegengeprüft):
+  - **Regelfehler Projektdefinition:** Trennzeichen-Regel verletzt (z. B. alle Volltags `203-17-111-TZIT-011`: „-“ statt „_“) oder Aufbau passt nicht zur Tag-Struktur.
+  - **Code fehlt in Projektdefinition:** Code nicht in der Liste, z. B. `…LTCHW_CS01…` (Fluid code fehlt in der Media list), `151HPP01` (Function code HPP).
+  - **Code unvollständig:** Platzhalter statt Code. Zählt bei: `?` irgendwo, `X` an Stelle von Ziffern (`AV_TL02_XXX_2"`, `VHXXX`), Code nur aus X oder mit `XX` (`SSXX`), einzelnes X für eine Ziffer eines bekannten Codes (`ST1X` → ST10). Ein X in einem Buchstaben-Code (HEX, XV, CHX) zählt nicht, ein solcher unbekannter Code „fehlt“.
+  - **mehrfach vorhanden:** kommt zu jedem Befund dazu, wenn der Tag auf einer Seite mehrfach steht, z. B. „Code unvollständig + mehrfach vorhanden“.
+  - Je Tag höchstens ein unbekannter Code (Platzhalter an allen Stellen), sonst gilt er als Regelfehler. Verhindert irreführende Hinweise, z. B. bei `203_17_152_PFC_…` (überzähliges „_“).
+- **Platzhalter-Tags werden im Projektmodus mit eingelesen** (X/? statt Ziffern, für alle Tag-Typen und Rohrleitungen). Beim Ein- und Ausschalten des Projektmodus werden geladene PDFs neu eingelesen. Im Standardmodus bleibt alles wie bisher.
+- „Nur Abweichungen“, rote Rahmen im Viewer, Kopfband und Exporte erfassen jeden Befund. Review-Excel, Blatt Info: „Projekt-Befunde (Fundstellen)“.
+- Beispielordner (25 PDFs, SGOPS): 23 zusätzliche Platzhalter-Tags. Alle drei Befundarten kommen vor, teils kombiniert, z. B. `LTCWR_ST04_XXX_1"`: Fluid code fehlt + Line number Platzhalter).
+- Tests: `test_project_defs.py` um Befund-Kombinationen und das Einlesen von Platzhaltern erweitert (jetzt 10 Tests).
+
+## 1.0.9 – 2026-11-21
+- **Projektmodus mit Projektdefinitionen (Modul aus P3D Tag Compliance):** neue Menüband-Gruppe „Projekt“ (vorne). „Projektmodus: an/aus“ schaltet das Modul ein und aus; **aus = Standardmodus wie bisher** (keine Prüfspalten, keine Projektregeln). Modus und Projekt werden gemerkt (`config\state.json`).
+- **Projekt wählen:** aus Tag Compliance übernehmen (`pidtag_project.db` wählen, wird nur gelesen), Projekt öffnen, neues Projekt; Liste der Projekte in `<Datenordner>\projects\*.db`.
+- **Projekt-Datenbank im Schema von Tag Compliance:** alle Definitionstabellen (General/Building/System/Fitting/Function/Pipeclass codes, Nummernkreise, Tag structures, Tag segments, Notes, Quelle), alle Listen (z. B. Media list, Pipeclass Project) und die Trennzeichen-Regel (`-` → `_`). Lizenz-, DCF- und Projektdatei-Tabellen werden nicht übernommen. Erneute Übernahme ersetzt die Definitionen; eigene Prüfregeln und PDF-Strukturen bleiben.
+- **Verwaltungsdialog „Projektdefinitionen …“** (Aufbau wie in Tag Compliance): Tabellen/Listen mit Zeilenzahl, bearbeitbares Raster mit Filter, + Zeile / Zeile löschen / Speichern / Verwerfen (Rückfrage bei ungespeicherten Änderungen), Neue Liste, Liste aus Excel, Spalten, Liste löschen, Excel-Export/-Import (Blattnamen wie Tag Compliance), Übernahme aus Tag Compliance (optional vorher Excel-Sicherung), Projektname, Standard-Prüfregeln, „Tag testen“.
+- **Prüfregeln** (Tabelle „PDF-Prüfregeln“): PDF-Tag-Typ → Tag-Struktur(en) aus Segmenten (Segment-Quellen wie im Segment Tag Designer: Codeliste, Liste|Spalte, const:, seq:n, free). Mitgeliefert: PDF_EQUIPMENT (Unit + Function code + Nr.), PDF_VALVE (Fitting type + Nr.), PDF_PIPE_LINE und PDF_HOSE, PDF_FULL_TAG (Building_System_Unit_Tag), PDF_INSTRUMENT. Zeichnungsverweise werden nicht geprüft.
+- **Im Projektmodus:** Spalten „Projekt-Prüfung“ (OK/Fehler) und „Projekt-Hinweis“ (passende Struktur bzw. erstes nicht passendes Segment oder Trennzeichen-Regel) in „Tags der gewählten PDF“ und „Alle Tags“; Filter „Nur Abweichungen“ (Leiste und Menüband); Viewer: Abweichungen rot umrandet, außer der Review ist „OK“ oder „Nicht relevant“; Kopfband mit Projekt und Anzahl Abweichungen; Export Excel/CSV und Review-Excel mit den Prüfspalten (Info-Blatt mit Projekt und Abweichungen).
+- Beispielordner (25 PDFs, SGOPS-Definitionen): u. a. alle Volltags `203-17-…` → Trennzeichen „-“ statt „_“, `151HPP01`/`215CHX01` → Function code nicht in der Liste, `…LTCHW_CS01…` → Fluid code nicht in der Media list.
+- Neu: `core\project_defs.py` (ohne Qt), `gui\project_dialog.py`; Spalten der Tag-Tabelle: Prüfspalten nach „Seiten“. Web-Version unverändert (noch ohne Projektmodus).
+- Tests: `tests\test_project_defs.py` (8 Tests: Anlage, Übernahme nur lesend, Prüfung und Hinweise, Tabellen/Listen, erneute Übernahme, Excel, Viewer-Status, GUI-Umschaltung mit Dialog); `test_gui.py` an die neuen Spaltenpositionen angepasst.
+
 ## 1.0.8 – 2026-11-21
 - **Monochrom-Ansicht im PDF-Viewer:** Button „Monochrom“ in der Viewer-Leiste (Desktop und Web). Die Seite wird wie ein Schwarz-Weiß-Plot gezeigt: Weiß bleibt weiß, jede kräftige Farbe (auch Gelb, Cyan) wird schwarz, Pastelltöne grau, Kantenglättung bleibt. Zoom, Drehung und Markierungen bleiben beim Umschalten erhalten; die Wahl wird gemerkt (Desktop `config\state.json`, Web im Browser). Nur Ansicht – die PDF wird nicht verändert.
-- Neues Kernmodul `coreender.py` (ohne Qt, ohne numpy), genutzt von Desktop-Vorschau und Web-Server (`/render?...&mono=1`). Monochrom kostet beim Grundbild ca. 0,7 s zusätzlich je Seite.
+- Neues Kernmodul `core
+ender.py` (ohne Qt, ohne numpy), genutzt von Desktop-Vorschau und Web-Server (`/render?...&mono=1`). Monochrom kostet beim Grundbild ca. 0,7 s zusätzlich je Seite.
 - **Alle gefundenen Tags im Viewer umrandet:** grün = korrekt, rot = fehlerhaft (Review „Korrektur erforderlich“). Tags ohne Review oder mit anderem Review-Wert sind grün. Die Farben ändern sich sofort beim Bearbeiten der Review-Spalte. Farben aus dem Kit-Theme (`LIGHT.ok` / `LIGHT.err`). Doppelte Tags bleiben zusätzlich gelb hinterlegt, die Auswahl-Markierung liegt darüber.
 - Web: alle gefundenen Tags grün umrandet (Review-Status gibt es im Web noch nicht, daher dort kein Rot).
 - Tests: `tests	est_viewer_display.py` (Monochrom-Bild, Statuszuordnung, Viewer-Umschaltung und Rahmenfarben).
