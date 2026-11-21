@@ -250,3 +250,73 @@ def test_gui_project_mode_toggle(tmp_path, monkeypatch):
     w2 = MainWindow(app, "test")
     assert w2.checker is not None and w2.project.name == "P1"                    # Modus und Projekt gemerkt
     w2.close()
+
+
+def test_save_list_with_new_columns(project):
+    """Kachel-Editor: neue Spaltenfolge einer Liste in einer Transaktion; feste Tabellen behalten ihre Spalten."""
+    project.save("list:media", [["PFC", "001", "x"]], columns=["Medium Code (Fluid)", "Sr.No", "Hinweis"])
+    assert project.read("list:media") == (["Medium Code (Fluid)", "Sr.No", "Hinweis"], [["PFC", "001", "x"]])
+    with pytest.raises(ValueError):
+        project.save("list:media", [["a", "b"]], columns=["A", "a"])
+    with pytest.raises(ValueError):
+        project.save("def_function_codes", [["X", "y"]], columns=["description", "code"])
+    assert project.read("list:media")[0] == ["Medium Code (Fluid)", "Sr.No", "Hinweis"]
+
+
+def test_definitions_dialog_menus_tiles_and_undo(project, tmp_path, monkeypatch):
+    """Projektdefinitionen wie Tag Compliance: Rechtsklick-Menues (Zelle, Zeilennummer, Spaltenkopf), Undo/Redo,
+    Kachel-Editor (Spalten verschieben/ausblenden/einfuegen), Kacheln links umsortieren, Ansicht nach Excel."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path / "home"))
+    from p3d_pdfreader.gui import project_dialog
+    from p3d_pdfreader.gui.project_dialog import ProjectDefinitionsDialog
+    dlg = ProjectDefinitionsDialog(project)
+    keys = [dlg.list.item(i).data(Qt.UserRole) for i in range(dlg.list.count())]
+    dlg.list.setCurrentRow(keys.index("def_function_codes"))
+    assert dlg.grid_data()[1] == [["PMP", "Pump"], ["REA", "Reactor"]]
+
+    # Zeilen: Menue der Zeilennummern, duplizieren, Rueckgaengig/Wiederholen
+    dlg._select_rows([0])
+    texts = [a.text() for a in dlg.row_header_menu().actions() if a.text()]
+    assert "Zeile oberhalb einfügen" in texts and "Zeile duplizieren" in texts and "Rückgängig" in texts
+    dlg.duplicate_rows()
+    assert dlg.grid.rowCount() == 3 and dlg.dirty
+    dlg.undo()
+    assert dlg.grid.rowCount() == 2
+    dlg.redo()
+    assert dlg.grid.rowCount() == 3
+    dlg.undo()
+    # Zellenmenue und Spaltenmenue einer festen Tabelle (Spalten fest)
+    cell = [a.text() for a in dlg.cell_menu(dlg.grid.model().index(0, 0)).actions() if a.text()]
+    assert "Zeile hinzufügen" in cell and "Ansicht nach Excel …" in cell and "Nach Code A–Z sortieren" in cell
+    col = {a.text(): a.isEnabled() for a in dlg.column_menu(0).actions() if a.text()}
+    assert col["Spalte links einfügen"] is False and col["Zeilen absteigend sortieren"] is True
+    # feste Tabelle: Spalten nur in der Ansicht verschieben, gespeichert wird in der Tabellenfolge
+    dlg.move_columns([1, 0])
+    assert dlg.grid_data()[0] == ["description", "code"]
+    dlg.grid.item(0, dlg.grid.horizontalHeader().logicalIndex(1)).setText("ABC")
+    assert dlg.rows()[0][0] == "ABC" and dlg.save_table()
+    assert ["ABC", "Pump"] in project.read("def_function_codes")[1]
+
+    # Liste: Kachel-Editor, Spalte einfuegen, umsortieren, ausblenden, speichern
+    dlg.tiles_button.setChecked(True)
+    assert dlg.column_tiles.isVisibleTo(dlg) and dlg.column_tiles.tiles.count() == 2
+    dlg.list.setCurrentRow([dlg.list.item(i).data(Qt.UserRole) for i in range(dlg.list.count())].index("list:media"))
+    dlg.insert_columns(2, 1, ["Hinweis"])
+    dlg.move_columns([1, 0, 2])
+    dlg.set_column_hidden(2, True)
+    assert dlg.column_tiles.tiles.count() == 3
+    assert dlg.column_tiles.tiles.item(2).checkState() == Qt.Unchecked
+    assert dlg.save_table()
+    assert project.read("list:media")[0] == ["Medium Code (Fluid)", "Sr.No", "Hinweis"]
+    # Kacheln links: Reihenfolge und Name gemerkt (Projekt-Datenbank)
+    dlg._tiles_reordered()
+    assert json.loads(project.meta(project_dialog.TILE_ORDER))[0] == keys[0]
+    # Ansicht nach Excel: nur sichtbare Spalten und gefilterte Zeilen
+    from p3d_pdfreader.gui.table_export import visible_table
+    dlg.filter.setText("TFHR")
+    assert visible_table(dlg.grid) == (["Medium Code (Fluid)", "Sr.No"], [["TFHR", "002"]])
+    dlg.close()
+    app.processEvents()

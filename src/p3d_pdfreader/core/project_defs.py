@@ -268,9 +268,19 @@ class ProjectDB:
         sort_code_rows(cols, rows)
         return cols, rows
 
-    def save(self, table: str, rows: list) -> int:
-        """Inhalt einer Tabelle ersetzen (eine Transaktion). Leere Zeilen entfallen; doppelte Schluessel -> ValueError."""
+    def save(self, table: str, rows: list, columns=None) -> int:
+        """Inhalt einer Tabelle ersetzen (eine Transaktion). Leere Zeilen entfallen; doppelte Schluessel -> ValueError.
+        ``columns`` (nur Listen): neue Spaltenfolge/-namen, in derselben Transaktion gespeichert (Kachel-Editor)."""
         _title, cols = self.info(table)
+        if columns is not None:
+            if not is_list(table):
+                raise ValueError("Die Spalten einer festen Tabelle lassen sich nicht ändern.")
+            columns = list(columns)
+            cols = [c for c in (_clean(c) for c in columns) if c]
+            if not cols or len(cols) != len(columns):
+                raise ValueError("Jede Spalte braucht einen Namen.")
+            if len({c.lower() for c in cols}) != len(cols):
+                raise ValueError("Spaltennamen doppelt.")
         clean = []
         for r in rows:
             r = [_clean(x) for x in list(r)[:len(cols)]]
@@ -282,6 +292,9 @@ class ProjectDB:
             self.con.execute("begin")
             if is_list(table):
                 n = list_name(table)
+                if columns is not None:
+                    self.con.execute("update def_lists set columns=? where name=?",
+                                     (json.dumps(cols, ensure_ascii=False), n))
                 self.con.execute("delete from def_list_rows where list_name=?", (n,))
                 self.con.executemany("insert into def_list_rows(list_name,pos,data) values(?,?,?)",
                                      [(n, i, json.dumps(r, ensure_ascii=False)) for i, r in enumerate(clean)])

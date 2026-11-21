@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.13 – 2026-11-21
+- **Projektdefinitionen wie in P3D Tag Compliance** (Vorlage: Fenster „Project definitions“, `pidtag_gui.py` + `linetag_defs_tiles.py`; neues Modul `gui\project_tiles.py`):
+  - **Rechtsklick in eine Zelle:** Zeile hinzufügen, Zeile(n) duplizieren/löschen, Nach Code A–Z sortieren, Kopieren, Einfügen, Inhalt löschen, Nur Zeilen mit „Wert“ zeigen, Filter zurücksetzen, Kachel-Editor ein/aus, Ansicht nach Excel …, Rückgängig/Wiederholen.
+  - **Rechtsklick auf Zeilennummern (wie Excel):** Zeile(n) oberhalb/unterhalb einfügen, duplizieren, kopieren, ausschneiden, aus der Zwischenablage oberhalb/unterhalb einfügen, löschen, Inhalt löschen.
+  - **Rechtsklick auf Spaltenkopf:** umbenennen, links/rechts einfügen, duplizieren, kopieren, ausschneiden, einfügen, löschen, Inhalt löschen, Zeilen auf-/absteigend sortieren, ausblenden, alle einblenden. Spaltenänderungen nur bei Listen; feste Tabellen behalten ihre Spalten.
+  - **Kachel-Editor** (Knopf über der Tabelle, Zustand gemerkt): Spalten als Kacheln – ziehen = verschieben, Haken = sichtbar, Doppelklick = umbenennen, Rechtsklick = Spaltenmenü, „+ Spalte“, „Alle einblenden“. Bei Listen schreibt „Speichern“ neue Spaltenfolge und -namen zusammen mit den Zeilen (eine Transaktion, `ProjectDB.save(..., columns=)`).
+  - **Kacheln links** per Drag & Drop umsortieren und umbenennen (Doppelklick, F2, Rechtsklick); Reihenfolge und Namen liegen in der Projekt-Datenbank.
+  - **Ansicht nach Excel …**: sichtbare Spalten in angezeigter Reihenfolge, nur gefilterte Zeilen (gilt jetzt allgemein für `visible_table`).
+  - Tastatur: Strg+Z/Strg+Y, Strg+C/Strg+V (tabulatorgetrennt wie Excel), Entf leert die markierten Zellen. Spaltenköpfe lassen sich ziehen.
+  - Nicht übernommen: der QML-Kachel-Editor von Tag Compliance mit berechneten Spalten und Profilen.
+- Tests: Speichern mit neuen Listenspalten, Menüs, Undo/Redo, Kachel-Editor, Kachelreihenfolge, Ansicht-Export.
+
 ## 1.0.12 – 2026-11-21
 - **Tests:** pytest legt seine Temp-Dateien jetzt im Projektordner `.pytest_tmp\` an (`pytest.ini`, `--basetemp`; in `.gitignore`). Vorher brachen alle Tests mit `tmp_path` mit „Zugriff verweigert“ ab, wenn der Standardordner `%TEMP%\pytest-of-<Benutzer>` gesperrt war.
 

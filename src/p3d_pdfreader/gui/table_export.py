@@ -16,7 +16,8 @@ def visible_table(table: QTableView) -> tuple[list[str], list[list]]:
     model, header = table.model(), table.horizontalHeader()
     cols = [header.logicalIndex(v) for v in range(header.count()) if not header.isSectionHidden(header.logicalIndex(v))]
     headers = [str(model.headerData(c, Qt.Horizontal, Qt.DisplayRole) or "") for c in cols]
-    rows = [[model.index(r, c).data(Qt.DisplayRole) for c in cols] for r in range(model.rowCount())]
+    rows = [[model.index(r, c).data(Qt.DisplayRole) for c in cols] for r in range(model.rowCount())
+            if not table.isRowHidden(r)]                         # ausgefilterte Zeilen (setRowHidden) gehoeren nicht dazu
     return headers, rows
 
 

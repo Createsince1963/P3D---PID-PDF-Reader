@@ -4,12 +4,13 @@ Zeilenzahl, rechts die Tabelle; Listen anlegen, Spalten, Liste aus Excel, Excel-
 Compliance, Tag testen). Daten und Pruefung: ``core.project_defs`` (ohne Qt). Farben nur aus design/appearance/Kit."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QDialog, QFileDialog, QFormLayout, QGroupBox,
-                               QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox,
-                               QSplitter, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
+                               QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidgetItem, QMessageBox,
+                               QSplitter, QTableWidget, QVBoxLayout, QWidget)
 
 from main_gui_kit.buttons import ButtonKind, action_button
 
@@ -19,8 +20,12 @@ from ..core.project_defs import (DEFAULT_DESIGNS, RULES, SEGMENTS, SETTING_NOTES
 from . import last_paths
 from .design import ERROR_QSS, NOTE_QSS, SECTION_QSS
 from .paths_dialog import open_in_explorer
+from .project_tiles import ColumnTiles, GridEditing, TileList, load_json_meta
 from .sheet import table_header_qss
+from .table_export import export_table_view
 
+TILES_ON = "defs_tile_editor_on"          # config/state.json: Kachel-Editor zuletzt ein/aus
+TILE_ORDER, TILE_NAMES = "tile_order", "tile_names"   # Projekt-Datenbank (meta): Kachelreihenfolge und -namen links
 TC_KIND = "last_tag_compliance_dir"     # config/state.json: zuletzt gewaehlter Ordner der Tag-Compliance-Datenbank
 DB_FILTER = "Projekt-Datenbank (*.db);;Alle Dateien (*.*)"
 
@@ -120,7 +125,7 @@ def _counts_text(counts: dict[str, int]) -> str:
 # ----------------------------------------------------------------------------------------------------------------
 # Verwaltungsdialog
 # ----------------------------------------------------------------------------------------------------------------
-class ProjectDefinitionsDialog(QDialog):
+class ProjectDefinitionsDialog(GridEditing, QDialog):
     """Bearbeitbare Projektdefinitionen. ``changed`` ist True, sobald etwas gespeichert wurde (Pruefung neu bauen)."""
 
     def __init__(self, db: ProjectDB, parent=None):
@@ -129,6 +134,9 @@ class ProjectDefinitionsDialog(QDialog):
         self.changed = False
         self.dirty = False
         self.table_key: str | None = None
+        self.db_cols: list[str] = []
+        self.db_key: str | None = None                   # Tabelle, die gerade im Raster steht
+        self.column_tiles = None
         self._loading = False
         self.setWindowTitle("Projektdefinitionen (bearbeitbare Datenbank)")
         self.resize(1320, 820)
@@ -170,8 +178,10 @@ class ProjectDefinitionsDialog(QDialog):
         caption = QLabel("Tabellen und Listen")
         caption.setStyleSheet(SECTION_QSS)
         left_lay.addWidget(caption)
-        self.list = QListWidget()
+        self.list = TileList()
         self.list.currentItemChanged.connect(self._table_changed)
+        self.list.reordered.connect(self._tiles_reordered)
+        self.list.renameRequested.connect(self._rename_tile)
         left_lay.addWidget(self.list, 1)
         for text, kind, slot in (("+ Neue Liste …", ButtonKind.SECONDARY, self._new_list),
                                  ("Liste aus Excel …", ButtonKind.SECONDARY, self._list_from_excel),
@@ -194,6 +204,13 @@ class ProjectDefinitionsDialog(QDialog):
         self.filter.setClearButtonEnabled(True)
         self.filter.textChanged.connect(self._apply_filter)
         top.addWidget(self.filter, 1)
+        self.tiles_button = action_button("Kachel-Editor", ButtonKind.PRIMARY,
+                                          "Spalten als Kacheln: verschieben, ein-/ausblenden, umbenennen, einfügen, "
+                                          "löschen (Rechtsklick auf eine Kachel)")
+        self.tiles_button.setCheckable(True)
+        self.tiles_button.toggled.connect(self._tiles_toggled)
+        top.addWidget(self.tiles_button)
+        self._button(top, "Ansicht nach Excel …", ButtonKind.PROCESS, self.export_view)
         right_lay.addLayout(top)
         self.hint = QLabel()
         self.hint.setWordWrap(True)
@@ -209,6 +226,12 @@ class ProjectDefinitionsDialog(QDialog):
         self.grid.setEditTriggers(QAbstractItemView.DoubleClicked | QAbstractItemView.EditKeyPressed
                                   | QAbstractItemView.AnyKeyPressed)
         self.grid.itemChanged.connect(self._edited)
+        self.grid.setToolTip("Rechtsklick: Zeilen, Zellen und Spalten bearbeiten (auch auf Zeilennummern und "
+                             "Spaltenköpfe); Strg+Z/Strg+Y rückgängig/wiederholen, Strg+C/Strg+V wie Excel")
+        self.install_grid_functions()
+        self.column_tiles = ColumnTiles(self)
+        self.column_tiles.hide()
+        right_lay.addWidget(self.column_tiles)
         right_lay.addWidget(self.grid, 1)
         edit_row = QHBoxLayout()
         self._button(edit_row, "+ Zeile", ButtonKind.SECONDARY, self._add_row)
@@ -245,6 +268,7 @@ class ProjectDefinitionsDialog(QDialog):
         self._fill_list()
         self._update_source()
         self._set_dirty(False)
+        self.tiles_button.setChecked(bool(last_paths.get_value(TILES_ON, False)))
 
     # --- Hilfen ------------------------------------------------------------------------------------------------
     @staticmethod
@@ -262,8 +286,9 @@ class ProjectDefinitionsDialog(QDialog):
         select = select or self.table_key
         self._loading = True
         self.list.clear()
-        for key, title, _cols in self.db.tables():
-            item = QListWidgetItem(f"{title}  ({self.db.count(key)})")
+        names = load_json_meta(self.db, TILE_NAMES, {})
+        for key, title, _cols in self._ordered_tables():
+            item = QListWidgetItem(f"{names.get(key) or title}  ({self.db.count(key)})")
             item.setData(Qt.UserRole, key)
             tip = "Liste" if is_list(key) else ("Tabelle des PDF Readers" if key in (RULES, SETTINGS)
                                                 else "Definitionstabelle (wie Tag Compliance)")
@@ -272,6 +297,51 @@ class ProjectDefinitionsDialog(QDialog):
         self._loading = False
         keys = [self.list.item(i).data(Qt.UserRole) for i in range(self.list.count())]
         self.list.setCurrentRow(keys.index(select) if select in keys else 0)
+
+    def _ordered_tables(self) -> list:
+        """Tabellen in der Kachelreihenfolge des Nutzers; unbekannte bleiben in ihrer ueblichen Reihenfolge am Ende."""
+        rank = {k: i for i, k in enumerate(load_json_meta(self.db, TILE_ORDER, []))}
+        return sorted(self.db.tables(), key=lambda t: rank.get(t[0], len(rank)))
+
+    def _tiles_reordered(self) -> None:
+        order = [self.list.item(i).data(Qt.UserRole) for i in range(self.list.count())]
+        self.db.set_meta(TILE_ORDER, json.dumps(order))
+
+    def _rename_tile(self, row: int) -> None:
+        """Kachel umbenennen (nur Anzeige, die Tabelle behaelt ihren Namen); leer = urspruenglicher Titel."""
+        item = self.list.item(row)
+        if item is None:
+            return
+        key = item.data(Qt.UserRole)
+        title, _cols = self.db.info(key)
+        names = load_json_meta(self.db, TILE_NAMES, {})
+        name, ok = QInputDialog.getText(self, "Kachel umbenennen", f"Name der Kachel (Original: {title}).\n"
+                                        "Leer = Originalname.", text=names.get(key, title))
+        if not ok:
+            return
+        name = name.strip()
+        if name and name != title:
+            names[key] = name
+        else:
+            names.pop(key, None)
+        self.db.set_meta(TILE_NAMES, json.dumps(names, ensure_ascii=False))
+        self._fill_list(self.table_key)
+
+    def columns_editable(self) -> bool:
+        return bool(self.table_key) and is_list(self.table_key)
+
+    def _tiles_toggled(self, on: bool) -> None:
+        last_paths.set_value(TILES_ON, bool(on))
+        self.column_tiles.setVisible(on)
+        if on:
+            self.column_tiles.refresh()
+
+    def toggle_tiles(self) -> None:
+        self.tiles_button.setChecked(not self.tiles_button.isChecked())
+
+    def export_view(self) -> None:
+        """Sichtbare Spalten in angezeigter Reihenfolge und die gefilterten Zeilen nach Excel/CSV."""
+        export_table_view(self.grid, self.title_label.text() or "Projektdefinitionen")
 
     def _set_dirty(self, dirty: bool) -> None:
         self.dirty = dirty
@@ -313,19 +383,16 @@ class ProjectDefinitionsDialog(QDialog):
     def load_table(self, key: str) -> None:
         self.table_key = key
         title, _cols = self.db.info(key)
+        same = key == self.db_key                        # nach Speichern/Verwerfen: Ansicht (ausgeblendet, Breiten) bleibt
+        hidden = self._hidden_labels() if same else set()
         cols, rows = self.db.read(key)
-        self._loading = True
-        self.grid.clear()
-        self.grid.setColumnCount(len(cols))
-        self.grid.setHorizontalHeaderLabels(cols)
-        self.grid.setRowCount(len(rows))
-        for r, row in enumerate(rows):
-            for c, value in enumerate(row):
-                self.grid.setItem(r, c, QTableWidgetItem(value))
-        self.grid.resizeColumnsToContents()
-        for c in range(len(cols)):
-            self.grid.setColumnWidth(c, min(420, max(80, self.grid.columnWidth(c))))
-        self._loading = False
+        self.db_cols, self.db_key = list(cols), key
+        self.set_grid(list(cols), rows, hidden)
+        if not same:
+            self.grid.resizeColumnsToContents()
+            for c in range(len(cols)):
+                self.grid.setColumnWidth(c, min(420, max(80, self.grid.columnWidth(c))))
+        self.reset_undo()
         self.title_label.setText(title)
         hint = HINTS.get(key, "")
         if key == SETTINGS:
@@ -336,14 +403,16 @@ class ProjectDefinitionsDialog(QDialog):
         self._set_dirty(False)
 
     def rows(self) -> list[list[str]]:
-        out = []
-        for r in range(self.grid.rowCount()):
-            out.append([(self.grid.item(r, c).text() if self.grid.item(r, c) else "")
-                        for c in range(self.grid.columnCount())])
-        return out
+        """Zeilen zum Speichern: Listen in Anzeigereihenfolge der Spalten, feste Tabellen in ihrer Spaltenfolge."""
+        labels, rows = self.grid_data()
+        if self.columns_editable():
+            return rows
+        pos = [labels.index(c) for c in self.db_cols]
+        return [[r[p] for p in pos] for r in rows]
 
     def _edited(self, _item) -> None:
         if not self._loading:
+            self.cell_edited()
             self._set_dirty(True)
 
     def _apply_filter(self, text: str) -> None:
@@ -355,25 +424,15 @@ class ProjectDefinitionsDialog(QDialog):
     def _add_row(self) -> None:
         if self.table_key is None:
             return
-        self.filter.clear()
         r = self.grid.rowCount()
-        self._loading = True
-        self.grid.insertRow(r)
-        for c in range(self.grid.columnCount()):
-            self.grid.setItem(r, c, QTableWidgetItem(""))
-        self._loading = False
+        self.insert_rows(r)
+        first = self.grid.horizontalHeader().logicalIndex(0)
         self.grid.scrollToBottom()
-        self.grid.setCurrentCell(r, 0)
-        self.grid.editItem(self.grid.item(r, 0))
-        self._set_dirty(True)
+        self.grid.setCurrentCell(r, first)
+        self.grid.editItem(self.grid.item(r, first))
 
     def _delete_rows(self) -> None:
-        rows = sorted({i.row() for i in self.grid.selectedIndexes()}, reverse=True)
-        if not rows:
-            return
-        for r in rows:
-            self.grid.removeRow(r)
-        self._set_dirty(True)
+        self.delete_rows()
 
     def _discard(self) -> None:
         if self.table_key:
@@ -382,8 +441,10 @@ class ProjectDefinitionsDialog(QDialog):
     def save_table(self) -> bool:
         if self.table_key is None:
             return True
+        labels = self.grid_data()[0]
+        columns = labels if self.columns_editable() and labels != self.db_cols else None
         try:
-            n = self.db.save(self.table_key, self.rows())
+            n = self.db.save(self.table_key, self.rows(), columns)
         except ValueError as exc:
             QMessageBox.warning(self, "Speichern", str(exc))
             return False
