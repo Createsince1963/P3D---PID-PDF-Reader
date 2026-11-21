@@ -1,6 +1,7 @@
 data/
 __pycache__/
 .pytest_cache/
+.pytest_tmp/
 dist/
 build/
 CLAUDE.md

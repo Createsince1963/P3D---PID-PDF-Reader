@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.12 – 2026-11-21
+- **Tests:** pytest legt seine Temp-Dateien jetzt im Projektordner `.pytest_tmp\` an (`pytest.ini`, `--basetemp`; in `.gitignore`). Vorher brachen alle Tests mit `tmp_path` mit „Zugriff verweigert“ ab, wenn der Standardordner `%TEMP%\pytest-of-<Benutzer>` gesperrt war.
+
 ## 1.0.11 – 2026-11-21
 - **Menüband:** Jede Gruppe hat oben eine **dunkelblaue Überschrift** (Farbe des Tabellenkopfs, folgt der Akzentfarbe). `ribbon.py` (Kopie aus XCHANGE) bleibt unverändert; neues Modul `gui\ribbon_heads.py`.
 - **Gruppe „Einstellungen“** (Pfade, Tag-Muster) steht jetzt direkt nach „1 Einlesen“, vor „2 Prüfen“.
