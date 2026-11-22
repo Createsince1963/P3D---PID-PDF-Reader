@@ -19,20 +19,20 @@ from PySide6.QtWidgets import (QApplication, QComboBox, QHBoxLayout, QLabel, QLi
 from main_gui_kit.branding import HeaderBanner
 from main_gui_kit.buttons import ButtonKind, action_button
 from main_gui_kit.preview import DataPreviewDialog
-from main_gui_kit.tables import (MultiColumnFilterProxy, TableAdminBar, TableDataModel, configure_table_view,
-                                 table_zoom_slider)
+from main_gui_kit.tables import (MultiColumnFilterProxy, TableAdminBar, TableDataModel, apply_table_layout,
+                                 configure_table_view, table_zoom_slider)
 from main_gui_kit.theme import LIGHT, ThemeManager
 
 from .. import i18n, paths
 from ..constants import APP_NAME
-from ..core import export, redline, review
+from ..core import data_link, export, project_settings, redline, review
 from ..core.extract import PdfResult
 from ..core.project_defs import CHECK_HEADERS, ProjectDB, is_fault_status
 from ..core.review_store import CHANGE_VALUES, EDIT_FIELDS, FIELDS, REVIEW_VALUES, ReviewStore, status_hits
 from . import appearance, icons, last_paths, table_views
 from .design import NOTE_QSS
 from .paths_dialog import PathsDialog, open_in_explorer
-from . import project_dialog, web_control
+from . import project_dialog, table_profiles, web_control
 from .controls import indicator_qss
 from .data_link_ui import LinkController
 from .icons import excel_icon
@@ -649,6 +649,18 @@ class AllTagsSheet(Sheet):
         self.body_layout.addWidget(self.tags, 1)
 
 
+class LinkReviewSheet(Sheet):
+    """Review-Tabelle (1.0.36): Abgleich der PDF-Tags mit der Importtabelle ueber Datenlink 1 und 2, Pruefergebnis
+    je Zeile (``core.data_link.review_rows``). Excel ueber das Symbol in der Tabellenecke."""
+
+    def __init__(self):
+        super().__init__("Review Importliste", "Prüfergebnis: PDF-Tags ↔ Importtabelle (Datenlink 1 und 2)",
+                         closable=True)
+        self.tags = DataTable("link_review", "Prüfergebnisse", list(data_link.REVIEW_HEAD))
+        self.tags.table.export_name = lambda: "Review_Importliste"
+        self.body_layout.addWidget(self.tags, 1)
+
+
 class MainWindow(QMainWindow):
     def __init__(self, app, version: str):
         super().__init__()
@@ -680,6 +692,7 @@ class MainWindow(QMainWindow):
         self.links.install("files", self.page.files, FILE_COLS)
         self.links.install("tags", self.page.tags, TAG_COLS)
         self.all_page = AllTagsSheet()
+        self.review_page = LinkReviewSheet()
         self.ribbon = self._build_ribbon()
         self._show_pipes(bool(last_paths.get_value(PIPES_KEY, False)))
         root.addWidget(self.ribbon)
@@ -691,6 +704,7 @@ class MainWindow(QMainWindow):
         root.addWidget(self.tabs, 1)
         self.setCentralWidget(central)
         self.all_page.header.close_requested.connect(lambda: self._close_widget(self.all_page))
+        self.review_page.header.close_requested.connect(lambda: self._close_widget(self.review_page))
         self.tabs.addTab(self.page, "PID-Tags")
         for side in (QTabBar.RightSide, QTabBar.LeftSide):
             self.tabs.tabBar().setTabButton(0, side, None)
@@ -749,11 +763,21 @@ class MainWindow(QMainWindow):
         g.large("sheet_all", "Alle Tags", "reports", self.show_all_tags)
         g.large("monitor", "Viewer\n2. Monitor", "monitor", self.page.viewer.monitor_button.toggle)
         g.large("preview", "Tabellen-\nVorschau …", "columns", self.show_table_preview)
+        # Tabellenprofil: Ansicht aller Tabellen als Datei speichern / laden (gui/table_profiles.py)
+        self.profile_menu = QMenu(self)
+        self.profile_menu.addAction("Tabellenprofil speichern …", lambda: table_profiles.save_dialog(self, self.version))
+        self.profile_menu.addAction("Tabellenprofil laden …", lambda: table_profiles.load_dialog(self))
+        g.large("table_profile", "Tabellen-\nprofil", "write", lambda: None, self.profile_menu)
+        r.buttons["table_profile"].setToolTip("Ansicht aller Tabellen (Spalten, Breiten, Sortierung, Filter) als Datei "
+                                              "speichern oder laden")
         g = r.group("3  Prüfen")
         g.large("prev", "Fundstelle\nzurück", "prev", self.page.previous_occurrence)
         g.large("next", "Fundstelle\nweiter", "next", self.page.next_occurrence)
         g.large("dups", "Nur doppelte\nTags", "duplicates", self.page.dup_button.toggle)
         g.large("deviations", "Nur Projekt-\nabweichungen", "deviations", self.page.fault_button.toggle)
+        g.large("link_review", "Review\nImportliste", "reports", self.show_link_review)
+        r.buttons["link_review"].setToolTip("Review-Tabelle: PDF-Tags mit der Importtabelle abgleichen (OK, Nicht in "
+                                            "Liste, Fehlt im PDF, Zeichnung nicht gescannt)")
         g.large("filter_reset", "Filter\nzurücksetzen", "filter_reset", self._clear_filters)
         g.large("edit", "Tabelle\nbearbeiten", "rename", self.page.edit_button.toggle)
         g.large("save", "Review\nspeichern", "write", self.page.save_review)
@@ -797,6 +821,31 @@ class MainWindow(QMainWindow):
         return r
 
     # --- Blaetter ------------------------------------------------------------------------------------------------
+    def show_link_review(self) -> None:
+        """Review-Tabelle erzeugen und als Blatt zeigen; ohne aktiven Datenlink 2 ein Hinweis."""
+        if self.links.link is None or not self.links.active(2):
+            QMessageBox.information(self, "Review Importliste", "Für die Review-Tabelle zuerst eine Excel-Liste "
+                                    "importieren und in der Tag-Tabelle per Rechtsklick auf den Spaltenkopf das "
+                                    "Datenlink-Feld setzen (Datenlink 2, optional Datenlink 1 in der Dateiliste).")
+            return
+        with progress_task(self, "Review-Tabelle wird erzeugt", steps=2,
+                           message=f"PDF-Tags mit der Importtabelle abgleichen ({len(self.results)} PDFs)") as dlg:
+            headers, rows = data_link.review_rows(self.links.link, self._review_input())
+            dlg.update_progress(70, f"Tabelle anzeigen ({len(rows)} Zeilen)", 2)
+            self.review_page.tags.headers = headers
+            self.review_page.tags.set_rows(rows)
+            counts = data_link.review_summary(rows)
+            self.review_page.set_band(" · ".join(f"{k}: {v}" for k, v in counts.items()))
+        if self.tabs.indexOf(self.review_page) < 0:
+            self.tabs.addTab(self.review_page, "Review Importliste")
+        self.tabs.setCurrentWidget(self.review_page)
+
+    def _review_input(self) -> list[tuple]:
+        """Je PDF: Name, Wert des Datenlink-Felds der Dateiliste, Tags mit dem Wert des Tag-Felds („Tag“/„Typ“)."""
+        attr = {"Typ": "type"}.get(self.links.fields.get("tags", ""), "tag")
+        return [(r.name, self.file_link_value(r),
+                 [(t.type, t.tag, t.count, t.pages_text, getattr(t, attr)) for t in r.tags]) for r in self.results]
+
     def show_all_tags(self) -> None:
         if self.tabs.indexOf(self.all_page) < 0:
             self.tabs.addTab(self.all_page, "Alle Tags")
@@ -814,7 +863,7 @@ class MainWindow(QMainWindow):
     def _clear_filters(self) -> None:
         self.page.dup_button.setChecked(False)
         self.page.fault_button.setChecked(False)
-        for table in (self.page.files, self.page.tags, self.all_page.tags):
+        for table in (self.page.files, self.page.tags, self.all_page.tags, self.review_page.tags):
             table.clear_filters()
 
     def _update_bands(self) -> None:
@@ -837,7 +886,7 @@ class MainWindow(QMainWindow):
     def _refresh(self) -> None:
         rows = [file_row(r) for r in export.file_rows(self.results)]
         field = self.links.fields.get("files", "")
-        extra = self.links.file_extra() if field in FILE_COLS else []
+        extra = self.links.file_extra(FILE_COLS) if field in FILE_COLS else []
         if extra:
             c = FILE_COLS.index(field)
             for row in rows:
@@ -861,6 +910,8 @@ class MainWindow(QMainWindow):
         edit = m.addAction("Importtabelle bearbeiten (Kachel-Editor) …", self.edit_data_link)
         edit.setEnabled(self.links.table is not None)
         m.addSeparator()
+        review = m.addAction("Review-Tabelle (Prüfergebnisse) …", self.show_link_review)
+        review.setEnabled(self.links.table is not None)
         m.addAction("Datenlinks anzeigen", lambda: QMessageBox.information(self, "Datenlink", self.links.summary()))
         remove = m.addAction("Importtabelle entfernen", self._remove_data_link)
         remove.setEnabled(self.links.table is not None)
@@ -876,22 +927,60 @@ class MainWindow(QMainWindow):
             self.links.remove()
 
     def _relink(self) -> None:
-        """Nach Import oder neuem Datenlink-Feld: Dateiliste und Tag-Tabelle neu fuellen, gewaehlte PDF bleibt."""
+        """Nach Import oder neuem Datenlink-Feld: Dateiliste und Tag-Tabelle neu fuellen, gewaehlte PDF bleibt.
+        Mit Fortschrittsanzeige (1.0.34); danach Pruefung, ob die Datenlinks gemeinsame Werte haben."""
         page = self.page
         current = page._store_result
-        page._switching = True                       # kein PDF-Wechsel waehrend die Dateiliste neu gefuellt wird
-        try:
-            self._refresh()
-            if current is not None and current in self.results:
-                src = page.files.proxy.sourceModel().index(self.results.index(current), 0)
-                index = page.files.proxy.mapFromSource(src)
-                if index.isValid():
-                    page.files.table.setCurrentIndex(index)
-        finally:
-            page._switching = False
-        page._only_duplicates()
-        page.files.table.horizontalHeader().viewport().update()
-        page.tags.table.horizontalHeader().viewport().update()
+        with progress_task(self, "Tabelle mit Importliste wird erzeugt", steps=3,
+                           message="Datenlink prüfen: gemeinsame Werte mit der Importtabelle") as dlg:
+            problems = self._link_problems()
+            dlg.update_progress(20, f"Dateiliste verknüpfen ({len(self.results)} PDFs)", 2)
+            page._switching = True                   # kein PDF-Wechsel waehrend die Dateiliste neu gefuellt wird
+            try:
+                self._refresh()
+                dlg.update_progress(60, "Tag-Tabelle verknüpfen und anzeigen", 3)
+                if current is not None and current in self.results:
+                    src = page.files.proxy.sourceModel().index(self.results.index(current), 0)
+                    index = page.files.proxy.mapFromSource(src)
+                    if index.isValid():
+                        page.files.table.setCurrentIndex(index)
+            finally:
+                page._switching = False
+            page._only_duplicates()
+            page.files.table.horizontalHeader().viewport().update()
+            page.tags.table.horizontalHeader().viewport().update()
+        if problems:
+            QMessageBox.warning(self, "Datenlink", "\n\n".join(problems))
+        if self.tabs.indexOf(self.review_page) >= 0 and self.links.active(2):
+            self.show_link_review()                      # offene Review-Tabelle mit dem neuen Datenlink erneuern
+
+    def _link_problems(self) -> list[str]:
+        """Fehlermeldungen, wenn Tabelle 1 (Dateien) bzw. 2 (Tags) keinen gemeinsamen Datenlink-Wert mit der
+        Importtabelle hat. Tabelle 2 wird ueber alle PDFs geprueft, wenn das Feld „Tag“ oder „Typ“ ist."""
+        link = self.links.link
+        if link is None or not self.results:
+            return []
+        out = []
+        checks = []
+        field1 = self.links.fields.get("files", "")
+        if self.links.active(1) and field1 in FILE_COLS:
+            c = FILE_COLS.index(field1)
+            checks.append((1, field1, [file_row(r)[c] for r in export.file_rows(self.results)]))
+        field2 = self.links.fields.get("tags", "")
+        attr = {"Tag": "tag", "Typ": "type"}.get(field2)
+        if self.links.active(2) and attr:
+            checks.append((2, field2, [getattr(t, attr) for r in self.results for t in r.tags]))
+        for n, field, values in checks:
+            hits, total = link.match_count(n, values)
+            if total and not hits:
+                samples = ", ".join(f"„{s}“" for s in link.samples(n)) or "–"
+                tool = next((v for v in values if str(v).strip()), "")
+                out.append(f"Datenlink {n}: Keine Übereinstimmung zwischen Tabelle {n} „{field}“ und der "
+                           f"Importtabelle „{link.table.link(n)}“ ({total} Werte geprüft).\n"
+                           f"Beispiel Tool: „{tool}“ · Beispiele Importtabelle: {samples}\n"
+                           "Bitte im Kachel-Editor die Datenlink-Spalte bzw. per Rechtsklick auf den Spaltenkopf "
+                           "das Datenlink-Feld prüfen.")
+        return out
 
     def _refresh_tags(self) -> None:
         """Blatt "Alle Tags", Pruefspalten und Kopfband (Dateiliste und Auswahl bleiben)."""
@@ -1226,8 +1315,9 @@ class MainWindow(QMainWindow):
         path = action(self) if action else None
         return bool(path) and self.activate_project(path)
 
-    def activate_project(self, path) -> bool:
-        """Projekt-Datenbank oeffnen, merken und den Projektmodus einschalten."""
+    def activate_project(self, path, settings: bool = False) -> bool:
+        """Projekt-Datenbank oeffnen, merken und den Projektmodus einschalten. ``settings``: gespeicherte
+        Einstellungen des Projekts nach Rueckfrage laden (Projekt waehlen/oeffnen; nicht beim Programmstart)."""
         try:
             db = ProjectDB(path)
         except Exception as exc:  # noqa: BLE001
@@ -1238,6 +1328,8 @@ class MainWindow(QMainWindow):
         self.project = db
         last_paths.set_value(PROJECT_DB_KEY, str(db.path))
         self._set_mode(True)
+        if settings:
+            self.load_project_settings()
         return True
 
     def _set_mode(self, on: bool, quiet: bool = False) -> None:
@@ -1284,12 +1376,18 @@ class MainWindow(QMainWindow):
         m.clear()
         m.addAction("Aus Tag Compliance übernehmen …", lambda: self._pick(project_dialog.import_project))
         m.addAction("Projekt öffnen …", lambda: self._pick(project_dialog.open_project))
-        m.addAction("Neues Projekt …", lambda: self._pick(project_dialog.new_project))
+        m.addAction("Neues Projekt …", self.new_project)
+        save = m.addAction("Projekt speichern (mit allen Einstellungen)", self.save_project)
+        save.setEnabled(self.project is not None)
+        save_as = m.addAction("Projekt speichern unter …", self.save_project_as)
+        save_as.setEnabled(self.project is not None)
+        load = m.addAction("Einstellungen des Projekts laden", lambda: self.load_project_settings(ask=False))
+        load.setEnabled(self.project is not None and project_settings.load_from_project(self.project) is not None)
         m.addSeparator()
         current = self.project.path if self.project else None
         found = sorted(paths.projects_dir().glob("*.db"), key=lambda f: f.name.casefold())
         for f in found:
-            action = m.addAction(f.stem, lambda f=f: self.activate_project(f))
+            action = m.addAction(f.stem, lambda f=f: self.activate_project(f, settings=True))
             action.setCheckable(True)
             action.setChecked(current is not None and paths.same_path(f, current))
             action.setProperty("i18n_skip", True)
@@ -1301,7 +1399,86 @@ class MainWindow(QMainWindow):
     def _pick(self, action) -> None:
         path = action(self)
         if path:
-            self.activate_project(path)
+            self.activate_project(path, settings=True)
+
+    # --- Projekt mit allen Einstellungen (1.0.37) --------------------------------------------------------------------
+    def new_project(self) -> None:
+        """Neues Projekt; auf Wunsch mit den aktuellen Einstellungen (Quellordner, Importtabelle, Datenlinks,
+        Tabellenansichten …) als Startpunkt."""
+        path = project_dialog.new_project(self)
+        if not path or not self.activate_project(path):
+            return
+        answer = QMessageBox.question(self, "Neues Projekt", "Die aktuellen Einstellungen (Quellordner, Tag-Muster, "
+                                      "Importtabelle mit Datenlinks, Tabellenansichten, Optionen) in das neue "
+                                      "Projekt übernehmen?")
+        if answer == QMessageBox.Yes:
+            self.save_project()
+
+    def save_project(self) -> bool:
+        if self.project is None:
+            return False
+        try:
+            project_settings.save_to_project(self.project, paths.config_dir(), self.version)
+        except Exception as exc:  # noqa: BLE001 - Datenbank schreibgeschuetzt o. ae.
+            QMessageBox.warning(self, "Projekt speichern", f"Das Projekt ließ sich nicht speichern:\n{exc}")
+            return False
+        self.statusBar().showMessage(f"Projekt „{self.project.name}“ mit allen Einstellungen gespeichert.", 8000)
+        return True
+
+    def save_project_as(self) -> None:
+        """Projekt (Definitionen und Einstellungen) unter neuem Namen speichern und weiterarbeiten."""
+        if self.project is None:
+            return
+        name = project_dialog._ask_name(self, "Projekt speichern unter", self.project.name + " Kopie")
+        target = project_dialog._target(self, name) if name else None
+        if target is None:
+            return
+        self.save_project()
+        import sqlite3
+        dst = sqlite3.connect(str(target))
+        try:
+            self.project.con.backup(dst)
+        finally:
+            dst.close()
+        if self.activate_project(target):
+            self.project.set_meta("name", name)
+            self.statusBar().showMessage(f"Projekt gespeichert unter „{name}“: {target}", 8000)
+
+    def load_project_settings(self, ask: bool = True) -> bool:
+        """Gespeicherte Einstellungen des aktuellen Projekts herstellen und die Oberflaeche neu aufbauen."""
+        bundle = project_settings.load_from_project(self.project) if self.project is not None else None
+        if bundle is None:
+            return False
+        if ask and QMessageBox.question(
+                self, "Projekt laden", f"Das Projekt „{self.project.name}“ hat gespeicherte Einstellungen "
+                f"(Stand {bundle.get('saved', '–')}).\nEinstellungen laden? Die aktuellen Einstellungen werden "
+                "ersetzt.") != QMessageBox.Yes:
+            return False
+        before = paths.PathSettings.load().existing_sources()
+        project_settings.apply(paths.config_dir(), bundle)
+        self._apply_loaded_settings()
+        after = paths.PathSettings.load().existing_sources()
+        self.statusBar().showMessage(f"Einstellungen des Projekts „{self.project.name}“ geladen.", 8000)
+        if after and [str(Path(s)) for s in after] != [str(Path(s)) for s in before] and \
+                QMessageBox.question(self, "Projekt laden", "Das Projekt hat andere Quellordner.\n"
+                                     "Jetzt einlesen?\n\n" + "\n".join(map(str, after))) == QMessageBox.Yes:
+            self.scan(None)
+        return True
+
+    def _apply_loaded_settings(self) -> None:
+        from .data_link_ui import load_fields
+        from ..core.data_link import ImportTable
+        self.links.table = ImportTable.load(paths.config_dir())
+        self.links.fields = load_fields()
+        self.links._build()
+        self._show_pipes(bool(last_paths.get_value(PIPES_KEY, False)))
+        self.layer_action.setChecked(redline.review_layer_enabled())
+        self.page.scan_button.setChecked(bool(last_paths.get_value(SCAN_KEY, False)))
+        self._relink()
+        tables = table_profiles.stored_layouts(table_profiles.read_json(table_views.store().path))
+        for key, view in table_profiles.live_views():
+            if key in tables:
+                apply_table_layout(view, tables[key])
 
     def edit_project_definitions(self) -> None:
         """Verwaltung der Projektdefinitionen; nach Aenderungen wird die Pruefung neu aufgebaut."""

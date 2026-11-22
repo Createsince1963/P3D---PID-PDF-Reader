@@ -242,6 +242,32 @@ class DataLink:
             hits = [i for i in hits if i in same]
         return hits
 
+    def match_count(self, n: int, values) -> tuple[int, int]:
+        """(Werte mit mindestens einem Treffer, nicht leere Werte) fuer Datenlink n – Pruefung nach dem Verknuepfen."""
+        if n not in self._idx:
+            return 0, 0
+        idx, hits, total = self._idx[n], 0, 0
+        for v in values:
+            if not norm(v):
+                continue
+            total += 1
+            hits += bool(idx.find(v))
+        return hits, total
+
+    def samples(self, n: int, limit: int = 3) -> list[str]:
+        """Einige nicht leere Werte der Datenlink-Spalte n der Importtabelle (fuer Fehlermeldungen)."""
+        name = self.table.link(n)
+        if name not in self.table.headers:
+            return []
+        c, out = self.table.headers.index(name), []
+        for r in self.table.rows:
+            v = r[c] if c < len(r) else ""
+            if v and v not in out:
+                out.append(v)
+                if len(out) >= limit:
+                    break
+        return out
+
     def values(self, rows: list[int]) -> list[str]:
         """Werte der uebergebenen Spalten; bei mehreren Treffern verschiedene Werte mit „ | “ verbunden."""
         out = []
@@ -254,3 +280,59 @@ class DataLink:
             text = JOIN.join(seen[:MAX_JOINED]) + (JOIN + "…" if len(seen) > MAX_JOINED else "")
             out.append(text)
         return out
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Review-Tabelle: Abgleich der PDF-Tags mit der Importtabelle (1.0.36)
+# ----------------------------------------------------------------------------------------------------------------
+STATUS_OK = "OK"
+STATUS_NOT_IN_LIST = "Nicht in Liste"            # Tag im PDF, keine passende Zeile der Importtabelle
+STATUS_NOT_IN_PDF = "Fehlt im PDF"               # Zeile der Importtabelle zu einer gescannten Zeichnung, Tag nicht im PDF
+STATUS_NO_PDF = "Zeichnung nicht gescannt"       # Zeile der Importtabelle, deren Zeichnung (Datenlink 1) kein PDF hat
+REVIEW_STATUS = (STATUS_OK, STATUS_NOT_IN_LIST, STATUS_NOT_IN_PDF, STATUS_NO_PDF)
+REVIEW_HEAD = ["Prüfergebnis", "PDF", "Zeichnung (Tool)", "Typ", "Tag (PDF)", "Anzahl", "Seiten", "Importzeilen"]
+
+
+def review_rows(link: DataLink, pdfs: list[tuple[str, object, list[tuple]]]) -> tuple[list[str], list[list]]:
+    """Review-Tabelle aus Datenlink und PDF-Tags. ``pdfs`` = je PDF ``(PDF-Name, Wert des Datenlink-Felds der
+    Dateiliste oder None, [(Typ, Tag, Anzahl, Seiten, Wert des Datenlink-Felds der Tag-Tabelle), …])``.
+
+    Zeilen: jedes PDF-Tag mit „OK“ (passende Importzeile, mit Datenlink 1 nur derselben Zeichnung) oder „Nicht in
+    Liste“; danach jede nicht getroffene Importzeile mit „Fehlt im PDF“ (ihre Zeichnung ist gescannt) bzw.
+    „Zeichnung nicht gescannt“ (nur mit Datenlink 1). Rechts die exportierten Spalten der Importtabelle.
+    Ohne aktiven Datenlink 2 gibt es keine Review-Tabelle (leere Liste)."""
+    headers = REVIEW_HEAD + unique_names([h if h not in REVIEW_HEAD else h + " (Liste)" for h in link.columns])
+    if not link.active(2):
+        return headers, []
+    empty = [""] * len(link.columns)
+    rows: list[list] = []
+    hit: set[int] = set()
+    scanned: dict[int, str] = {}                   # Importzeile -> PDF-Name (Zeichnung gescannt)
+    use_files = link.active(1)
+    for name, file_value, tags in pdfs:
+        if use_files:
+            for i in link.file_rows(file_value):
+                scanned.setdefault(i, name)
+        for typ, tag, count, pages, value in tags:
+            found = link.tag_rows(value, file_value if use_files else None)
+            hit.update(found)
+            rows.append([STATUS_OK if found else STATUS_NOT_IN_LIST, name, cell_text(file_value), typ, tag, count,
+                         pages, ", ".join(str(i + 1) for i in found[:MAX_JOINED]),
+                         *(link.values(found) if found else empty)])
+    key = link.table.headers.index(link.table.link(2))      # aktiv(2) -> Spalte vorhanden
+    for i, row in enumerate(link.table.rows):
+        if i in hit or not cell_text(row[key] if key < len(row) else ""):
+            continue                                         # getroffen oder ohne Tag
+        if use_files and i not in scanned:
+            status, pdf = STATUS_NO_PDF, ""
+        else:
+            status, pdf = STATUS_NOT_IN_PDF, scanned.get(i, "")
+        rows.append([status, pdf, "", "", "", "", "", str(i + 1), *link.values([i])])
+    return headers, rows
+
+
+def review_summary(rows: list[list]) -> dict[str, int]:
+    out = {s: 0 for s in REVIEW_STATUS}
+    for r in rows:
+        out[r[0]] = out.get(r[0], 0) + 1
+    return out

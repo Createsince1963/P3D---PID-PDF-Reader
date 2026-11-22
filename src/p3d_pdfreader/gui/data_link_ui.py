@@ -36,22 +36,40 @@ def link_marker(n: int) -> str:
 # ----------------------------------------------------------------------------------------------------------------
 # Kopf dunkelgruen
 # ----------------------------------------------------------------------------------------------------------------
+def import_color() -> QColor:
+    """Heller Kopf der Importspalten: Datenlink-Gruen, stark zu Weiss aufgehellt (keine eigene Farbe)."""
+    return mix(QColor(LINK_COLOR), QColor("white"), 0.2)
+
+
+def mix(a: QColor, b: QColor, share_a: float) -> QColor:
+    s = max(0.0, min(1.0, share_a))
+    return QColor(round(a.red() * s + b.red() * (1 - s)), round(a.green() * s + b.green() * (1 - s)),
+                  round(a.blue() * s + b.blue() * (1 - s)))
+
+
+IMPORT_LABEL = "Import"
+
+
 class LinkHeaderPainter(QObject):
     """Malt die Kopfzellen der Datenlink-Spalten dunkelgruen mit weisser Schrift. ``columns()`` liefert die logischen
     Spalten; ``bottom`` = Hoehe der Filterzeile unter der Beschriftung (Kit-Tabellen), sonst 0. Laeuft als Ereignis-
-    filter: erst zeichnet der Kopf wie immer, dann wird darueber gemalt (Kit-Kopf bleibt unveraendert)."""
+    filter: erst zeichnet der Kopf wie immer, dann wird darueber gemalt (Kit-Kopf bleibt unveraendert).
 
-    def __init__(self, header, columns: Callable[[], set[int]], bottom: Callable[[], int] = lambda: 0):
+    ``imports()`` (seit 1.0.34) liefert die Spalten, die aus der Importtabelle stammen: heller gruener Kopf mit
+    dunkelgruener Schrift und dem Hinweis „Import“ rechts im Kopf."""
+
+    def __init__(self, header, columns: Callable[[], set[int]], bottom: Callable[[], int] = lambda: 0,
+                 imports: Callable[[], set[int]] = set):
         super().__init__(header)
-        self.header, self.columns, self.bottom = header, columns, bottom
+        self.header, self.columns, self.bottom, self.imports = header, columns, bottom, imports
         self._busy = False
         header.viewport().installEventFilter(self)
 
     def eventFilter(self, obj, event):  # noqa: N802
         if event.type() != QEvent.Paint or self._busy:
             return False
-        cols = self.columns()
-        if not cols:
+        cols, imports = self.columns(), self.imports()
+        if not cols and not imports:
             return False
         self._busy = True
         try:
@@ -60,10 +78,10 @@ class LinkHeaderPainter(QObject):
         finally:
             obj.installEventFilter(self)
             self._busy = False
-        self._paint(obj, cols)
+        self._paint(obj, cols, imports - cols)
         return True
 
-    def _paint(self, viewport, cols: set[int]) -> None:
+    def _paint(self, viewport, cols: set[int], imports: set[int] = frozenset()) -> None:
         h = self.header
         model = h.model()
         if model is None:
@@ -71,21 +89,34 @@ class LinkHeaderPainter(QObject):
         painter = QPainter(viewport)
         try:
             bottom = max(0, int(self.bottom()))
-            for c in cols:
+            styles = [(c, False) for c in cols] + [(c, True) for c in imports]
+            for c, is_import in styles:
                 if c < 0 or c >= h.count() or h.isSectionHidden(c):
                     continue
                 x, w = h.sectionViewportPosition(c), h.sectionSize(c)
                 rect = viewport.rect().adjusted(0, 0, 0, -bottom)
                 rect.setLeft(x)
                 rect.setWidth(w - 1)
-                painter.fillRect(rect, QColor(LINK_COLOR))
-                painter.setPen(QColor("white"))
+                painter.fillRect(rect, import_color() if is_import else QColor(LINK_COLOR))
+                text = str(model.headerData(c, Qt.Horizontal, Qt.DisplayRole) or "")
+                room = max(10, w - 10)
+                if is_import:                                   # kleiner Hinweis „Import“ rechts
+                    small = h.font()
+                    small.setItalic(True)
+                    small.setPointSizeF(max(6.0, small.pointSizeF() * 0.8))
+                    painter.setFont(small)
+                    painter.setPen(QColor(LINK_COLOR))
+                    tag_w = painter.fontMetrics().horizontalAdvance(IMPORT_LABEL)
+                    if tag_w + 30 < w:
+                        painter.drawText(rect.adjusted(0, 0, -5, 0), Qt.AlignRight | Qt.AlignVCenter
+                                         | Qt.TextSingleLine, IMPORT_LABEL)
+                        room = max(10, w - 16 - tag_w)
                 f = h.font()
                 f.setBold(True)
                 painter.setFont(f)
-                text = str(model.headerData(c, Qt.Horizontal, Qt.DisplayRole) or "")
+                painter.setPen(QColor(LINK_COLOR) if is_import else QColor("white"))
                 painter.drawText(rect.adjusted(6, 0, -4, 0), Qt.AlignLeft | Qt.AlignVCenter | Qt.TextSingleLine,
-                                 painter.fontMetrics().elidedText(text, Qt.ElideRight, max(10, w - 10)))
+                                 painter.fontMetrics().elidedText(text, Qt.ElideRight, room))
         finally:
             painter.end()
 
@@ -155,13 +186,9 @@ class LinkController:
     def active(self, n: int) -> bool:
         return self.link is not None and self.link.active(n)
 
-    def file_extra(self) -> list[str]:
-        return [HITS] if self.active(1) else []
-
-    def tag_extra(self, taken: list[str]) -> list[str]:
-        """Zusatzspalten der Tag-Tabelle: Treffer + uebergebene Spalten (Namensgleichheit -> „ (Liste)“)."""
-        if not self.active(2):
-            return []
+    def _extra(self, taken: list[str]) -> list[str]:
+        """Treffer + exportierte Spalten der Importtabelle (Anpassung im Kachel-Editor); Namensgleichheit mit einer
+        Tool-Spalte -> „ (Liste)“."""
         out = [HITS]
         for name in self.link.columns:
             label = name
@@ -170,8 +197,19 @@ class LinkController:
             out.append(label)
         return out
 
+    def file_extra(self, taken: list[str] = ()) -> list[str]:
+        """Zusatzspalten der Dateiliste (seit 1.0.35 wie die Tag-Tabelle mit allen exportierten Listenspalten)."""
+        return self._extra(list(taken)) if self.active(1) else []
+
+    def tag_extra(self, taken: list[str]) -> list[str]:
+        """Zusatzspalten der Tag-Tabelle: Treffer + uebergebene Spalten (Namensgleichheit -> „ (Liste)“)."""
+        return self._extra(taken) if self.active(2) else []
+
     def file_values(self, value) -> list:
-        return [len(self.link.file_rows(value))] if self.active(1) else []
+        if not self.active(1):
+            return []
+        rows = self.link.file_rows(value)
+        return [len(rows), *self.link.values(rows)]
 
     def tag_values(self, value, file_value=None) -> list:
         if not self.active(2):
@@ -203,7 +241,8 @@ class LinkController:
             menu.addAction("Datenlink: Importtabelle …", self.on_open)
 
         view._shared_header_menu_hook = hook
-        LinkHeaderPainter(view.horizontalHeader(), lambda: self._field_columns(key, data_table), _filter_height)
+        LinkHeaderPainter(view.horizontalHeader(), lambda: self._field_columns(key, data_table), _filter_height,
+                          lambda: set(range(len(base), len(data_table.headers))))
 
     def _field_columns(self, key: str, data_table) -> set[int]:
         name = self.fields.get(key, "")

@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.0.37 – 2026-11-22
+- **Projekt mit allen Einstellungen** (Menüband Projekt › Projekt wählen): Die Projekt-Datenbank speichert jetzt auch die Einstellungen des Tools – Quell-/Exportordner, Tag-Muster, Importtabelle mit Kachel-Editor-Anpassung, Datenlink-Felder, Tabellenansichten, Rohrleitungen, PDF-Scan-Spalten, Review-Layer und Review-Optionen. Eine Projektdatei enthält damit alles.
+  - **Neues Projekt …** fragt, ob die aktuellen Einstellungen übernommen werden.
+  - **Projekt speichern (mit allen Einstellungen)** und **Projekt speichern unter …** (Kopie unter neuem Namen, danach wird mit der Kopie weitergearbeitet).
+  - **Projekt öffnen / wählen** fragt bei gespeicherten Einstellungen, ob sie geladen werden; danach werden Importtabelle, Datenlinks, Umschalter und Tabellenansichten sofort übernommen, bei anderen Quellordnern wird das Einlesen angeboten. **Einstellungen des Projekts laden** stellt den gespeicherten Stand jederzeit wieder her.
+  - Beim Programmstart wird das zuletzt gewählte Projekt wie bisher ohne Rückfrage geöffnet.
+  - Kern: `core/project_settings.py` (Meta-Eintrag `tool_settings`, ohne Qt).
+
+## 1.0.36 – 2026-11-22
+- **Review-Tabelle „Review Importliste“** (Menüband „3 Prüfen“ › Review Importliste, oder Liste importieren › Review-Tabelle): gleicht alle PDF-Tags mit der Importtabelle ab (Datenlink 2, mit Datenlink 1 nur innerhalb derselben Zeichnung) und zeigt ein Prüfergebnis je Zeile:
+  - **OK** – Tag im PDF und in der Importliste,
+  - **Nicht in Liste** – Tag im PDF, keine passende Zeile der Importliste,
+  - **Fehlt im PDF** – Zeile der Importliste zu einer gescannten Zeichnung, Tag nicht im PDF,
+  - **Zeichnung nicht gescannt** – Zeile der Importliste, deren Zeichnung (Datenlink 1) kein PDF hat.
+  Rechts die im Kachel-Editor exportierten Spalten der Importliste, Spalte „Importzeilen“ mit den Zeilennummern. Zählung je Ergebnis im Blattkopf, Excel über das Symbol in der Tabellenecke, Fortschrittsanzeige beim Erzeugen. Eine offene Review-Tabelle wird nach neuem Import/Datenlink erneuert. Kern: `core.data_link.review_rows`, `review_summary`.
+
+## 1.0.35 – 2026-11-22
+- **Dateiliste (Tabelle 1) zeigt die Importtabelle über Datenlink 1:** wie die Tag-Tabelle über Datenlink 2 jetzt „Datenlink-Treffer“ und alle im Kachel-Editor exportierten Spalten der angepassten Importliste (gleiche Reihenfolge, umbenannte Spalten mit neuem Namen; Namensgleichheit mit einer Tool-Spalte → „ (Liste)“; mehrere passende Importzeilen → verschiedene Werte mit „ | “). Kopf hellgrün mit „Import“.
+
+## 1.0.34 – 2026-11-22
+- **Importspalten im Tool erkennbar:** Spalten, die über den Datenlink aus der Importtabelle in die Dateiliste bzw. Tag-Tabelle kommen (Datenlink-Treffer und übergebene Listenspalten), haben einen hellgrünen Kopf mit dunkelgrüner Schrift und rechts den Hinweis „Import“. Das Datenlink-Feld selbst bleibt dunkelgrün. Farbe aus dem Datenlink-Grün (`appearance`) abgeleitet, keine eigene Farbe (`gui\data_link_ui.py`, `LinkHeaderPainter`).
+- **Tabellenprofil als Datei** (Menüband „2 Ansicht“ › Tabellenprofil): Ansicht *aller* Tabellen des Tools (Spaltenreihenfolge, Breiten, ausgeblendete Spalten, Sortierung, Zoom, Filter) in einer JSON-Datei speichern und wieder laden. Offene Tabellen übernehmen das Profil sofort, die übrigen beim nächsten Öffnen. Benannte Ansichten je Tabelle bleiben unberührt. Neu: `gui/table_profiles.py`.
+- **Fortschrittsanzeige beim Verknüpfen:** Nach dem Import aus dem Kachel-Editor bzw. nach dem Setzen eines Datenlink-Felds erscheint „Tabelle mit Importliste wird erzeugt“ (Prüfen → Dateiliste → Tag-Tabelle).
+- **Fehlermeldung ohne gemeinsamen Datenlink-Wert:** Wenn Tabelle 1 (Dateien) bzw. Tabelle 2 (Tags, Feld „Tag“ oder „Typ“) keinen einzigen Wert mit der Datenlink-Spalte der Importtabelle gemeinsam hat, meldet das Tool das mit je einem Beispielwert aus Tool und Importtabelle (`DataLink.match_count`, `DataLink.samples`).
+
 ## 1.0.33 – 2026-11-22
 - **Kachel-Editor komplett deutsch:** Kacheln, Bereichs-Überschriften, Kachelmenü, Seitenleiste (Aktive Kachel, Schritte), alle Dialoge (Teilen, Ersetzen, Typ ändern, Wenn-dann, Liste prüfen, Aus Liste, Gruppieren, Index-, Ja/Nein-Spalte, Leere füllen, Spalten hinzufügen), Typnamen (Ganzzahl, Dezimalzahl, Datum …), Meldungen und Verlaufstexte.
 - Neu: `tools	ranslate_column_editor.py` – übersetzt die Kopie `column_editor` per Wörterbuch (nur Anzeigetexte; interne Schlüssel bleiben) und baut `qml_resources.py` neu. Wiederholbar; nach einer neuen Kopie aus Tag Compliance erneut ausführen, das Werkzeug meldet nicht mehr gefundene Texte. `QUELLE.md` beschreibt den Ablauf.

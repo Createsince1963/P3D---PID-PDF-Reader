@@ -157,7 +157,10 @@ def test_main_window_link_fields_and_columns(app, tmp_path, monkeypatch):
     act = next(a for a in menu.actions() if "Datenlink-Feld setzen" in a.text())
     act.trigger()
     assert w.links.fields == {"files": "Zeichnungsnr."}
-    assert w.page.files.headers[-1] == HITS and w.page.files.rows()[0][-1] == 3
+    fh, n = w.page.files.headers, len(main_window.FILE_COLS)
+    assert fh[n] == HITS and w.page.files.rows()[0][n] == 3        # Datenlink 1: Treffer + Listenspalten
+    assert "Service" in fh and w.page.files.rows()[0][fh.index("Service")] == "Inlet A2 | Inlet A4 | Exakt"
+    assert w.links.link.columns and len(fh) == n + 1 + len(w.links.link.columns)
     w.links.set_field("tags", "Tag")
     w.page._store_result, w.page.store = result, None
     w.page._only_duplicates()
@@ -191,3 +194,108 @@ def test_help_workflow_data():
             assert (help_dir / fig["img"]).is_file() and fig["marks"]
             for m in fig["marks"]:
                 assert 0 <= m["pin"][0] <= 100 and 0 <= m["pin"][1] <= 100 and m["title"] and m["text"]
+
+
+def test_match_count_and_samples(tmp_path):
+    link = DataLink(_table(tmp_path), {"files": "Zeichnungsnr.", "tags": "Tag"})
+    assert link.match_count(1, ["SGOPS-P-DL1-PID-00-EQPM-124", "GIBT-ES-NICHT", "", None]) == (1, 2)
+    assert link.match_count(2, ["NIX-1", "NIX-2"]) == (0, 2)
+    assert link.samples(1) == ["SGOPS-P-DL1-PID-00-EQPM-122", "SGOPS-P-DL1-PID-00-EQPM-124"]
+
+
+def test_relink_warns_without_common_values(app, tmp_path, monkeypatch):
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path))
+    from p3d_pdfreader import paths
+    from p3d_pdfreader.core.extract import PdfResult, Tag
+    from p3d_pdfreader.gui import main_window
+    _table(tmp_path).save(paths.config_dir())
+    w = main_window.MainWindow(app, "test")
+    shown = []
+    monkeypatch.setattr(main_window.QMessageBox, "warning", lambda *a, **k: shown.append(a[2]))
+    w.results = [PdfResult(path=tmp_path / "a.pdf", drawing_no="ANDERE-ZEICHNUNG",
+                           tags=[Tag(tag="XX-1", type="Instrument")])]
+    w.links.set_field("files", "Zeichnungsnr.")
+    assert len(shown) == 1 and "Datenlink 1" in shown[0] and "ANDERE-ZEICHNUNG" in shown[0]
+    w.links.set_field("tags", "Tag")
+    assert "Datenlink 2" in shown[-1]
+    w.results[0].drawing_no = "SGOPS-P-DL1-PID-00-EQPM-124"
+    w.results[0].tags[0].tag = "XV-332"
+    shown.clear()
+    w._relink()
+    assert shown == []
+    w.close()
+
+
+def test_table_profile_roundtrip(app, tmp_path, monkeypatch):
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path))
+    from p3d_pdfreader.gui import table_profiles as tp
+    stored = tp.stored_layouts({"auto|a": {"profiles": {"Default": {"column_order": ["x"]}}, "last_profile": "Default"},
+                                "named|a": {"profiles": {"P": {"column_order": ["y"]}}}})
+    assert stored == {"auto|a": {"column_order": ["x"]}}
+    profile = tp.build_profile(stored, {"auto|b": {"column_order": ["z"]}}, "1.0.34")
+    assert set(profile["tables"]) == {"auto|a", "auto|b"}
+    path = tmp_path / "profil.json"
+    import json
+    path.write_text(json.dumps(profile), encoding="utf-8")
+    assert tp.load_profile(path) == (2, 0)
+    assert tp.table_views.store().load("auto|b", "Default") == {"column_order": ["z"]}
+    assert tp.save_profile(tmp_path / "neu.json") >= 2       # plus offene Tabellen anderer Tests
+    with pytest.raises(ValueError):
+        tp.parse_profile({"format": "fremd"})
+
+
+def test_review_rows_status(tmp_path):
+    from p3d_pdfreader.core import data_link as dl
+    table = _table(tmp_path)
+    link = DataLink(table, {"files": "Zeichnungsnr.", "tags": "Tag"})
+    pdfs = [("b.pdf", "SGOPS-P-DL1-PID-00-EQPM-124",
+             [("Instrument", "XV-332", 1, "1", "203-17-339-XV-332"), ("Instrument", "XX-9", 1, "1", "XX-9")])]
+    headers, rows = dl.review_rows(link, pdfs)
+    assert headers[:len(dl.REVIEW_HEAD)] == dl.REVIEW_HEAD and "Service" in headers
+    status = {(r[0], r[4] or r[7]) for r in rows}
+    assert (dl.STATUS_OK, "XV-332") in status and (dl.STATUS_NOT_IN_LIST, "XX-9") in status
+    counts = dl.review_summary(rows)
+    assert counts[dl.STATUS_NOT_IN_PDF] == 2            # zwei weitere Zeilen der gescannten Zeichnung ...124
+    assert counts[dl.STATUS_NO_PDF] == 1                # Zeichnung ...122 nicht gescannt
+    assert dl.review_rows(DataLink(table, {"files": "Zeichnungsnr."}), pdfs)[1] == []   # ohne Datenlink 2
+
+
+def test_main_window_link_review_sheet(app, tmp_path, monkeypatch):
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path))
+    from p3d_pdfreader import paths
+    from p3d_pdfreader.core import data_link as dl
+    from p3d_pdfreader.core.extract import PdfResult, Tag
+    from p3d_pdfreader.gui import main_window
+    _table(tmp_path).save(paths.config_dir())
+    w = main_window.MainWindow(app, "test")
+    assert "link_review" in w.ribbon.buttons
+    w.results = [PdfResult(path=tmp_path / "a.pdf", drawing_no="SGOPS-P-DL1-PID-00-EQPM-124",
+                           tags=[Tag(tag="XV-332", type="Instrument")])]
+    w.links.set_field("files", "Zeichnungsnr.")
+    w.links.set_field("tags", "Tag")
+    w.show_link_review()
+    assert w.tabs.currentWidget() is w.review_page
+    rows = w.review_page.tags.rows()
+    assert rows[0][0] == dl.STATUS_OK and len(rows) == 4
+    w.close()
+
+
+def test_main_window_project_save_and_load(app, tmp_path, monkeypatch):
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path))
+    from p3d_pdfreader import paths
+    from p3d_pdfreader.gui import main_window
+    _table(tmp_path).save(paths.config_dir())
+    w = main_window.MainWindow(app, "test")
+    monkeypatch.setattr(main_window.QMessageBox, "question", lambda *a, **k: main_window.QMessageBox.Yes)
+    path = paths.projects_dir() / "Test.db"
+    from p3d_pdfreader.core.project_defs import ProjectDB
+    ProjectDB.create(path, "Test").close()
+    w.activate_project(path)
+    w.links.set_field("tags", "Tag")
+    assert w.save_project()
+    w.links.set_field("tags", "")
+    w.links.remove()
+    assert w.links.table is None
+    assert w.load_project_settings(ask=False)
+    assert w.links.table is not None and w.links.fields == {"tags": "Tag"}
+    w.close()

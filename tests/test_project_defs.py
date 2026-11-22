@@ -337,3 +337,27 @@ def test_definitions_dialog_menus_tiles_and_undo(project, tmp_path, monkeypatch)
     assert visible_table(dlg.grid) == (["Medium Code (Fluid)", "Sr.No"], [["TFHR", "002"]])
     dlg.close()
     app.processEvents()
+
+
+def test_project_settings_roundtrip(tmp_path):
+    import json
+    from p3d_pdfreader.core import project_settings as ps
+    from p3d_pdfreader.core.project_defs import ProjectDB
+    cfg = tmp_path / "cfg"
+    cfg.mkdir()
+    (cfg / "paths.json").write_text(json.dumps({"sources": ["X:/pdf"]}), encoding="utf-8")
+    (cfg / "data_link.json").write_text(json.dumps({"rows": [[1]]}), encoding="utf-8")
+    (cfg / "state.json").write_text(json.dumps({"data_link_fields": {"tags": "Tag"}, "fremd": 1}), encoding="utf-8")
+    db = ProjectDB.create(tmp_path / "p.db", "P")
+    assert ps.load_from_project(db) is None
+    ps.save_to_project(db, cfg, "1.0.37")
+    # anderer Stand im Tool: Importtabelle weg, anderes Feld, eigene Tabellenansicht
+    (cfg / "data_link.json").unlink()
+    (cfg / "table_views.json").write_text("{}", encoding="utf-8")
+    (cfg / "state.json").write_text(json.dumps({"data_link_fields": {}, "fremd": 2}), encoding="utf-8")
+    written = ps.apply(cfg, ps.load_from_project(db))
+    assert set(written) == {"paths.json", "data_link.json"}
+    assert not (cfg / "table_views.json").exists()
+    state = json.loads((cfg / "state.json").read_text(encoding="utf-8"))
+    assert state == {"fremd": 2, "data_link_fields": {"tags": "Tag"}}
+    db.close()
