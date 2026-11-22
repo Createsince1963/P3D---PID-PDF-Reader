@@ -34,10 +34,12 @@ from .design import NOTE_QSS
 from .paths_dialog import PathsDialog, open_in_explorer
 from . import project_dialog, web_control
 from .controls import indicator_qss
+from .data_link_ui import LinkController
 from .icons import excel_icon
 from .progress import ProgressDialog, progress_task
 from .review_dialog import ReviewDialog
 from .ribbon import Ribbon
+from .ribbon_fold import RibbonFold
 from .ribbon_heads import apply_group_heads
 from .sheet import SheetHeader, configure_subtabs, mark_active_filters, table_header_qss
 from .table_export import export_table_view, install_excel_corner
@@ -64,6 +66,7 @@ FIRST_FIELD = TAG_COLS.index(FIELDS[0])
 CHECK_COL = TAG_COLS.index(CHECK_HEADERS[0])
 SCAN_COL = len(TAG_COLS) - len(SCAN_COLS)
 SCAN_KEY = "tags_scan_fields"       # config/state.json
+FOLD_KEY = "ribbon_collapsed"       # config/state.json: eingeklappte Menueband-Gruppen
 SCAN_TIP = ("Aus PDF-Scan übernehmen: Ersteller, Checked, Rev, Rev-Datum und Rev-Text aus dem Schriftfeld der PDF als "
             "Spalten hinten an die Tag-Tabelle anfügen (bleibt eingeschaltet).")
 AUTOFILL_TIP = ("Autofill OK: bei allen Tags mit Review „OK“ (oder leerem Review und Projekt-Prüfung „OK“) Review = OK, "
@@ -72,9 +75,17 @@ AUTOFILL_TIP = ("Autofill OK: bei allen Tags mit Review „OK“ (oder leerem Re
 ALL_TAG_COLS = ["PDF", "Zeichnungsnr.", "Typ", "Tag", "Anzahl", *CHECK_HEADERS]
 ALL_CHECK_COL = ALL_TAG_COLS.index(CHECK_HEADERS[0])
 VIEWER_SPLIT = (500, 800)           # Standardteilung Tag-Tabelle : Viewer im Hauptfenster
+DATA_LINK_TIP = ("Datenlink: Excel-Liste (z. B. Instrumenten-Gesamtliste) importieren, im Kachel-Editor prüfen und "
+                 "bearbeiten, Datenlink 1 (Zeichnung) und 2 (Tag) setzen. In den Tabellen per Rechtsklick auf den "
+                 "Spaltenkopf das Datenlink-Feld wählen (Kopf dunkelgrün) – dann erscheinen die Listenspalten.")
 PROJECT_MODE_KEY, PROJECT_DB_KEY = "project_mode", "project_db"     # config/state.json
 PROJECT_TIP = ("Projektmodus: Tags werden gegen die Projektdefinitionen geprüft (Codelisten und Tag-Strukturen wie in "
                "P3D Tag Compliance). Aus = Standardmodus ohne Projektdefinitionen.")
+
+
+def file_row(r: list) -> list:
+    """Zeile der Dateiliste (``FILE_COLS``) aus einer Zeile von ``export.file_rows``."""
+    return [r[0], r[1], r[2], r[3], r[5], r[7], r[8], r[9], r[11], r[15], r[17]]
 
 
 def scan_values(result: PdfResult) -> list[str]:
@@ -409,10 +420,18 @@ class TagsSheet(Sheet):
             return []
         checker = self.win.checker
         scan = scan_values(result) if self.scan_button.isChecked() else [""] * len(SCAN_COLS)
-        return [[t.type, t.tag, t.count, t.pages_text,
+        rows = [[t.type, t.tag, t.count, t.pages_text,
                  *(checker.columns(t.type, t.tag, t.count) if checker else ["", ""]),
                  *(self.store.values(t.type, t.tag) if self.store else [""] * len(FIELDS)), *scan]
                 for t in result.tags]
+        # Datenlink 2: Zusatzspalten aus der Importtabelle (Feld per Rechtsklick auf den Spaltenkopf)
+        links = self.win.links
+        field = links.fields.get("tags", "")
+        if links.active(2) and field in TAG_COLS:
+            c, file_value = TAG_COLS.index(field), self.win.file_link_value(result)
+            for row in rows:
+                row.extend(links.tag_values(row[c], file_value))
+        return rows
 
     def _toggle_scan_fields(self, on: bool) -> None:
         last_paths.set_value(SCAN_KEY, bool(on))
@@ -444,6 +463,8 @@ class TagsSheet(Sheet):
         on = self.dup_button.isChecked() if on is None else on
         faults = self.fault_button.isChecked() and self.win.checker is not None
         rows = [r for r in self._tag_rows() if (not on or r[2] > 1) and (not faults or is_fault_status(r[CHECK_COL]))]
+        field = self.win.links.fields.get("tags", "")
+        self.tags.headers = TAG_COLS + (self.win.links.tag_extra(TAG_COLS) if field in TAG_COLS else [])
         self.tags.set_rows(rows)
         self.tags.proxy.sourceModel().dataChanged.connect(self._store_changed)   # neues Modell -> neu verbinden
         self.win.apply_project_columns()
@@ -646,6 +667,8 @@ class MainWindow(QMainWindow):
         self.project: ProjectDB | None = None          # Projektmodus: geoeffnete Projekt-Datenbank
         self.checker = None                            # Projektmodus: Pruefung (project_defs.Checker), sonst None
         self._scan_placeholders = False                # letzter Scan mit Platzhalter-Tags (nur Projektmodus)
+        # Datenlink: importierte Excel-Liste, verknuepft ueber Datenlink 1 (Dateien) und 2 (Tags)
+        self.links = LinkController(self._relink, self.edit_data_link)
 
         central = QWidget()
         root = QVBoxLayout(central)
@@ -654,6 +677,8 @@ class MainWindow(QMainWindow):
         root.addWidget(HeaderBanner(APP_NAME, version))
         self.setStatusBar(QStatusBar())
         self.page = TagsSheet(self)                 # vor dem Menueband: es ruft Funktionen der Blaetter auf
+        self.links.install("files", self.page.files, FILE_COLS)
+        self.links.install("tags", self.page.tags, TAG_COLS)
         self.all_page = AllTagsSheet()
         self.ribbon = self._build_ribbon()
         self._show_pipes(bool(last_paths.get_value(PIPES_KEY, False)))
@@ -714,6 +739,11 @@ class MainWindow(QMainWindow):
         g.large("scan", "Quellordner\nscannen", "scan", lambda: self.scan(None))
         g.large("folder", "Ordner\nöffnen …", "folder", self._pick_folder)
         g.large("files", "Dateien\nöffnen …", "files", self._pick_files)
+        # Datenlink: Excel-Liste (z. B. Instrumenten-Gesamtliste) importieren und mit den Tabellen verknuepfen
+        self.link_menu = QMenu(self)
+        self.link_menu.aboutToShow.connect(self._fill_link_menu)
+        g.large("data_link", "Liste\nimportieren", "import", lambda: None, self.link_menu)
+        r.buttons["data_link"].setToolTip(DATA_LINK_TIP)
         g = r.group("2  Ansicht")
         g.large("sheet_tags", "PID-Tags", "start", lambda: self.tabs.setCurrentWidget(self.page))
         g.large("sheet_all", "Alle Tags", "reports", self.show_all_tags)
@@ -760,6 +790,10 @@ class MainWindow(QMainWindow):
         g.large("language", "Sprache", "language", lambda: None, self.lang_menu)
         r.buttons["language"].setToolTip("Sprache der Oberfläche: Deutsch, English, Français")
         apply_group_heads(r)                                # dunkelblaue Gruppenueberschriften oben
+        # Klick auf eine Kopfleiste klappt die Gruppe ein; gestapelt (4 je Spalte) hinter den sichtbaren, gemerkt.
+        # Beim Start stehen die eingeklappten Kopfleisten in einer Reihe (Nutzervorgabe 2026-11-22)
+        self.ribbon_fold = RibbonFold(r, last_paths.get_value(FOLD_KEY),     # None = Standard: nur Projekt offen
+                                      lambda keys: last_paths.set_value(FOLD_KEY, keys))
         return r
 
     # --- Blaetter ------------------------------------------------------------------------------------------------
@@ -801,10 +835,63 @@ class MainWindow(QMainWindow):
         return self.results[row] if 0 <= row < len(self.results) else None
 
     def _refresh(self) -> None:
-        rows = [[r[0], r[1], r[2], r[3], r[5], r[7], r[8], r[9], r[11], r[15], r[17]]
-                for r in export.file_rows(self.results)]
+        rows = [file_row(r) for r in export.file_rows(self.results)]
+        field = self.links.fields.get("files", "")
+        extra = self.links.file_extra() if field in FILE_COLS else []
+        if extra:
+            c = FILE_COLS.index(field)
+            for row in rows:
+                row.extend(self.links.file_values(row[c]))
+        self.page.files.headers = FILE_COLS + extra
         self.page.files.set_rows(rows)
         self._refresh_tags()
+
+    def file_link_value(self, result: PdfResult):
+        """Wert des Datenlink-Felds der Dateiliste fuer diese PDF (None ohne Feld)."""
+        field = self.links.fields.get("files", "")
+        if field not in FILE_COLS:
+            return None
+        return file_row(export.file_rows([result])[0])[FILE_COLS.index(field)]
+
+    # --- Datenlink -----------------------------------------------------------------------------------------------
+    def _fill_link_menu(self) -> None:
+        m = self.link_menu
+        m.clear()
+        m.addAction("Excel-Liste importieren …", lambda: self.edit_data_link(new=True))
+        edit = m.addAction("Importtabelle bearbeiten (Kachel-Editor) …", self.edit_data_link)
+        edit.setEnabled(self.links.table is not None)
+        m.addSeparator()
+        m.addAction("Datenlinks anzeigen", lambda: QMessageBox.information(self, "Datenlink", self.links.summary()))
+        remove = m.addAction("Importtabelle entfernen", self._remove_data_link)
+        remove.setEnabled(self.links.table is not None)
+
+    def edit_data_link(self, new: bool = False) -> None:
+        if self.links.edit(self, new=new or self.links.table is None):
+            self.statusBar().showMessage("Datenlink: " + self.links.summary().replace("\n", " · "), 12000)
+
+    def _remove_data_link(self) -> None:
+        answer = QMessageBox.question(self, "Datenlink", "Importtabelle entfernen? Die Datenlink-Spalten verschwinden "
+                                                         "aus den Tabellen (die Excel-Datei bleibt unverändert).")
+        if answer == QMessageBox.Yes:
+            self.links.remove()
+
+    def _relink(self) -> None:
+        """Nach Import oder neuem Datenlink-Feld: Dateiliste und Tag-Tabelle neu fuellen, gewaehlte PDF bleibt."""
+        page = self.page
+        current = page._store_result
+        page._switching = True                       # kein PDF-Wechsel waehrend die Dateiliste neu gefuellt wird
+        try:
+            self._refresh()
+            if current is not None and current in self.results:
+                src = page.files.proxy.sourceModel().index(self.results.index(current), 0)
+                index = page.files.proxy.mapFromSource(src)
+                if index.isValid():
+                    page.files.table.setCurrentIndex(index)
+        finally:
+            page._switching = False
+        page._only_duplicates()
+        page.files.table.horizontalHeader().viewport().update()
+        page.tags.table.horizontalHeader().viewport().update()
 
     def _refresh_tags(self) -> None:
         """Blatt "Alle Tags", Pruefspalten und Kopfband (Dateiliste und Auswahl bleiben)."""

@@ -76,3 +76,55 @@ def test_cell_menu_copy_filter_and_columns(window, app):
     assert not dialog.hidden()
     dialog.accept()
     assert not view.isColumnHidden(0)
+
+
+def test_groups_fold_into_stack_of_three(window, app):
+    """Nutzervorgabe 2026-11-22: Klick auf die Kopfleiste klappt ein; Kopfleisten stapeln sich hinter den sichtbaren
+    Gruppen, 4 je Spalte (Text linksbuendig); Klick auf die gestapelte Kopfleiste klappt wieder auf; Zustand wird gemerkt."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from p3d_pdfreader.gui import last_paths
+    from p3d_pdfreader.gui.main_window import FOLD_KEY
+    fold = window.ribbon_fold
+    groups = _group_titles(window.ribbon)
+    web, hilfe = groups[-2], groups[-1]
+    # Standard beim ersten Start: nur Projekt offen, die anderen 7 Kopfleisten in einer Reihe
+    assert not groups[0].isHidden() and all(g.isHidden() for g in groups[1:])
+    pos = [fold.grid.getItemPosition(fold.grid.indexOf(b))[:2] for b in fold.stack_buttons]
+    assert pos == [(0, c) for c in range(7)]
+    for group in groups:
+        fold.set_collapsed(group, False)
+    assert fold.stack.isHidden() and last_paths.get_value(FOLD_KEY) == []
+    QTest.mouseClick(web.title, Qt.LeftButton)
+    fold.set_collapsed(hilfe, True)
+    assert web.isHidden() and hilfe.isHidden() and not fold.stack.isHidden()
+    assert last_paths.get_value(FOLD_KEY) == ["Web", "Hilfe"]
+    # wie die beiden blauen Rechtecke: Web oben, Hilfe darunter in derselben Spalte
+    pos = [fold.grid.getItemPosition(fold.grid.indexOf(b))[:2] for b in fold.stack_buttons]
+    assert [b.text() for b in fold.stack_buttons] == ["Web", "Hilfe"] and pos == [(0, 0), (1, 0)]
+    # alle einklappen: 8 Gruppen -> zwei Spalten mit je 4 Kopfleisten
+    for group in groups:
+        fold.set_collapsed(group, True)
+    pos = [fold.grid.getItemPosition(fold.grid.indexOf(b))[:2] for b in fold.stack_buttons]
+    assert pos == [(0, 0), (1, 0), (2, 0), (3, 0), (0, 1), (1, 1), (2, 1), (3, 1)]
+    assert all("text-align: left" in b.styleSheet() for b in fold.stack_buttons)
+    assert fold.stack_sep.isHidden()                       # keine sichtbare Gruppe davor -> keine Trennlinie
+    # gestapelte Kopfleiste "1  Einlesen" anklicken -> Gruppe wieder an ihrer Stelle sichtbar
+    button = next(b for b in fold.stack_buttons if b.text() == "1  Einlesen")
+    button.click()
+    assert not groups[1].isHidden() and groups[1].sep.isHidden()   # erste sichtbare Gruppe: ohne Trennlinie davor
+    assert "1  Einlesen" not in last_paths.get_value(FOLD_KEY) and len(fold.stack_buttons) == 7
+
+
+def test_fold_state_restored_on_start(app, tmp_path, monkeypatch):
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path))
+    from p3d_pdfreader.gui import last_paths
+    from p3d_pdfreader.gui.main_window import FOLD_KEY, MainWindow
+    last_paths.set_value(FOLD_KEY, ["Hilfe", "unbekannt"])
+    w = MainWindow(app, "test")
+    try:
+        groups = _group_titles(w.ribbon)
+        assert groups[-1].isHidden() and [b.text() for b in w.ribbon_fold.stack_buttons] == ["Hilfe"]
+        assert not w.ribbon_fold.stack_sep.isHidden()
+    finally:
+        w.close()

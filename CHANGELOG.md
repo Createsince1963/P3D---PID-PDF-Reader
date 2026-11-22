@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.0.30 – 2026-11-22
+- **Neu: Datenlink – Excel-Liste importieren** (Menüband „1 Einlesen“ › **Liste importieren**): z. B. die Instrumenten-Gesamtliste aus P3D InstrumentationList (Blatt „Gesamtliste“ wird vorgeschlagen). Die Excel-Datei wird nur gelesen.
+  - **Vorschau mit Kachel-Editor** (`gui\data_link_ui.py`, nutzt `ColumnTiles`): Spalten verschieben, ein-/ausblenden (= übergeben oder nicht), umbenennen, einfügen, löschen, sortieren; Zellen bearbeiten. Schnelles Tabellenmodell – auch die Gesamtliste mit ~1450 Zeilen × 346 Spalten öffnet in unter einer Sekunde.
+  - **Datenlink 1** (zu Tabelle 1 – Dateien) und **Datenlink 2** (zu Tabelle 2 – Tags) per Rechtsklick auf Spaltenkopf/Kachel oder Auswahlfeld; Vorschlag „P&ID No.“/„DWG Number“ und „Tag“. „Übernehmen und verlinken“ speichert nach `config\data_link.json`.
+  - **Datenlink-Feld je Tool-Tabelle** per Rechtsklick auf den Spaltenkopf („… als Datenlink-Feld setzen“ / „entfernen“); der Kopf wird **dunkelgrün** (`appearance.ACCENT_CHOICES[1]`, passend zum dunkelblauen Kopf). Gemerkt in `config\state.json` (`data_link_fields`).
+  - Sobald beide Seiten gesetzt sind: Dateien bekommt „Datenlink-Treffer“, die Tag-Tabelle „Datenlink-Treffer“ plus alle übergebenen Listenspalten (auch im Tabellen-Excel).
+  - Abgleich (`core\data_link.py`, ohne Qt): ohne Groß-/Kleinschreibung; ohne exakten Treffer zählt die Endung ab einem Bindestrich („301-30-149-TI-300“ ↔ „TI-300“); mit beiden Datenlinks nur Listenzeilen derselben Zeichnung.
+- Handbuch: neues Kapitel „Datenlink (Excel-Liste)“, Menüband-Eintrag und Rechtsklick-Übersicht ergänzt; Hilfebilder neu erzeugt.
+- Tests: `tests\test_data_link.py` (Einlesen, Abgleich, Speichern, Import-Dialog, Datenlink-Felder im Hauptfenster).
+
+## 1.0.29 – 2026-11-22
+- **Menüband, Standardansicht:** ohne gemerkten Zustand ist nur die Gruppe **Projekt** aufgeklappt, alle anderen sind eingeklappt.
+- **Beim Start** stehen die eingeklappten Überschriften **in einer Reihe** nebeneinander; nach dem ersten Ein- oder Aufklappen wird wieder gestapelt (4 je Spalte).
+
+## 1.0.28 – 2026-11-22
+- **Menüband-Stapel:** jetzt **4** eingeklappte Gruppen-Überschriften je Spalte (vorher 3), danach neue Spalte. Text der gestapelten Überschriften **linksbündig**; Höhe so bemessen, dass das Menüband nicht höher wird.
+
+## 1.0.27 – 2026-11-22
+- **Menüband-Gruppen einklappbar:** Klick auf die dunkelblaue Überschrift einer Gruppe klappt sie ein. Ihre Überschrift steht dann rechts hinter den sichtbaren Gruppen im Stapel – 3 untereinander, danach beginnt eine neue Spalte. Klick auf die gestapelte Überschrift klappt die Gruppe an ihrer ursprünglichen Stelle wieder auf (neu: `gui\ribbon_fold.py`, `ribbon.py` unverändert).
+- Der Zustand wird in `config\state.json` (`ribbon_collapsed`) gemerkt und beim nächsten Start wiederhergestellt.
+- Handbuch (Kapitel Menüband) ergänzt; Tests für Stapel, Aufklappen und Wiederherstellen.
+
 ## 1.0.26 – 2026-11-22
 - **Viewer auf dem 2. Monitor:** die Tag-Tabelle nutzt jetzt die ganze Breite (kein leerer Platzhalter mehr rechts). Hinweis und Knopf **„Viewer zurückholen“** stehen oberhalb der Tag-Tabelle rechts in der Kopfzeile.
 - **Viewer zurückholen** teilt den Bereich wieder im Standardverhältnis (Tag-Tabelle : Viewer = 5 : 8).

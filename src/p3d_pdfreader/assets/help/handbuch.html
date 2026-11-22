@@ -157,7 +157,7 @@ details > div{padding:0 12px 8px}
 
 <section id="ribbon" data-title="Menüband">
 <h2>Menüband</h2>
-<p>Jede Gruppe hat eine dunkelblaue Überschrift. <b>Klick auf einen Knopf</b> zeigt darunter, was er tut. Die Einstellungen (Pfade, Tag-Muster) stehen in der Gruppe „Projekt“. Ist der Projektmodus an, ist sein Symbol grün.</p>
+<p>Jede Gruppe hat eine dunkelblaue Überschrift. <b>Klick auf einen Knopf</b> zeigt darunter, was er tut. Die Einstellungen (Pfade, Tag-Muster) stehen in der Gruppe „Projekt“. Ist der Projektmodus an, ist sein Symbol grün. <b>Klick auf eine Überschrift</b> klappt die Gruppe ein: ihre Überschrift steht dann rechts hinter den sichtbaren Gruppen im Stapel (4 untereinander, linksbündig, danach eine neue Spalte). Klick auf die gestapelte Überschrift klappt die Gruppe wieder auf. Der Zustand bleibt beim nächsten Start erhalten; beim Start stehen die eingeklappten Überschriften in einer Reihe. Standard: nur „Projekt“ aufgeklappt.</p>
 <div class="ribbon" id="rib"></div>
 <div class="detail" id="det"><div class="note">Knopf im Menüband anklicken …</div></div>
 <h3>Leisten über den Bereichen</h3>
@@ -207,11 +207,27 @@ details > div{padding:0 12px 8px}
   <thead><tr><th>Wo</th><th>Funktionen</th></tr></thead>
   <tbody>
     <tr><td>Zelle</td><td>Kopieren (<kbd>Strg</kbd>+<kbd>C</kbd>), Zeile kopieren, Zeile mit Überschriften kopieren, Nur „Wert“ in „Spalte“ zeigen, Filter der Spalte zurücksetzen, Alle Filter zurücksetzen, Spalten …, Nach Excel …</td></tr>
-    <tr><td>Spaltenkopf</td><td>Spalte ausblenden, alle Spalten zeigen, Spalte an den Anfang/ans Ende, mehrere markierte Spalten verschieben (<kbd>Strg</kbd>+Klick), Ausrichtung, Ansicht zurücksetzen, Teilreiter aus dieser Spalte erstellen / entfernen</td></tr>
+    <tr><td>Spaltenkopf</td><td>Spalte ausblenden, alle Spalten zeigen, Spalte an den Anfang/ans Ende, mehrere markierte Spalten verschieben (<kbd>Strg</kbd>+Klick), Ausrichtung, Ansicht zurücksetzen, Teilreiter aus dieser Spalte erstellen / entfernen, <b>als Datenlink-Feld setzen / entfernen</b> (Kopf dunkelgrün)</td></tr>
     <tr><td><img src="img/excel.png" alt="" style="width:16px;vertical-align:middle"> Excel-Symbol (Tabellenecke)</td><td>Klick: sichtbare Ansicht als Excel/CSV sichern · Rechtsklick: <b>Spalten …</b> (Reihenfolge, Ein-/Ausblenden, „Standard“ = wie eingelesen)</td></tr>
     <tr><td>Teilreiter-Leiste</td><td>Teilreiter aus (zurück zur Gesamttabelle)</td></tr>
   </tbody>
 </table>
+</section>
+
+<section id="datalink" data-title="Datenlink (Excel-Liste)">
+<h2>Datenlink (Excel-Liste)</h2>
+<p>Eine Excel-Liste – z. B. die <b>Gesamtliste</b> aus P3D InstrumentationList – wird importiert und über zwei Schlüsselspalten mit den Tabellen verknüpft. Die Excel-Datei wird nur gelesen.</p>
+<ol>
+  <li><b>1 Einlesen › Liste importieren › Excel-Liste importieren …</b>: Datei und Blatt wählen (Blatt „Gesamtliste“ wird vorgeschlagen). Kopfzeile = erste Zeile mit mindestens zwei Einträgen.</li>
+  <li><b>Vorschau mit Kachel-Editor:</b> jede Spalte eine Kachel – Haken = Spalte wird übergeben, ziehen = verschieben, Doppelklick = umbenennen. Zellen per Doppelklick bearbeiten. Rechtsklick auf Spaltenkopf oder Kachel: umbenennen, einfügen, löschen, sortieren, ein-/ausblenden.</li>
+  <li><b>Datenlink 1</b> (zu Tabelle 1 – Dateien, z. B. „P&amp;ID No.“) und <b>Datenlink 2</b> (zu Tabelle 2 – Tags, z. B. „Tag“) per Rechtsklick oder Auswahlfeld setzen; der Spaltenkopf wird dunkelgrün. <b>Übernehmen und verlinken</b> speichert die Tabelle (<code>config\data_link.json</code>).</li>
+  <li>Im Tool je Tabelle das <b>Datenlink-Feld</b> setzen: Rechtsklick auf den Spaltenkopf (z. B. „Zeichnungsnr.“ bzw. „Tag“) › <i>als Datenlink-Feld setzen</i>. Der Kopf wird <b>dunkelgrün</b>. Entfernen ebenso per Rechtsklick.</li>
+</ol>
+<ul>
+  <li><b>Dateien</b> bekommt die Spalte „Datenlink-Treffer“ (Zeilen der Liste zu dieser Zeichnung).</li>
+  <li><b>Tags</b> bekommt „Datenlink-Treffer“ und alle übergebenen Spalten der Liste (gleichnamige mit „ (Liste)“). 0 Treffer = Tag fehlt in der Liste.</li>
+  <li><b>Abgleich:</b> ohne Groß-/Kleinschreibung und Leerzeichen; ohne exakten Treffer zählt die Endung ab einem Bindestrich – „301-30-149-<b>TI-300</b>“ passt zum Tag „TI-300“. Sind beide Datenlinks aktiv, zählen für einen Tag nur Listenzeilen derselben Zeichnung. Mehrere Treffer: verschiedene Werte mit „ | “ verbunden.</li>
+</ul>
 </section>
 
 <section id="review" data-title="Review / Redline">
@@ -292,7 +308,8 @@ const R = [
  ["1  Einlesen", [
   ["scan","Quellordner\nscannen","Liest alle PDFs der Quellordner (inkl. Unterordner) ein. Taste F5."],
   ["folder","Ordner\nöffnen …","Einen beliebigen Ordner mit PDF-Plots einlesen."],
-  ["files","Dateien\nöffnen …","Einzelne PDF-Dateien wählen und einlesen."]]],
+  ["files","Dateien\nöffnen …","Einzelne PDF-Dateien wählen und einlesen."],
+  ["data_link","Liste\nimportieren","Datenlink: Excel-Liste (z. B. Instrumenten-Gesamtliste) importieren, im Kachel-Editor bearbeiten, Datenlink 1 und 2 setzen; Importtabelle bearbeiten, Datenlinks anzeigen, entfernen. Siehe Kapitel „Datenlink“."]]],
  ["2  Ansicht", [
   ["sheet_tags","PID-Tags","Wechselt zum Blatt „PID-Tags“."],
   ["sheet_all","Alle Tags","Öffnet das Blatt mit den Tags aller PDFs."],

@@ -1,0 +1,209 @@
+"""Datenlink: eine Excel-Tabelle (z. B. die Instrumenten-Gesamtliste aus P3D InstrumentationList) importieren und
+ueber zwei Schluesselspalten mit den Tabellen des Tools verknuepfen (Nutzervorgabe 2026-11-22). Ohne Qt.
+
+* **Datenlink 1** - Spalte der Importtabelle, die zum Datenlink-Feld der Tabelle 1 (Dateien, z. B. „Zeichnungsnr.“)
+  passt, z. B. „P&ID No.“.
+* **Datenlink 2** - Spalte der Importtabelle, die zum Datenlink-Feld der Tabelle 2 (Tags der gewaehlten PDF, z. B.
+  „Tag“) passt, z. B. „Tag“.
+
+Abgleich: Gross-/Kleinschreibung und Leerzeichen egal. Zuerst exakt; gibt es keinen exakten Treffer, zaehlt die
+**Endung ab einem Bindestrich** (Importwert „301-30-149-TI-300“ passt zum Tag „TI-300“). Sind beide Datenlinks aktiv,
+zaehlen fuer eine Tag-Zeile nur Importzeilen derselben Zeichnung (Datenlink 1).
+
+Die bearbeitete Importtabelle liegt in ``config/data_link.json``; die Datenlink-Felder der Tool-Tabellen in
+``config/state.json`` (Schluessel ``data_link_fields``)."""
+from __future__ import annotations
+
+import json
+from dataclasses import asdict, dataclass, field
+from datetime import date, datetime
+from pathlib import Path
+
+FILE_NAME = "data_link.json"
+MAX_JOINED = 5          # hoechstens so viele verschiedene Werte je Zelle, wenn mehrere Importzeilen passen
+JOIN = " | "
+
+
+def cell_text(value) -> str:
+    """Excel-Zellwert als Text (ganze Zahlen ohne „.0“, Datum als JJJJ-MM-TT)."""
+    if value is None:
+        return ""
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d") if value.time() == datetime.min.time() else value.strftime("%Y-%m-%d %H:%M")
+    if isinstance(value, date):
+        return value.strftime("%Y-%m-%d")
+    return str(value).strip()
+
+
+def norm(value) -> str:
+    return "".join(str(value or "").split()).casefold()
+
+
+def suffixes(value: str) -> list[str]:
+    """Alle Endungen ab einem Bindestrich (ohne den Wert selbst): „a-b-c“ -> „b-c“, „c“."""
+    parts = value.split("-")
+    return ["-".join(parts[i:]) for i in range(1, len(parts)) if "-".join(parts[i:])]
+
+
+def sheet_names(path) -> list[str]:
+    from openpyxl import load_workbook
+    wb = load_workbook(path, read_only=True, data_only=True)
+    try:
+        return list(wb.sheetnames)
+    finally:
+        wb.close()
+
+
+def read_sheet(path, sheet: str | None = None) -> tuple[list[str], list[list[str]]]:
+    """Ein Blatt lesen: Kopfzeile = erste Zeile mit mindestens zwei Eintraegen. Ganz leere Spalten und Zeilen fallen
+    weg; doppelte oder leere Spaltennamen werden eindeutig gemacht."""
+    from openpyxl import load_workbook
+    wb = load_workbook(path, read_only=True, data_only=True)
+    try:
+        ws = wb[sheet] if sheet else wb.worksheets[0]
+        data = [[cell_text(v) for v in r] for r in ws.iter_rows(values_only=True)]
+    finally:
+        wb.close()
+    start = next((i for i, r in enumerate(data) if sum(1 for v in r if v) >= 2), None)
+    if start is None:
+        raise ValueError("Keine Kopfzeile gefunden (Blatt leer?).")
+    head, body = data[start], [r for r in data[start + 1:] if any(r)]
+    width = max([len(head)] + [len(r) for r in body])
+    keep = [c for c in range(width)
+            if (c < len(head) and head[c]) or any(c < len(r) and r[c] for r in body)]
+    headers: list[str] = []
+    for n, c in enumerate(keep, start=1):
+        name = (head[c] if c < len(head) else "") or f"Spalte {n}"
+        base, k = name, 2
+        while name in headers:
+            name, k = f"{base} ({k})", k + 1
+        headers.append(name)
+    rows = [[r[c] if c < len(r) else "" for c in keep] for r in body]
+    return headers, rows
+
+
+@dataclass
+class ImportTable:
+    """Bearbeitete Importtabelle. ``headers``/``rows`` in Anzeigereihenfolge; ``hidden`` = Spalten, die nicht an das
+    Tool uebergeben werden; ``link1``/``link2`` = Spaltennamen der Datenlinks (oder "")."""
+    source: str = ""
+    sheet: str = ""
+    headers: list[str] = field(default_factory=list)
+    rows: list[list[str]] = field(default_factory=list)
+    hidden: list[str] = field(default_factory=list)
+    link1: str = ""
+    link2: str = ""
+
+    # --- Speichern -------------------------------------------------------------------------------------------------
+    @staticmethod
+    def file(folder) -> Path:
+        return Path(folder) / FILE_NAME
+
+    def save(self, folder) -> Path:
+        path = self.file(folder)
+        path.write_text(json.dumps(asdict(self), ensure_ascii=False), encoding="utf-8")
+        return path
+
+    @classmethod
+    def load(cls, folder) -> "ImportTable | None":
+        try:
+            data = json.loads(cls.file(folder).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        if not isinstance(data, dict) or not isinstance(data.get("headers"), list):
+            return None
+        known = {k: data[k] for k in cls.__dataclass_fields__ if k in data}
+        table = cls(**known)
+        table.headers = [str(h) for h in table.headers]
+        table.rows = [[str(v) for v in r] for r in table.rows if isinstance(r, list)]
+        table.hidden = [h for h in table.hidden if h in table.headers]
+        table.link1 = table.link1 if table.link1 in table.headers else ""
+        table.link2 = table.link2 if table.link2 in table.headers else ""
+        return table
+
+    @staticmethod
+    def remove(folder) -> None:
+        try:
+            ImportTable.file(folder).unlink()
+        except OSError:
+            pass
+
+    # --- Abfragen --------------------------------------------------------------------------------------------------
+    def transfer_columns(self) -> list[str]:
+        """Spalten, die an die Tag-Tabelle uebergeben werden (sichtbare, in Anzeigereihenfolge)."""
+        hidden = set(self.hidden)
+        return [h for h in self.headers if h not in hidden]
+
+    def link(self, n: int) -> str:
+        return self.link1 if n == 1 else self.link2
+
+
+class _KeyIndex:
+    """Index einer Spalte: normalisierter Wert -> Zeilen, Endung -> Zeilen."""
+
+    def __init__(self, values: list[str]):
+        self.exact: dict[str, list[int]] = {}
+        self.tail: dict[str, list[int]] = {}
+        for i, v in enumerate(values):
+            key = norm(v)
+            if not key:
+                continue
+            self.exact.setdefault(key, []).append(i)
+            for s in suffixes(key):
+                self.tail.setdefault(s, []).append(i)
+
+    def find(self, value) -> list[int]:
+        key = norm(value)
+        if not key:
+            return []
+        return self.exact.get(key) or self.tail.get(key, [])
+
+
+class DataLink:
+    """Verknuepfung der Importtabelle mit den Tool-Tabellen. ``fields`` = Datenlink-Feld je Tool-Tabelle
+    (``{"files": "Zeichnungsnr.", "tags": "Tag"}``)."""
+
+    def __init__(self, table: ImportTable, fields: dict[str, str]):
+        self.table = table
+        self.fields = dict(fields or {})
+        cols = table.headers
+        self._idx: dict[int, _KeyIndex] = {}
+        for n in (1, 2):
+            name = table.link(n)
+            if name in cols:
+                c = cols.index(name)
+                self._idx[n] = _KeyIndex([r[c] if c < len(r) else "" for r in table.rows])
+        self.columns = table.transfer_columns()
+        self._pos = [cols.index(h) for h in self.columns]
+
+    def active(self, n: int) -> bool:
+        """Datenlink n aktiv: Spalte in der Importtabelle gesetzt und Feld in der Tool-Tabelle gesetzt."""
+        return n in self._idx and bool(self.fields.get("files" if n == 1 else "tags"))
+
+    def file_rows(self, value) -> list[int]:
+        return self._idx[1].find(value) if self.active(1) else []
+
+    def tag_rows(self, value, file_value=None) -> list[int]:
+        """Importzeilen zu einem Wert der Tag-Tabelle; mit aktivem Datenlink 1 nur Zeilen derselben Zeichnung."""
+        if not self.active(2):
+            return []
+        hits = self._idx[2].find(value)
+        if hits and self.active(1) and file_value is not None:
+            same = set(self.file_rows(file_value))
+            hits = [i for i in hits if i in same]
+        return hits
+
+    def values(self, rows: list[int]) -> list[str]:
+        """Werte der uebergebenen Spalten; bei mehreren Treffern verschiedene Werte mit „ | “ verbunden."""
+        out = []
+        for c in self._pos:
+            seen: list[str] = []
+            for i in rows:
+                v = self.table.rows[i][c] if c < len(self.table.rows[i]) else ""
+                if v and v not in seen:
+                    seen.append(v)
+            text = JOIN.join(seen[:MAX_JOINED]) + (JOIN + "…" if len(seen) > MAX_JOINED else "")
+            out.append(text)
+        return out
