@@ -12,6 +12,12 @@
       "runtimeExecutable": "C:\\Users\\mail\\AI_Coworker_Claude\\Tools_Central\\Python\\python\\python.exe",
       "runtimeArgs": ["-m", "http.server", "8790", "--bind", "127.0.0.1", "--directory", "C:\\Users\\mail\\AI_Coworker_Claude\\P3D - Engineering Tools\\P3D - PDF Reader\\data\\exports"],
       "port": 8790
+    },
+    {
+      "name": "help-static",
+      "runtimeExecutable": "C:\\Users\\mail\\AI_Coworker_Claude\\Tools_Central\\Python\\python\\python.exe",
+      "runtimeArgs": ["-m", "http.server", "8791", "--bind", "127.0.0.1", "--directory", "C:\\Users\\mail\\AI_Coworker_Claude\\P3D - Engineering Tools\\P3D - PDF Reader\\src\\p3d_pdfreader\\assets\\help"],
+      "port": 8791
     }
   ]
 }

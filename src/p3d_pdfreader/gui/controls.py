@@ -59,3 +59,12 @@ QCheckBox::indicator:disabled, QRadioButton::indicator:disabled {{ background: {
 QCheckBox::indicator:checked:disabled {{ background: {LIGHT.border}; }}
 QCheckBox:disabled, QRadioButton:disabled {{ color: {DISABLED}; }}
 """
+
+
+def tip_button(text: str, kind, tip: str):
+    """Kit-Knopf mit Tooltip. ``main_gui_kit.buttons.action_button`` nimmt als dritten Parameter ein Symbol, das vor
+    den Text gesetzt wird - ein dort uebergebener Erklaerungstext stand deshalb auf dem Knopf."""
+    from main_gui_kit.buttons import action_button
+    button = action_button(text, kind)
+    button.setToolTip(tip)
+    return button

@@ -27,6 +27,7 @@ from main_gui_kit.buttons import ButtonKind, action_button
 from ..core.project_defs import code_col, sort_code_rows
 from . import appearance
 from .design import BAND, BORDER, NOTE_QSS, SECTION_QSS, TEXT
+from .controls import tip_button
 
 UNDO_LIMIT = 60
 _CLIP: dict = {}                # zuletzt kopierte Zeilen/Spalten (die Zwischenablage bekommt den Text, tabulatorgetrennt)
@@ -154,8 +155,8 @@ class ColumnTiles(QWidget):
         self.note = QLabel()
         self.note.setStyleSheet(NOTE_QSS)
         head.addWidget(self.note, 1)
-        self.b_add = action_button("+ Spalte", ButtonKind.SECONDARY, "Neue Spalte rechts von der markierten Kachel")
-        self.b_show = action_button("Alle einblenden", ButtonKind.NEUTRAL, "Alle ausgeblendeten Spalten wieder zeigen")
+        self.b_add = tip_button("+ Spalte", ButtonKind.SECONDARY, "Neue Spalte rechts von der markierten Kachel")
+        self.b_show = tip_button("Alle einblenden", ButtonKind.NEUTRAL, "Alle ausgeblendeten Spalten wieder zeigen")
         self.b_add.clicked.connect(self._add)
         self.b_show.clicked.connect(owner.show_all_columns)
         head.addWidget(self.b_add)

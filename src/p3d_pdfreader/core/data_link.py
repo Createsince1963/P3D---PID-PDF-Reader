@@ -11,7 +11,11 @@ Abgleich: Gross-/Kleinschreibung und Leerzeichen egal. Zuerst exakt; gibt es kei
 zaehlen fuer eine Tag-Zeile nur Importzeilen derselben Zeichnung (Datenlink 1).
 
 Die bearbeitete Importtabelle liegt in ``config/data_link.json``; die Datenlink-Felder der Tool-Tabellen in
-``config/state.json`` (Schluessel ``data_link_fields``)."""
+``config/state.json`` (Schluessel ``data_link_fields``).
+
+Seit 1.0.32 wird die Liste im Kachel-Editor (Modul ``column_editor`` aus P3D Tag Compliance) angepasst: gespeichert
+werden die eingelesene Originalliste (``raw_headers``/``raw_rows``), die Anpassung (``tile_config``, Schritte, Reihenfolge,
+Namen, Export ja/nein) und das Ergebnis (``headers``/``rows``, ``hidden`` = nicht exportierte Spalten)."""
 from __future__ import annotations
 
 import json
@@ -95,6 +99,9 @@ class ImportTable:
     hidden: list[str] = field(default_factory=list)
     link1: str = ""
     link2: str = ""
+    raw_headers: list[str] = field(default_factory=list)   # eingelesene Originalliste (Grundlage der Anpassung)
+    raw_rows: list[list[str]] = field(default_factory=list)
+    tile_config: dict = field(default_factory=dict)        # Anpassung aus dem Kachel-Editor (column_editor, schema 3)
 
     # --- Speichern -------------------------------------------------------------------------------------------------
     @staticmethod
@@ -121,6 +128,9 @@ class ImportTable:
         table.hidden = [h for h in table.hidden if h in table.headers]
         table.link1 = table.link1 if table.link1 in table.headers else ""
         table.link2 = table.link2 if table.link2 in table.headers else ""
+        table.raw_headers = [str(h) for h in (table.raw_headers or [])]
+        table.raw_rows = [[str(v) for v in r] for r in (table.raw_rows or []) if isinstance(r, list)]
+        table.tile_config = table.tile_config if isinstance(table.tile_config, dict) else {}
         return table
 
     @staticmethod
@@ -138,6 +148,43 @@ class ImportTable:
 
     def link(self, n: int) -> str:
         return self.link1 if n == 1 else self.link2
+
+    def base(self) -> tuple[list[str], list[list[str]]]:
+        """Grundlage fuer den Kachel-Editor: die eingelesene Originalliste, bei aelteren Dateien das gespeicherte Ergebnis."""
+        if self.raw_headers:
+            return list(self.raw_headers), [list(r) for r in self.raw_rows]
+        return list(self.headers), [list(r) for r in self.rows]
+
+    def export_view(self) -> tuple[list[str], list[list[str]]]:
+        """Die kompatible Importliste: nur uebergebene Spalten, in Anzeigereihenfolge."""
+        pos = [self.headers.index(h) for h in self.transfer_columns()]
+        return [self.headers[c] for c in pos], [[r[c] if c < len(r) else "" for c in pos] for r in self.rows]
+
+
+def unique_names(names: list[str]) -> list[str]:
+    """Spaltennamen eindeutig machen (leere -> „Spalte n“, doppelte -> „Name (2)“)."""
+    out: list[str] = []
+    for n, name in enumerate(names, start=1):
+        name = str(name or "").strip() or f"Spalte {n}"
+        base, k = name, 2
+        while name in out:
+            name, k = f"{base} ({k})", k + 1
+        out.append(name)
+    return out
+
+
+def write_excel(path, headers: list[str], rows: list[list], sheet: str = "Importliste") -> Path:
+    """Liste als Excel-Datentabelle schreiben (kompatibel zu „Liste importieren“: Kopf in Zeile 1)."""
+    from openpyxl import Workbook
+
+    from .xlsx import write_table
+    wb = Workbook()
+    ws = wb.active
+    ws.title = sheet[:31]
+    write_table(ws, headers, rows, sheet)
+    path = Path(path)
+    wb.save(path)
+    return path
 
 
 class _KeyIndex:

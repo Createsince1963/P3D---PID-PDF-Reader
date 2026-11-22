@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from PySide6.QtCore import Qt  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from p3d_pdfreader.core.data_link import DataLink, ImportTable, read_sheet, suffixes  # noqa: E402
@@ -82,28 +83,57 @@ def app():
     return QApplication.instance() or QApplication([])
 
 
-def test_import_dialog_links_and_tiles(app, tmp_path):
-    from PySide6.QtWidgets import QMenu
-    from p3d_pdfreader.gui.data_link_ui import ImportDialog
+def test_tile_editor_window_full(app, tmp_path):
+    """Kachel-Editor als Vollfenster: Ladebildschirm, drei Bereiche, Datenlinks, Export ja/nein, Anpassung bleibt."""
+    os.environ.setdefault("QT_QUICK_BACKEND", "software")
+    from p3d_pdfreader.core.data_link import write_excel
+    from p3d_pdfreader.gui.tile_editor import TileEditorWindow
     t = _table(tmp_path)
-    t.link1 = t.link2 = ""
-    dlg = ImportDialog(t)
-    assert dlg.column_tiles.tiles.count() == len(t.headers)
-    menu = dlg.column_menu(1)
-    assert isinstance(menu, QMenu) and "Als ⛓ Datenlink 2 setzen" in menu.actions()[1].text()
-    menu.actions()[1].trigger()
-    assert t.link2 == "Tag" and dlg.link_boxes[2].currentData() == "Tag"
-    assert dlg._link_columns() == {1} and "Datenlink 2" in dlg.model.label(1)
-    dlg.link_boxes[1].setCurrentIndex(dlg.link_boxes[1].findData("P&ID No."))
-    assert t.link1 == "P&ID No."
-    dlg.set_column_hidden(3, True)
-    assert t.transfer_columns() == ["P&ID No.", "Tag", "Service", "Location"]
-    dlg.move_columns([2, 0, 1, 3, 4])
-    assert t.headers[0] == "Service" and t.rows[0][0] == "Process Nitrogen Inlet"
-    dlg.model.setData(dlg.model.index(0, 0), "geändert")
-    assert t.rows[0][0] == "geändert" and dlg.dirty
-    dlg.grab()                                   # Kopf mit gruenen Datenlink-Spalten zeichnen (kein Absturz)
-    dlg.close()
+    t.link1 = ""
+    win = TileEditorWindow(t, maximized=False)
+    seen = []
+    step = win.overlay.step
+    win.overlay.step = lambda f, text="": (seen.append((f, text)), step(f, text))
+    win.open()
+    try:
+        assert win.overlay.title == "Kachel-Editor wird geladen …" and not win.overlay.isVisible()
+        assert seen[0][1] == "Kachel-Editor wird erstellt …" and seen[-1][0] == 1.0
+        assert win.panel is not None and win.panel.state == "ready", win.notes
+        assert win.panel.ribbon.tabs.tabText(0) == "Start"                     # Bereich 1, deutsch
+        assert win.deck.side_for(win.panel) is not None and win.deck.isVisible()   # Bereich 2: Seitenleiste im Dock
+        assert win.model.columnCount() == len(HEAD) and win.model.rowCount() == len(ROWS)   # Bereich 3
+        assert win.links == {1: "", 2: "Tag"} and "Datenlink 2" in win.model.headerData(1, Qt.Horizontal)
+        win.link_boxes[1].setCurrentIndex(win.link_boxes[1].findData("P&ID No."))
+        assert win.links[1] == "P&ID No." and win._link_columns() == {0, 1}
+        ctl, keys = win.panel.controller, win.panel.model.keys()
+        assert ctl.setExport(keys.index("Leer"), False)                        # Leer nicht uebergeben
+        ctl.moveColumn(keys.index("Service"), 0)
+        app.processEvents()
+        win.source.flush()
+        assert win.model.keys()[0] == "Service"
+        assert ctl.renameOutput(win.panel.model.keys().index("Location"), "Ort") == ""
+        win.source.flush()
+        res = win.build_result()
+        assert res.headers[0] == "Service" and "Ort" in res.headers and res.hidden == ["Leer"]
+        assert res.link1 == "P&ID No." and res.link2 == "Tag" and res.raw_headers == HEAD and res.tile_config
+        headers, rows = res.export_view()
+        assert "Leer" not in headers and rows[0][0] == "Process Nitrogen Inlet"
+        path = write_excel(tmp_path / "out.xlsx", headers, rows)
+        assert read_sheet(path)[0] == headers                                  # kompatibel zu "Liste importieren"
+        win.grab()
+        win.accept()
+        assert win.result is not None and not win.isVisible() and win.panel is None
+    finally:
+        win.close()
+    # erneut oeffnen: Anpassung wird auf die Originalliste angewendet
+    again = TileEditorWindow(win.result, maximized=False)
+    again.open()
+    try:
+        assert again.build_result().headers == win.result.headers
+        assert again.build_result().hidden == ["Leer"] and again.links[1] == "P&ID No."
+        assert not again.dirty
+    finally:
+        again.close()
 
 
 def test_main_window_link_fields_and_columns(app, tmp_path, monkeypatch):
@@ -145,3 +175,19 @@ def test_main_window_link_fields_and_columns(app, tmp_path, monkeypatch):
     w.page._only_duplicates()
     assert w.page.tags.headers == main_window.TAG_COLS
     w.close()
+
+
+def test_help_workflow_data():
+    """Handbuch-Kapitel "Workflow Schritt fuer Schritt": workflow.js gueltig, alle Bilder vorhanden, Nummern im Bild."""
+    import json
+    help_dir = Path(__file__).resolve().parent.parent / "src" / "p3d_pdfreader" / "assets" / "help"
+    html = (help_dir / "handbuch.html").read_text(encoding="utf-8")
+    assert '<script src="workflow.js"></script>' in html and 'id="workflow"' in html
+    js = (help_dir / "workflow.js").read_text(encoding="utf-8")
+    steps = json.loads(js[js.index("["):js.rindex("]") + 1])
+    assert [s["id"] for s in steps][:2] == ["overview", "project"] and len(steps) >= 7
+    for step in steps:
+        for fig in step["figs"]:
+            assert (help_dir / fig["img"]).is_file() and fig["marks"]
+            for m in fig["marks"]:
+                assert 0 <= m["pin"][0] <= 100 and 0 <= m["pin"][1] <= 100 and m["title"] and m["text"]

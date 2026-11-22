@@ -16,6 +16,7 @@ erzeugt Redline-PDFs und Review-Excel. Zwei Oberflächen auf demselben Kern:
 | `src\p3d_pdfreader\web\` | HTTP-Server und Offline-Bericht, nutzt `core` unverändert |
 | `src\p3d_pdfreader\assets\` | web (HTML/JS/CSS), help (Handbuch + Bilder), i18n-Katalog, Icons |
 | `main_gui_kit\`, `gui\design.py`, `gui\appearance.py` | **Kopien aus XCHANGE 0.5.0 – nicht ändern** |
+| `src\p3d_pdfreader\column_editor\` | **Kopie des Kachel-Editors aus Tag Compliance – nicht ändern** (`QUELLE.md`); Einbindung in `gui\tile_editor\` (Vollfenster für die Datenlink-Importliste) |
 | `Launcher\` | `START_LAUNCHER.bat`, `launcher_gui.py` (Start, Quality gate, EXE, portable Kopie, Hotspot, Web-Server) |
 | `config\` | Projektdefinitionen, Listen, Profile (Laufzeitdaten) |
 | `data\exports\` | Export-Ziel (Berichte) |

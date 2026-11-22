@@ -84,7 +84,31 @@ details > div{padding:0 12px 8px}
 .wf .ln.dash{stroke-dasharray:4 3}
 .wf .ah{fill:var(--subtle)}
 .wf .lb{fill:var(--subtle);font-size:10px}
+/* Workflow Schritt fuer Schritt: Bildschirmfotos mit Nummern (Daten aus workflow.js) */
+.wfnav{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
+.wfnav a{display:flex;align-items:center;gap:6px;padding:4px 10px 4px 4px;border:1px solid var(--border);border-radius:14px;background:var(--card);color:var(--txt);text-decoration:none;font-size:12.5px}
+.wfnav a:hover{border-color:var(--accent)}
+.snum{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--head);color:#fff;font-weight:600;font-size:12px}
+.wfstep{border-top:2px solid var(--headline);margin-top:18px;padding-top:4px}
+.wfstep h3{display:flex;align-items:center;gap:8px;font-size:15px;color:var(--head)}
+.wffig{margin:10px 0 16px}
+.wffig .cap{font-size:12px;color:var(--subtle);margin:2px 0 4px}
+.shotbox{overflow:auto;border:1px solid var(--border);border-radius:3px;background:var(--band);max-height:78vh}
+.shotwrap{position:relative;width:100%;line-height:0}
+.shotwrap.big{width:var(--bigw)}
+.shotwrap img{width:100%;height:auto;display:block;cursor:zoom-in}
+.shotwrap.big img{cursor:zoom-out}
+.pin{position:absolute;transform:translate(-45%,-45%);min-width:22px;height:22px;padding:0 5px;border-radius:11px;background:var(--accent);color:#fff;font:600 12px/22px "Segoe UI",Arial,sans-serif;text-align:center;cursor:pointer;box-shadow:0 0 0 2px #fff,0 1px 4px rgba(27,43,74,.35);z-index:2;user-select:none}
+.pin.on,.pin:hover{background:var(--head)}
+.frame{position:absolute;border:2px solid var(--accent);border-radius:3px;pointer-events:none;opacity:0;transition:opacity .15s;z-index:1}
+.frame.on{opacity:1;box-shadow:0 0 0 3px rgba(47,128,237,.25)}
+ol.pins{list-style:none;padding:0;margin:8px 0 0;columns:2 360px;column-gap:18px}
+ol.pins li{display:flex;gap:8px;align-items:flex-start;break-inside:avoid;padding:4px 6px;border-radius:3px;cursor:pointer}
+ol.pins li:hover,ol.pins li.on{background:var(--band)}
+ol.pins li .snum{background:var(--accent);flex:none}
+ol.pins li b{display:block}
 @media (max-width:860px){nav{display:none}main{padding:12px}}
+@media print{.shotbox{max-height:none;overflow:visible}.shotwrap.big{width:100%}}
 @media print{header,nav,.cmenu{display:none}section{break-inside:avoid;border:none}body{background:#fff}}
 </style>
 </head>
@@ -101,7 +125,7 @@ details > div{padding:0 12px 8px}
 <section id="start" data-title="Schnellstart">
 <h2>Schnellstart</h2>
 <p>Der P3D PDF Reader liest PDF-Plots von P&amp;IDs aus AutoCAD Plant 3D, listet alle PID-Tags je PDF, erkennt doppelte Tags und erzeugt Redline-PDFs und Review-Excel. Die Original-PDFs werden <b>nur gelesen</b>.</p>
-<p class="note">Klick auf einen Schritt springt zum Knopf im Menüband.</p>
+<p class="note">Klick auf einen Schritt springt zum Knopf im Menüband. Den ganzen Ablauf mit Bildern der Oberfläche zeigt das Kapitel <a href="#workflow">Workflow Schritt für Schritt</a>.</p>
 <div class="steps">
   <div class="step" data-go="scan"><b>1 · Einlesen</b><img src="img/scan.png" alt="">Quellordner scannen (<kbd>F5</kbd>) oder Ordner/Dateien öffnen.</div>
   <div class="step" data-go="sheet_tags"><b>2 · Ansicht</b><img src="img/sheet_tags.png" alt="">Blatt „PID-Tags“ oder „Alle Tags“, Viewer auf 2. Monitor.</div>
@@ -109,6 +133,13 @@ details > div{padding:0 12px 8px}
   <div class="step" data-go="redline"><b>4 · Review / Redline</b><img src="img/redline.png" alt="">Redline-PDF und Review-Excel für die gewählte PDF oder im Bulk.</div>
   <div class="step" data-go="xlsx"><b>5 · Export</b><img src="img/xlsx.png" alt="">Alle Dateien und Tags als Excel oder CSV.</div>
 </div>
+</section>
+
+<section id="workflow" data-title="Workflow Schritt für Schritt">
+<h2>Workflow Schritt für Schritt</h2>
+<p>Der ganze Ablauf mit Bildern der Oberfläche. Jede Nummer im Bild gehört zur gleichnamigen Erklärung darunter – <b>Klick auf eine Nummer oder eine Erklärung</b> markiert das Bedienelement. <b>Klick ins Bild</b> vergrößert es (erneuter Klick verkleinert).</p>
+<div class="wfnav" id="wfnav"></div>
+<div id="wfsteps"><p class="note">Bilder fehlen – <code>tools\make_help_workflow.py</code> ausführen.</p></div>
 </section>
 
 <section id="flow" data-title="Ablauf &amp; Bausteine">
@@ -219,8 +250,14 @@ details > div{padding:0 12px 8px}
 <p>Eine Excel-Liste – z. B. die <b>Gesamtliste</b> aus P3D InstrumentationList – wird importiert und über zwei Schlüsselspalten mit den Tabellen verknüpft. Die Excel-Datei wird nur gelesen.</p>
 <ol>
   <li><b>1 Einlesen › Liste importieren › Excel-Liste importieren …</b>: Datei und Blatt wählen (Blatt „Gesamtliste“ wird vorgeschlagen). Kopfzeile = erste Zeile mit mindestens zwei Einträgen.</li>
-  <li><b>Vorschau mit Kachel-Editor:</b> jede Spalte eine Kachel – Haken = Spalte wird übergeben, ziehen = verschieben, Doppelklick = umbenennen. Zellen per Doppelklick bearbeiten. Rechtsklick auf Spaltenkopf oder Kachel: umbenennen, einfügen, löschen, sortieren, ein-/ausblenden.</li>
-  <li><b>Datenlink 1</b> (zu Tabelle 1 – Dateien, z. B. „P&amp;ID No.“) und <b>Datenlink 2</b> (zu Tabelle 2 – Tags, z. B. „Tag“) per Rechtsklick oder Auswahlfeld setzen; der Spaltenkopf wird dunkelgrün. <b>Übernehmen und verlinken</b> speichert die Tabelle (<code>config\data_link.json</code>).</li>
+  <li><b>Kachel-Editor im Vollfenster</b> (wie in P3D Tag Compliance; beim Öffnen zeigt ein Ladebildschirm den Fortschritt). Hier wird die Liste zu einer passenden Importliste angepasst – drei Bereiche:
+    <ul>
+      <li><b>1 Kachel-Editor</b> (oben): Menüband <i>Start</i> (Rückgängig/Wiederholen, Aus-/einblenden, <b>Export ja/nein</b>, Kacheln gruppieren, Spalte zurücksetzen/duplizieren, Spalten hinzufügen, Als Excel speichern), <i>Umwandeln</i> (Leerzeichen, Bereinigen, GROSS/klein, Ersetzen, Text ergänzen, Extrahieren, Teilen, Füllen) und <i>Spalte hinzufügen</i> (Wenn … dann …, Liste prüfen, Aus Liste, Ja/Nein-, Indexspalte). Jede Spalte ist eine Kachel: ziehen = verschieben, Doppelklick = umbenennen. Kacheln im Bereich <b>Nicht exportiert</b> werden nicht an das Tool übergeben.</li>
+      <li><b>2 Seitenleiste</b> (rechts): aktive Kachel, Gruppe und Verlauf aller Schritte; einklappbar oder als eigenes Fenster lösbar.</li>
+      <li><b>3 Datentabelle</b> (unten): die Liste, wie sie übergeben wird. Zellen der Originalspalten per Doppelklick bearbeiten. Klick auf einen Spaltenkopf wählt die Kachel.</li>
+    </ul></li>
+  <li><b>Datenlink 1</b> (zu Tabelle 1 – Dateien, z. B. „P&amp;ID No.“) und <b>Datenlink 2</b> (zu Tabelle 2 – Tags, z. B. „Tag“) per Rechtsklick auf den Tabellenkopf oder Auswahlfeld setzen; der Spaltenkopf wird dunkelgrün. <b>Übernehmen und verlinken</b> speichert Originalliste, Anpassung und Ergebnis (<code>config\data_link.json</code>); beim nächsten Öffnen sind alle Schritte wieder da.</li>
+  <li><b>Anpassung speichern / laden …</b> sichert alle Schritte als Datei und wendet sie auf eine neue Version der Liste an. <b>Andere Excel-Liste …</b> wendet die aktuelle Anpassung sofort auf die neue Liste an. <b>Als Excel speichern …</b> schreibt die angepasste Liste als Excel-Datei (nur exportierte Spalten), die sich wieder mit „Liste importieren“ einlesen lässt.</li>
   <li>Im Tool je Tabelle das <b>Datenlink-Feld</b> setzen: Rechtsklick auf den Spaltenkopf (z. B. „Zeichnungsnr.“ bzw. „Tag“) › <i>als Datenlink-Feld setzen</i>. Der Kopf wird <b>dunkelgrün</b>. Entfernen ebenso per Rechtsklick.</li>
 </ol>
 <ul>
@@ -296,7 +333,70 @@ details > div{padding:0 12px 8px}
 </section>
 </main>
 </div>
+<script src="workflow.js"></script>
 <script>
+/* Workflow Schritt fuer Schritt: aus WF (workflow.js, erzeugt von tools/make_help_workflow.py) */
+(function () {
+  if (typeof WF === "undefined") return;
+  const nav = document.getElementById("wfnav"), host = document.getElementById("wfsteps");
+  const esc = t => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  host.innerHTML = "";
+  let stepNo = 0;
+  for (const st of WF) {
+    const label = st.id === "overview" ? "Ü" : String(++stepNo);
+    const a = document.createElement("a");
+    a.href = "#wf-" + st.id;
+    a.innerHTML = `<span class="snum">${label}</span>${esc(st.title)}`;
+    nav.appendChild(a);
+    const box = document.createElement("div");
+    box.className = "wfstep"; box.id = "wf-" + st.id;
+    box.innerHTML = `<h3><span class="snum">${label}</span>${st.id === "overview" ? "" : "Schritt " + label + " · "}${esc(st.title)}</h3><p>${esc(st.intro)}</p>`;
+    let n = 0;
+    for (const f of st.figs) {
+      const fig = document.createElement("div"); fig.className = "wffig";
+      const bigw = Math.max(100, Math.round(100 * f.w / 1100));
+      let pins = "", frames = "", items = "";
+      for (const m of f.marks) {
+        n++;
+        const [x, y, w, h] = m.rect, [px, py] = m.pin || m.rect;
+        pins += `<span class="pin" data-n="${n}" style="left:${px}%;top:${py}%">${n}</span>`;
+        frames += `<div class="frame" data-n="${n}" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%"></div>`;
+        items += `<li data-n="${n}"><span class="snum">${n}</span><span><b>${esc(m.title)}</b>${esc(m.text)}</span></li>`;
+      }
+      fig.innerHTML = (f.caption ? `<div class="cap">${esc(f.caption)}</div>` : "") +
+        `<div class="shotbox"><div class="shotwrap" style="--bigw:${bigw}%"><img src="${f.img}" alt="${esc(f.caption || st.title)}" width="${f.w}" height="${f.h}" loading="lazy">${frames}${pins}</div></div>` +
+        `<ol class="pins">${items}</ol>`;
+      box.appendChild(fig);
+    }
+    host.appendChild(box);
+  }
+  function select(step, n) {
+    step.querySelectorAll(".on").forEach(e => e.classList.remove("on"));
+    step.querySelectorAll(`[data-n="${n}"]`).forEach(e => e.classList.add("on"));
+  }
+  host.addEventListener("click", e => {
+    const step = e.target.closest(".wfstep"); if (!step) return;
+    const hit = e.target.closest(".pin, ol.pins li");
+    if (hit) {
+      select(step, hit.dataset.n);
+      const pin = step.querySelector(`.pin[data-n="${hit.dataset.n}"]`), li = step.querySelector(`ol.pins li[data-n="${hit.dataset.n}"]`);
+      (hit.classList.contains("pin") ? li : pin).scrollIntoView({behavior: "smooth", block: "nearest", inline: "center"});
+      return;
+    }
+    if (e.target.tagName === "IMG") e.target.parentElement.classList.toggle("big");
+  });
+  host.addEventListener("mouseover", e => {
+    const hit = e.target.closest(".pin, ol.pins li"), step = e.target.closest(".wfstep");
+    if (hit && step) step.querySelectorAll(`.frame[data-n="${hit.dataset.n}"]`).forEach(f => f.classList.add("on"));
+  });
+  host.addEventListener("mouseout", e => {
+    const hit = e.target.closest(".pin, ol.pins li"), step = e.target.closest(".wfstep");
+    if (hit && step) step.querySelectorAll(`.frame[data-n="${hit.dataset.n}"]:not(.keep)`).forEach(f => {
+      if (!step.querySelector(`li.on[data-n="${hit.dataset.n}"]`)) f.classList.remove("on");
+    });
+  });
+})();
+
 const R = [
  ["Projekt", [
   ["project_pick","Projekt\nwählen","Projekt anlegen, öffnen oder aus P3D Tag Compliance übernehmen (pidtag_project.db wird nur gelesen)."],
@@ -309,7 +409,7 @@ const R = [
   ["scan","Quellordner\nscannen","Liest alle PDFs der Quellordner (inkl. Unterordner) ein. Taste F5."],
   ["folder","Ordner\nöffnen …","Einen beliebigen Ordner mit PDF-Plots einlesen."],
   ["files","Dateien\nöffnen …","Einzelne PDF-Dateien wählen und einlesen."],
-  ["data_link","Liste\nimportieren","Datenlink: Excel-Liste (z. B. Instrumenten-Gesamtliste) importieren, im Kachel-Editor bearbeiten, Datenlink 1 und 2 setzen; Importtabelle bearbeiten, Datenlinks anzeigen, entfernen. Siehe Kapitel „Datenlink“."]]],
+  ["data_link","Liste\nimportieren","Datenlink: Excel-Liste (z. B. Instrumenten-Gesamtliste) importieren, im Kachel-Editor (Vollfenster) anpassen, Datenlink 1 und 2 setzen; Importtabelle bearbeiten, Datenlinks anzeigen, entfernen. Siehe Kapitel „Datenlink“."]]],
  ["2  Ansicht", [
   ["sheet_tags","PID-Tags","Wechselt zum Blatt „PID-Tags“."],
   ["sheet_all","Alle Tags","Öffnet das Blatt mit den Tags aller PDFs."],
@@ -464,7 +564,7 @@ const io = new IntersectionObserver(entries => entries.forEach(en => {
   if (en.isIntersecting) links.forEach(a => a.classList.toggle("on", a.dataset.id === en.target.id));
 }), {rootMargin: "-60px 0px -70% 0px"});
 sections.forEach(s => io.observe(s));
-const originals = new Map(), LIVE = new Set(["start", "flow", "ribbon", "tables"]);   // interaktiv: nicht umschreiben
+const originals = new Map(), LIVE = new Set(["start", "workflow", "flow", "ribbon", "tables"]);   // interaktiv: nicht umschreiben
 function unmark(s) { if (originals.has(s)) s.innerHTML = originals.get(s); }
 document.getElementById("q").addEventListener("input", e => {
   const q = e.target.value.trim().toLowerCase(); let shown = 0;

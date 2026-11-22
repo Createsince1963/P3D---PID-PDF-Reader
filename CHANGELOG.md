@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.0.33 – 2026-11-22
+- **Kachel-Editor komplett deutsch:** Kacheln, Bereichs-Überschriften, Kachelmenü, Seitenleiste (Aktive Kachel, Schritte), alle Dialoge (Teilen, Ersetzen, Typ ändern, Wenn-dann, Liste prüfen, Aus Liste, Gruppieren, Index-, Ja/Nein-Spalte, Leere füllen, Spalten hinzufügen), Typnamen (Ganzzahl, Dezimalzahl, Datum …), Meldungen und Verlaufstexte.
+- Neu: `tools	ranslate_column_editor.py` – übersetzt die Kopie `column_editor` per Wörterbuch (nur Anzeigetexte; interne Schlüssel bleiben) und baut `qml_resources.py` neu. Wiederholbar; nach einer neuen Kopie aus Tag Compliance erneut ausführen, das Werkzeug meldet nicht mehr gefundene Texte. `QUELLE.md` beschreibt den Ablauf.
+- Neue Prüfspalten schreiben „NICHT IN LISTE“ (bisher „NOT IN LIST“); gespeicherte Anpassungen behalten ihren Text.
+- Handbuch-Hinweis auf englische Texte entfernt; Hilfebilder neu erzeugt.
+
+## 1.0.32 – 2026-11-22
+- **Kachel-Editor aus P3D Tag Compliance übernommen – als Vollfenster** (Datenlink › Excel-Liste importieren / Importtabelle bearbeiten). Die importierte Excel-Liste wird hier zu einer für den P3D PDF Reader kompatiblen Importliste angepasst. Die drei Bereiche wie in Tag Compliance:
+  1. **Kachel-Editor** mit Menüband Start / Umwandeln / Spalte hinzufügen (Rückgängig, Export ja/nein, Gruppen, Ersetzen, Teilen, Extrahieren, Füllen, Wenn-dann-, Ja/Nein-, Index-Spalte, Spalten aus einer anderen Liste …) und den Kachel-Bereichen „Nicht exportiert“, „Ausgeblendet“, „Umbenannt“.
+  2. **Seitenleiste** rechts als Dock über die volle Höhe: aktive Kachel, Gruppe, Verlauf; einklappbar, lösbar (Zustand in `config\state.json`, `tile_deck`).
+  3. **Datentabelle** unten in Kachel-Reihenfolge; Rechtsklick auf den Kopf = Datenlink 1/2 (dunkelgrün), Klick wählt die Kachel, Zellen der Originalspalten bearbeitbar.
+- **Ladebildschirm** wie in Tag Compliance („Kachel-Editor wird geladen …“, Zahnrad, Schritt, Prozent) beim Öffnen und bei „Andere Excel-Liste …“; Farben aus `design`/`appearance`.
+- **Anpassung bleibt erhalten:** `config\data_link.json` speichert jetzt Originalliste (`raw_headers`/`raw_rows`), Anpassung (`tile_config`) und Ergebnis; beim erneuten Öffnen werden alle Schritte wieder angewendet. Ältere Dateien werden weiter gelesen (ausgeblendete Spalten = „Nicht exportiert“).
+- Neu: **Anpassung speichern / laden …** (JSON, für die nächste Version der Liste), **Als Excel speichern …** (angepasste Liste, nur exportierte Spalten – wieder mit „Liste importieren“ lesbar; `core.data_link.write_excel`).
+- Eigenständiges Modul: `src\p3d_pdfreader\column_editor\` = unveränderte Kopie aus Tag Compliance 0.9.416 (Modul 0.1.0, siehe `QUELLE.md`, nicht ändern); PDF-Reader-Teil in `gui	ile_editor\` (Fenster, Ladebildschirm, Seitenleiste, Datenquelle, deutsches Menüband). Der bisherige Import-Dialog entfällt.
+- Bekannt: Texte in den QML-Kacheln und der Seitenleiste sind englisch (Kopie unverändert); das Menüband ist deutsch.
+- EXE-Build: QtQuick/QtQml werden nicht mehr ausgeschlossen (für den Kachel-Editor nötig), QtQuickWidgets/QtQuickControls2 und die QML-Ressourcen als Hidden Imports.
+- Handbuch (Kapitel Datenlink), Hilfebild-Werkzeug `tools\make_help_workflow.py` (Schritt 3 zeigt das Vollfenster; wegen der QML-Schrift mit `QT_QPA_PLATFORM=windows` ausführen) und Tests angepasst; Hilfebilder neu erzeugt.
+
+## 1.0.31 – 2026-11-22
+- **Handbuch: neues Kapitel „Workflow Schritt für Schritt“** – der ganze Ablauf mit echten Bildern der Oberfläche: Überblick, 1 Projekt einrichten, 2 PDFs einlesen, 3 Excel-Liste importieren (Datenlink), 4 Datenlink-Feld setzen, 5 Ansehen und prüfen, 6 Review/Redline, 7 Exportieren. Jedes Bedienelement trägt im Bild eine Nummer (1, 2, 3 …) mit Erklärung darunter; Klick auf Nummer oder Erklärung rahmt das Element ein, Klick ins Bild vergrößert. 12 Bilder, 78 Markierungen.
+  - Erzeugt von `tools\make_help_workflow.py` aus der laufenden App mit Beispiel-PDFs (Lage der Nummern aus den Widgets berechnet; nach GUI-Änderungen neu ausführen). Ausgabe: `assets\help\img\wf_*.png` und `assets\help\workflow.js`.
+  - Schnellstart verweist auf das neue Kapitel; Farben nur aus den vorhandenen Handbuch-Variablen.
+- **Fehler behoben:** Bei einigen Knöpfen stand der Erklärungstext auf dem Knopf statt im Tooltip – `action_button` des Kits nimmt als dritten Parameter ein Symbol. Betroffen: Kachel-Editor (Projektdefinitionen und Datenlink: „+ Spalte“, „Alle einblenden“, „Kachel-Editor“), Datenlink-Dialog („Andere Excel-Liste …“, „Übernehmen und verlinken“). Neu: `controls.tip_button`.
+- Datenlink-Kennzeichnung „» Datenlink 1/2“ statt eines Zeichens, das in der Standardschrift fehlte.
+- `.claude\launch.json`: Vorschau „help-static“ (Handbuch über http://localhost:8791).
+
 ## 1.0.30 – 2026-11-22
 - **Neu: Datenlink – Excel-Liste importieren** (Menüband „1 Einlesen“ › **Liste importieren**): z. B. die Instrumenten-Gesamtliste aus P3D InstrumentationList (Blatt „Gesamtliste“ wird vorgeschlagen). Die Excel-Datei wird nur gelesen.
   - **Vorschau mit Kachel-Editor** (`gui\data_link_ui.py`, nutzt `ColumnTiles`): Spalten verschieben, ein-/ausblenden (= übergeben oder nicht), umbenennen, einfügen, löschen, sortieren; Zellen bearbeiten. Schnelles Tabellenmodell – auch die Gesamtliste mit ~1450 Zeilen × 346 Spalten öffnet in unter einer Sekunde.

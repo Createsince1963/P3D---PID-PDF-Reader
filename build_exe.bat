@@ -100,7 +100,9 @@ if defined NOVER (
   %VERARG% "%VERVAL%" ^
   %EXCL% ^
   --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtWebEngineWidgets ^
-  --exclude-module PySide6.Qt3DCore --exclude-module PySide6.QtQuick --exclude-module PySide6.QtQml ^
+  --hidden-import PySide6.QtQuickWidgets --hidden-import PySide6.QtQuickControls2 ^
+  --hidden-import p3d_pdfreader.column_editor.qml_resources ^
+  --exclude-module PySide6.Qt3DCore ^
   --exclude-module PySide6.QtMultimedia --exclude-module PySide6.QtCharts --exclude-module PySide6.QtDataVisualization ^
   "%TOOL%\run_p3d_pdfreader.py"
 if errorlevel 1 (

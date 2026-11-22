@@ -1,0 +1,22 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+  <qresource prefix="/column_editor">
+    <file alias="ColumnGrid.qml">qml/ColumnGrid.qml</file>
+    <file alias="ColumnCard.qml">qml/ColumnCard.qml</file>
+    <file alias="DropIndicator.qml">qml/DropIndicator.qml</file>
+    <file alias="FunctionStack.qml">qml/FunctionStack.qml</file>
+    <file alias="RuleInspector.qml">qml/RuleInspector.qml</file>
+    <file alias="GroupPanel.qml">qml/GroupPanel.qml</file>
+    <file alias="ChangeTypeDialog.qml">qml/ChangeTypeDialog.qml</file>
+    <file alias="TileBackDialog.qml">qml/TileBackDialog.qml</file>
+    <file alias="TextPrompt.qml">qml/TextPrompt.qml</file>
+    <file alias="TransformDialog.qml">qml/TransformDialog.qml</file>
+    <file alias="StepsPanel.qml">qml/StepsPanel.qml</file>
+    <file alias="SplitDialog.qml">qml/SplitDialog.qml</file>
+    <file alias="ConditionalDialog.qml">qml/ConditionalDialog.qml</file>
+    <file alias="CheckDialog.qml">qml/CheckDialog.qml</file>
+    <file alias="LookupDialog.qml">qml/LookupDialog.qml</file>
+    <file alias="SidePane.qml">qml/SidePane.qml</file>
+    <file alias="TileStatus.qml">qml/TileStatus.qml</file>
+  </qresource>
+</RCC>

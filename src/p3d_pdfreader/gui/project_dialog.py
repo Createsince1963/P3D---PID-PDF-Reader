@@ -23,6 +23,7 @@ from .paths_dialog import open_in_explorer
 from .project_tiles import ColumnTiles, GridEditing, TileList, load_json_meta
 from .sheet import table_header_qss
 from .table_export import export_table_view
+from .controls import tip_button
 
 TILES_ON = "defs_tile_editor_on"          # config/state.json: Kachel-Editor zuletzt ein/aus
 TILE_ORDER, TILE_NAMES = "tile_order", "tile_names"   # Projekt-Datenbank (meta): Kachelreihenfolge und -namen links
@@ -204,9 +205,9 @@ class ProjectDefinitionsDialog(GridEditing, QDialog):
         self.filter.setClearButtonEnabled(True)
         self.filter.textChanged.connect(self._apply_filter)
         top.addWidget(self.filter, 1)
-        self.tiles_button = action_button("Kachel-Editor", ButtonKind.PRIMARY,
-                                          "Spalten als Kacheln: verschieben, ein-/ausblenden, umbenennen, einfügen, "
-                                          "löschen (Rechtsklick auf eine Kachel)")
+        self.tiles_button = tip_button("Kachel-Editor", ButtonKind.PRIMARY,
+                                       "Spalten als Kacheln: verschieben, ein-/ausblenden, umbenennen, einfügen, "
+                                       "löschen (Rechtsklick auf eine Kachel)")
         self.tiles_button.setCheckable(True)
         self.tiles_button.toggled.connect(self._tiles_toggled)
         top.addWidget(self.tiles_button)
