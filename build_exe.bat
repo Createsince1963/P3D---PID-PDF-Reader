@@ -24,10 +24,14 @@ if "%TOOL:~-1%"=="\" set "TOOL=%TOOL:~0,-1%"
 if not defined BUILD_OUT set "BUILD_OUT=%TOOL%\build_exe"
 rem Das zentrale Python enthaelt fremde Qt-Bindungen (PyQt5 ...): PyInstaller bricht bei mehreren Qt-Bindungen ab.
 rem Deshalb wird in einer eigenen, sauberen Umgebung gebaut (.venv_build, nur PySide6 + requirements.txt + PyInstaller).
-rem Mit "set PY=Pfad\zu\python.exe" laesst sich ein anderer Interpreter erzwingen (dann keine venv).
+rem Mit "set BUILD_PY=Pfad\zu\python.exe" laesst sich ein anderer Interpreter erzwingen (dann keine venv).
+rem Ein geerbtes PY (z.B. aus START_LAUNCHER.bat) wird bewusst ignoriert - sonst wuerde das zentrale Python
+rem mit PyQt5 benutzt und PyInstaller bricht ab.
+set "PY="
+if defined BUILD_PY set "PY=%BUILD_PY%"
 set "BASEPY=%TOOL%\..\..\Tools_Central\Python\python\python.exe"
 set "VENV=%TOOL%\.venv_build"
-set "EXCL=--exclude-module tkinter"
+set "EXCL=--exclude-module tkinter --exclude-module PyQt5 --exclude-module PyQt6 --exclude-module PySide2"
 set "MODE=--windowed"
 set "PACK=--onefile"
 for %%A in (%*) do (

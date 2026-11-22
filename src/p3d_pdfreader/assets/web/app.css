@@ -150,3 +150,7 @@ button { font: inherit; color: inherit; }
 .drop-hint { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; font-size: 18px;
   color: var(--accent); background: rgba(238, 243, 250, .85); border: 3px dashed var(--accent); z-index: 40; }
 .drop-hint.open { display: flex; }
+
+/* Zellen-Editor der Audit-Spalten */
+.t-row > div:has(.t-editor) { padding: 0; overflow: visible; }
+.t-editor { width: 100%; height: var(--row-h); border: 1px solid var(--accent); font: inherit; color: var(--text); background: var(--card); }

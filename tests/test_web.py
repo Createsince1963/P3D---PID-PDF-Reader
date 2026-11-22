@@ -40,7 +40,8 @@ class Client:
 
 
 @pytest.fixture()
-def server(tmp_path):
+def server(tmp_path, monkeypatch):
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path / "home"))     # Reviews/Config nie im echten Datenordner
     src = tmp_path / "quelle"
     src.mkdir()
     if SAMPLE.is_file():
@@ -161,3 +162,83 @@ def test_render_and_downloads(server):
     names = zipfile.ZipFile(io.BytesIO(z)).namelist()
     assert len(names) == 3 and all(n.startswith("Review_") for n in names)
     assert SAMPLE.read_bytes() == pdf                                      # Quelle nie veraendert
+
+
+def test_app_starts_and_stops_web_server():
+    """Menueband "Web": Server als eigener Prozess ueber ``python -m p3d_pdfreader --web`` (auch EXE-Weg)."""
+    import socket
+    from p3d_pdfreader.gui.web_control import WebServerControl, port_open
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    ctl = WebServerControl(port)
+    try:
+        assert ctl.start(timeout=30) == "started" and port_open(port)
+        assert WebServerControl(port).start() == "external"        # laufender Server wird genutzt, kein zweiter
+        assert json.loads(urllib.request.urlopen(f"http://127.0.0.1:{port}/api/info", timeout=10).read())["version"]
+    finally:
+        ctl.stop()
+    assert not port_open(port)
+
+
+def _offline_payload(page: str) -> dict:
+    start = page.index("window.P3D_OFFLINE = ") + len("window.P3D_OFFLINE = ")
+    return json.loads(page[start:page.index(";</script>", start)])
+
+
+@needs_sample
+def test_audit_saved_like_desktop_review(server, tmp_path):
+    """Audit-Spalten aus dem Browser -> ReviewStore (data\reviews), mit Browser-Nutzer; Review-Excel enthaelt sie."""
+    c = Client(server[0])
+    f = c.upload(SAMPLE)
+    tag = c.json(f"/api/files/{f['id']}/tags")[0]
+    assert set(tag["audit"]) >= {"Review", "Änderung", "Neuer Wert", "Bemerkung", "WPO", "Datum", "User"}
+    changes = [{"type": tag["type"], "tag": tag["tag"], "field": "Review", "value": "Korrektur erforderlich"},
+               {"type": tag["type"], "tag": tag["tag"], "field": "Bemerkung", "value": "Nummer prüfen"},
+               {"type": tag["type"], "tag": tag["tag"], "field": "Datum", "value": "manipuliert"},      # nicht editierbar
+               {"type": "Equipment", "tag": "GIBTESNICHT", "field": "Review", "value": "OK"}]         # unbekannter Tag
+    res = c.json("/api/audit", {"id": f["id"], "changes": changes, "user": "Tester"})
+    assert res["saved"] == 2
+    saved = next(t for t in res["tags"] if t["tag"] == tag["tag"])["audit"]
+    assert saved["Review"] == "Korrektur erforderlich" and saved["User"] == "Tester" and saved["Datum"] != "manipuliert"
+    assert list((tmp_path / "home" / "reviews").rglob("*_Review_*.json"))
+    assert c.json(f"/api/files/{f['id']}/tags")[0]["audit"]["Bemerkung"] == "Nummer prüfen"   # neu geladen
+    assert c.json("/api/info")["review_values"][3] == "Korrektur erforderlich"
+    import openpyxl
+    _s, _h, xlsx = c.req("/api/review", json.dumps({"ids": [f["id"]]}).encode(), {"Content-Type": "application/json"})
+    ws = openpyxl.load_workbook(io.BytesIO(xlsx))["Review"]
+    assert any("Nummer prüfen" == cell.value for row in ws.iter_rows() for cell in row)
+
+
+@needs_sample
+def test_offline_report_is_self_contained(server):
+    """Variante 1: eine HTML-Datei mit Oberflaeche, Daten, Seitenbildern, Redline-PDF und Excel - ohne Server."""
+    c = Client(server[0])
+    f = c.upload(SAMPLE)
+    tag = c.json(f"/api/files/{f['id']}/tags")[0]
+    c.json("/api/audit", {"id": f["id"], "user": "Tester",
+                          "changes": [{"type": tag["type"], "tag": tag["tag"], "field": "Review", "value": "OK"}]})
+    _s, h, body = c.req("/api/report", json.dumps({"ids": [f["id"]]}).encode(), {"Content-Type": "application/json"})
+    page = body.decode("utf-8")
+    assert "_Bericht_" in h["Content-Disposition"] and page.startswith("<!doctype html>")
+    assert '<script src=' not in page and 'href="app.css"' not in page and "/api/" in page   # alles inline
+    data = _offline_payload(page)
+    assert data["info"]["offline"] and len(data["files"]) == 1
+    assert data["images"]["1"][0].startswith("data:image/jpeg;base64,")
+    assert len(data["pages"]["1"]) == f["pages"]
+    per = data["downloads"]["per_file"]["1"]
+    assert per["redline"]["uri"].startswith("data:application/pdf;base64,") and per["review"]["name"].endswith(".xlsx")
+    assert data["downloads"]["export"]["name"].endswith(".xlsx")
+    assert next(t for t in data["tags"]["1"] if t["tag"] == tag["tag"])["audit"]["Review"] == "OK"
+
+
+@needs_sample
+def test_report_command_line(tmp_path, monkeypatch):
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path / "home"))
+    from p3d_pdfreader.app import main
+    out = tmp_path / "bericht.html"
+    assert main(["--report", "--source", str(SAMPLE), "--out", str(out), "--no-redline", "--max-px", "1200"]) == 0
+    made = list(tmp_path.glob("bericht*.html"))
+    assert len(made) == 1
+    data = _offline_payload(made[0].read_text(encoding="utf-8"))
+    assert "redline" not in data["downloads"]["per_file"]["1"] and data["info"]["max_px"] == 1200

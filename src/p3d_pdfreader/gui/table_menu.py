@@ -42,6 +42,9 @@ def apply_columns(table: QTableView, order: list[int], hidden: set[int]) -> None
     reposition = getattr(header, "_position_editors", None)      # Filterfelder des Kit-Kopfs nachfuehren
     if reposition is not None:
         reposition()
+    saver = getattr(table, "_shared_layout_saver", None)          # Anpassung des Nutzers als Standard merken
+    if saver is not None:
+        saver.start(0)
 
 
 class ColumnsDialog(QDialog):

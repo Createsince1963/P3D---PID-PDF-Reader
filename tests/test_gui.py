@@ -147,7 +147,9 @@ def test_pipe_option_rescans_and_is_remembered(app, tmp_path, monkeypatch):
     wait(w)
     w.page.files.table.selectRow(0)
     assert "Rohrleitung" not in {r[0] for r in w.page.tags.rows()}
-    w.pipe_action.trigger()                            # an -> neu einlesen
+    assert w.ribbon.buttons["pipes"].text().endswith("aus")
+    w.ribbon.buttons["pipes"].click()                  # an -> neu einlesen
+    assert w.ribbon.buttons["pipes"].text().endswith("an")
     wait(w)
     w.page.files.table.selectRow(0)
     assert sum(r[0] == "Rohrleitung" for r in w.page.tags.rows()) == 4
@@ -155,3 +157,30 @@ def test_pipe_option_rescans_and_is_remembered(app, tmp_path, monkeypatch):
     w2 = MainWindow(app, "test")
     assert w2.pipes_enabled()                          # gemerkt in config/state.json
     w2.close()
+
+
+def test_viewer_second_monitor_full_width_and_back(app, tmp_path, monkeypatch):
+    """2. Monitor: Tag-Tabelle ueber die ganze Breite, Zurueckholen-Knopf ueber der Tabelle; zurueck = Standardteilung.
+    Dazu die neuen Knoepfe "Aus PDF-Scan übernehmen" und "Autofill OK" vor "Bearbeiten"."""
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path))
+    from p3d_pdfreader.gui.main_window import SCAN_COL, TAG_COLS, VIEWER_SPLIT, MainWindow
+    w = MainWindow(app, "test")
+    w.resize(1600, 900)
+    w.show()
+    app.processEvents()
+    page = w.page
+    keys = list(page.tags.layout().itemAt(1).widget().buttons)
+    assert keys.index("scan_fields") < keys.index("autofill") < keys.index("edit")
+    assert TAG_COLS[SCAN_COL:] == ["Ersteller", "Checked", "Rev", "Rev-Datum", "Rev-Text"]
+    page.viewer.monitor_button.setChecked(True)
+    app.processEvents()
+    assert page._viewer_host.isHidden() and not page.viewer_away.isHidden()
+    page.viewer.monitor_button.setChecked(False)
+    app.processEvents()
+    assert not page._viewer_host.isHidden() and page.viewer_away.isHidden()
+    left, right = page._hsplit.sizes()
+    # Standardteilung, ausser die Mindestbreite der Tag-Tabelle (Knopfleiste) laesst weniger nicht zu
+    expected = VIEWER_SPLIT[0] / sum(VIEWER_SPLIT)
+    assert right > 0
+    assert abs(left / (left + right) - expected) < 0.05 or left <= page.tags.minimumSizeHint().width() + 2
+    w.close()

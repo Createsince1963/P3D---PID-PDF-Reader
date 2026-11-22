@@ -9,8 +9,24 @@ const store = {
 };
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
+// ---- Offline-Bericht (Variante 1, web/report.py): Daten und Seitenbilder stehen in der HTML-Datei -------------
+const OFFLINE = window.P3D_OFFLINE || null;
+// Funktionen, die den Server brauchen - im Offline-Bericht ausgeblendet
+const SERVER_CMDS = new Set(["scan", "upload", "pipes", "clear", "bulk", "redline", "review", "exportXlsx", "exportCsv",
+  "openPdf", "report"]);
+function offlineGet(path) {
+  const m = path.match(/^files\/(\d+)\/(tags|pages)$/);
+  if (m) return m[2] === "tags" ? OFFLINE.tags[m[1]] || [] : OFFLINE.pages[m[1]] || [];
+  if (path === "files") return OFFLINE.files;
+  if (path === "tags") return OFFLINE.all_tags;
+  if (path === "info") return OFFLINE.info;
+  if (path === "scan") return { running: false, finished: true, total: 0, done: 0, current: "", error: "" };
+  throw new Error("Im Offline-Bericht nicht verfügbar");
+}
+
 // ---- Server ------------------------------------------------------------------------------------------------
 async function api(path, options = {}) {
+  if (OFFLINE) throw new Error("Im Offline-Bericht nicht verfügbar – dafür die Web-Version oder die Desktop-App nutzen");
   const res = await fetch("/api/" + path, { credentials: "same-origin", ...options });
   if (!res.ok) {
     let msg = res.status + " " + res.statusText;
@@ -19,7 +35,7 @@ async function api(path, options = {}) {
   }
   return res;
 }
-const getJson = async path => (await api(path)).json();
+const getJson = async path => OFFLINE ? offlineGet(path) : (await api(path)).json();
 const postJson = async (path, data) => (await api(path, {
   method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data || {}) })).json();
 
@@ -73,7 +89,10 @@ class Table {
     });
     this.body.addEventListener("dblclick", e => {
       const div = e.target.closest(".t-row");
-      if (div && this.o.onActivate) this.o.onActivate(this.view[+div.dataset.i]);
+      if (!div) return;
+      const cell = e.target.closest(".t-row > div"), c = this.cols[[...div.children].indexOf(cell)];
+      if (c && c.edit && this.o.onEdit) this.editCell(this.view[+div.dataset.i], c, cell);
+      else if (this.o.onActivate) this.o.onActivate(this.view[+div.dataset.i]);
     });
     el.addEventListener("keydown", e => this.key(e));
     new ResizeObserver(() => this.paint()).observe(el);
@@ -139,6 +158,30 @@ class Table {
         this.cols.map(c => `<div class="${c.num ? "num" : ""}" title="${esc(this.text(r, c))}">${esc(this.text(r, c))}</div>`).join("") + "</div>";
     }
     this.body.innerHTML = html || (this.rows.length ? "" : `<div class="t-empty">${esc(this.o.empty || "Keine Daten")}</div>`);
+  }
+  // Zelle bearbeiten (Doppelklick auf eine Spalte mit ``edit``): Auswahlliste oder Textfeld, Enter/Verlassen = uebernehmen
+  editCell(row, c, cell) {
+    const old = String(this.value(row, c) ?? "");
+    const ed = c.options ? document.createElement("select") : document.createElement("input");
+    if (c.options) ed.innerHTML = c.options.map(v => `<option ${v === old ? "selected" : ""}>${esc(v)}</option>`).join("");
+    else ed.value = old;
+    ed.className = "t-editor";
+    cell.textContent = ""; cell.appendChild(ed);
+    ed.addEventListener("mousedown", e => e.stopPropagation());
+    let done = false;
+    const finish = save => {
+      if (done) return; done = true;
+      const v = ed.value;
+      if (save && v !== old) this.o.onEdit(row, c, v);
+      this.paint(); this.el.focus();
+    };
+    ed.addEventListener("keydown", e => {
+      e.stopPropagation();
+      if (e.key === "Enter") finish(true); else if (e.key === "Escape") finish(false);
+    });
+    ed.addEventListener("blur", () => finish(true));
+    if (c.options) ed.addEventListener("change", () => finish(true));
+    ed.focus();
   }
   paintSel() {      // nur Markierung umschalten - Zeilen bleiben erhalten (Doppelklick funktioniert)
     $$(".t-row", this.body).forEach(div => div.classList.toggle("sel", this.sel.has(this.view[+div.dataset.i])));
@@ -230,6 +273,11 @@ class Viewer {
   monoArg() { return this.mono ? "&mono=1" : ""; }
   loadBase() {
     const [w, h] = this.size;
+    if (OFFLINE) {             // Bild aus dem Bericht; Schwarz-Weiss nur als Anzeige-Filter
+      this.base.src = (OFFLINE.images[this.file.id] || [])[this.page] || "";
+      this.base.style.filter = this.mono ? "grayscale(1) contrast(1.8)" : "";
+      return;
+    }
     this.base.src = `/api/files/${this.file.id}/render?page=${this.page}&zoom=${(BASE_PIXELS / Math.max(w, h)).toFixed(4)}${this.monoArg()}`;
   }
   // Monochrom: Seite schwarz auf weiss (nur Ansicht); Zoom, Drehung und Markierungen bleiben
@@ -287,7 +335,7 @@ class Viewer {
     this.centerOn(c[0], c[1]);
   }
   async renderDetail() {
-    if (!this.file || this.page < 0) return;
+    if (!this.file || this.page < 0 || OFFLINE) return;     // offline: nur das Seitenbild aus dem Bericht
     const [w, h] = this.size, dpr = window.devicePixelRatio || 1;
     const zoom = this.s * dpr, baseZoom = BASE_PIXELS / Math.max(w, h);
     if (zoom <= baseZoom * 1.05) { this.detail.style.display = "none"; return; }
@@ -377,11 +425,27 @@ const fileCols = [
   { key: "origin", label: "Quelle", width: 70, fmt: v => v === "upload" ? "Upload" : "Server" },
   { key: "error", label: "Fehler", width: 160 },
 ];
+// Audit-/Review-Spalten wie der Bearbeiten-Modus der Desktop-App (core/review_store.py); Auswahllisten kommen vom
+// Server bzw. aus dem Bericht (info.review_values / info.change_values). Doppelklick in die Zelle = bearbeiten.
+const AUDIT_EDIT = ["Review", "Änderung", "Neuer Wert", "Bemerkung", "WPO"];
+const auditCols = () => [
+  ...AUDIT_EDIT.map(f => ({ key: "a:" + f, label: f, width: f === "Bemerkung" ? 180 : f === "Review" ? 150 : 120,
+    get: r => (r.audit || {})[f] || "", edit: f,
+    options: f === "Review" ? state.reviewValues : f === "Änderung" ? state.changeValues : null,
+    title: `${f} – Doppelklick zum Bearbeiten` })),
+  { key: "a:Datum", label: "Datum", width: 120, get: r => (r.audit || {}).Datum || "" },
+  { key: "a:User", label: "User", width: 90, get: r => (r.audit || {}).User || "" },
+];
+state.reviewValues = ["", "Offen", "OK", "Korrektur erforderlich", "Klärung", "Nicht relevant"];
+state.changeValues = ["", "Keine", "Tag ändern", "Tag ergänzen", "Tag löschen", "Position prüfen", "Doppelten Tag auflösen"];
+state.reviewFaulty = ["Korrektur erforderlich"];
+state.pending = {};             // fileId -> {"Typ|Tag": {type, tag, fields: {Feld: Wert}}} (noch nicht gespeichert)
 const tagCols = [
   { key: "type", label: "Typ", width: 120 },
   { key: "tag", label: "Tag", width: 200 },
   { key: "count", label: "Anzahl", width: 60, num: true },
   { key: "pages", label: "Seiten", width: 90 },
+  ...auditCols(),
 ];
 const allCols = [
   { key: "drawing_no", label: "Zeichnungsnr.", width: 220, get: r => r.drawing_no || r.pdf },
@@ -389,8 +453,10 @@ const allCols = [
   { key: "tag", label: "Tag", width: 200 },
   { key: "count", label: "Anzahl", width: 60, num: true },
   { key: "pages", label: "Seiten", width: 90 },
+  ...auditCols().map(c => ({ ...c, edit: undefined, title: c.label })),
   { key: "pdf", label: "PDF", width: 280 },
 ];
+const isFaulty = r => state.reviewFaulty.includes((r.audit || {}).Review || "");
 
 const tblFiles = new Table($("#tblFiles"), {
   columns: fileCols, multi: true, key: r => r.id, empty: "Noch keine PDFs eingelesen – „Quellordner scannen“ oder „PDFs hochladen“.",
@@ -398,7 +464,8 @@ const tblFiles = new Table($("#tblFiles"), {
 });
 const tblTags = new Table($("#tblTags"), {
   columns: tagCols, key: r => r.type + "|" + r.tag, empty: "Keine Tags",
-  rowClass: r => r.duplicate ? "dup" : "", onSelect: (r, again) => selectTag(r, again), onView: () => updateNote(),
+  rowClass: r => [r.duplicate ? "dup" : "", isFaulty(r) ? "err" : ""].join(" "), onSelect: (r, again) => selectTag(r, again),
+  onView: () => updateNote(), onEdit: (r, c, v) => editAudit(r, c.edit, v),
 });
 const tblAll = new Table($("#tblAll"), {
   columns: allCols, key: r => r.file + "|" + r.type + "|" + r.tag, empty: "Keine Tags",
@@ -437,6 +504,7 @@ async function loadAllTags() {
 
 async function openFile(file) {
   if (!file || (state.file && state.file.id === file.id)) return;
+  if (!OFFLINE && state.file && state.pending[state.file.id]) await saveAudit(true);   // Wechsel = speichern
   state.file = file; state.nav = null;
   $("#tagsTitle").textContent = `Tags: ${file.drawing_no || file.name}`;
   $("#viewerTitle").textContent = `PDF-Viewer: ${file.name}`;
@@ -445,9 +513,95 @@ async function openFile(file) {
   if (state.file !== file) return;
   tblTags.setRows(state.tags, false);
   viewer.dups = state.tags.filter(t => t.duplicate).map(t => t.hits);
-  viewer.found = state.tags.map(t => t.hits);   // im Web noch ohne Review-Status: alle gruen
+  markReviewInViewer();
   await viewer.open(file);
   viewer.draw();
+}
+
+// ---- Audit / Review-Spalten bearbeiten und speichern ----------------------------------------------------------
+function markReviewInViewer() {       // wie Desktop: "Korrektur erforderlich" rot umrandet, alle anderen gruen
+  viewer.found = state.tags.filter(t => !isFaulty(t)).map(t => t.hits);
+  viewer.faulty = state.tags.filter(isFaulty).map(t => t.hits);
+  viewer.draw();
+}
+function auditUser() {
+  let user = store.get("user", "");
+  if (!user) {
+    user = (window.prompt("Name oder Kürzel für die Spalte „User“ (wird auf diesem PC gemerkt):", "") || "").trim();
+    if (user) store.set("user", user);
+  }
+  return user;
+}
+const pendingCount = () => Object.values(state.pending).reduce((s, p) => s + Object.keys(p).length, 0);
+function editAudit(row, field, value) {
+  const user = auditUser();
+  row.audit = row.audit || {};
+  row.audit[field] = value;
+  const now = new Date(), pad = n => String(n).padStart(2, "0");
+  row.audit.Datum = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  row.audit.User = user;
+  const fid = state.file.id, k = row.type + "|" + row.tag;
+  const p = (state.pending[fid] = state.pending[fid] || {});
+  (p[k] = p[k] || { type: row.type, tag: row.tag, fields: {} }).fields[field] = value;
+  if (OFFLINE) offlineRemember();
+  state.allTags = null;                                       // Blatt "Alle Tags" neu aufbauen
+  tblTags.refresh(); markReviewInViewer();
+  status(OFFLINE ? `Audit gemerkt (in diesem Browser). „Review speichern“ speichert die Ergebnisse als CSV/Excel-Datei.`
+    : `${pendingCount()} ungespeicherte Audit-Änderung(en) – „Review speichern“ oder Strg+S.`);
+}
+async function saveAudit(silent = false) {
+  if (OFFLINE) return exportAuditCsv();
+  const ids = Object.keys(state.pending);
+  if (!ids.length) { if (!silent) status("Keine ungespeicherten Audit-Änderungen."); return; }
+  let n = 0;
+  for (const id of ids) {
+    const changes = [];
+    for (const e of Object.values(state.pending[id])) for (const [field, value] of Object.entries(e.fields)) changes.push({ type: e.type, tag: e.tag, field, value });
+    const res = await postJson("audit", { id: +id, changes, user: store.get("user", "") });
+    n += res.saved;
+    delete state.pending[id];
+    if (state.file && state.file.id === +id) { state.tags = res.tags; tblTags.setRows(state.tags); markReviewInViewer(); }
+  }
+  state.allTags = null;
+  status(`Audit gespeichert: ${n} Feld(er) – auf dem Server wie „Review speichern“ der Desktop-App (data\\reviews). Redline und Review-Excel enthalten die Einträge.`);
+}
+window.addEventListener("beforeunload", e => { if (!OFFLINE && pendingCount()) { e.preventDefault(); e.returnValue = ""; } });
+
+// Offline-Bericht: Eintraege im Browser merken (localStorage, je Bericht) und als CSV speichern
+const offlineKey = () => OFFLINE && `audit.${OFFLINE.info.created}.${OFFLINE.info.title}`;
+function offlineRemember() {
+  const all = {};
+  for (const [fid, tags] of Object.entries(OFFLINE.tags)) for (const t of tags)
+    if (t.audit && AUDIT_EDIT.some(f => t.audit[f])) (all[fid] = all[fid] || {})[t.type + "|" + t.tag] = t.audit;
+  store.set(offlineKey(), all);
+}
+function offlineRestore() {
+  const saved = store.get(offlineKey(), {});
+  let n = 0;
+  for (const [fid, entries] of Object.entries(saved)) for (const t of OFFLINE.tags[fid] || []) {
+    const a = entries[t.type + "|" + t.tag];
+    if (a) { t.audit = { ...(t.audit || {}), ...a }; n++; }
+  }
+  const byKey = {};
+  for (const [fid, tags] of Object.entries(OFFLINE.tags)) for (const t of tags) byKey[fid + "|" + t.type + "|" + t.tag] = t.audit;
+  for (const r of OFFLINE.all_tags) { const a = byKey[r.file + "|" + r.type + "|" + r.tag]; if (a) r.audit = a; }
+  return n;
+}
+function exportAuditCsv() {
+  const head = ["PDF", "Zeichnungsnr.", "Typ", "Tag", "Anzahl", "Seiten", "Doppelt", ...AUDIT_EDIT, "Datum", "User"];
+  const q = v => { const s = String(v ?? ""); return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const lines = [head.join(";")];
+  const files = Object.fromEntries(OFFLINE.files.map(f => [f.id, f]));
+  for (const [fid, tags] of Object.entries(OFFLINE.tags)) for (const t of tags) {
+    const a = t.audit || {}, f = files[fid] || {};
+    lines.push([f.name, f.drawing_no, t.type, t.tag, t.count, t.pages, t.duplicate ? "Ja" : "", ...AUDIT_EDIT.map(x => a[x]), a.Datum, a.User].map(q).join(";"));
+  }
+  const name = `${OFFLINE.info.title}_Audit_${new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-")}.csv`;
+  const url = URL.createObjectURL(new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" }));
+  const a = Object.assign(document.createElement("a"), { href: url, download: name });
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+  status(`Audit-Ergebnisse gespeichert: ${name} (alle Tags aller PDFs, öffnet in Excel).`);
 }
 
 // Fundstellen-Navigation wie in der Desktop-App
@@ -605,6 +759,38 @@ function bulkDialog() {
   };
 }
 
+function reportDialog() {
+  const marked = tblFiles.selected().filter(f => !f.error);
+  const o = store.get("report", { scope: "marked", redline: true, review: true });
+  const pagesOf = list => list.reduce((s, f) => s + Math.max(f.pages || 1, 1), 0);
+  const m = modal(`<h2>Offline-HTML-Bericht</h2>
+    <div class="note">Eine HTML-Datei ohne Server: Tabellen, Filter, Viewer, Fundstellen-Navigation und Audit-Spalten.
+      Weitergeben per Mail, Freigabe oder SharePoint; öffnen im Browser (Edge, Chrome).</div>
+    <div class="section">PDFs</div>
+    <label><input type="radio" name="rscope" value="marked" ${o.scope === "marked" && marked.length ? "checked" : ""} ${marked.length ? "" : "disabled"}> Markierte PDFs (${marked.length})</label>
+    <label><input type="radio" name="rscope" value="all" ${o.scope === "all" || !marked.length ? "checked" : ""}> Alle eingelesenen PDFs (${state.files.length})</label>
+    <div class="section">Im Bericht enthalten</div>
+    <label><input type="checkbox" id="rRed" ${o.redline ? "checked" : ""}> Redline-PDF je PDF (macht die Datei etwa so groß wie die PDFs)</label>
+    <label><input type="checkbox" id="rRev" ${o.review ? "checked" : ""}> Review-Excel je PDF</label>
+    <div class="note" id="rSize"></div>
+    <div class="buttons"><button class="btn" id="rClose">Abbrechen</button><button class="btn primary" id="rGo">Erstellen</button></div>`);
+  const chosen = () => $("input[name=rscope]:checked", m).value === "marked" ? marked : state.files.filter(f => !f.error);
+  const size = () => {
+    const n = pagesOf(chosen());
+    $("#rSize", m).textContent = `${chosen().length} PDF(s), ${n} Seite(n): ca. ${Math.max(1, Math.round(n * 0.7))} MB ohne Redline.` +
+      (n > 150 ? " Sehr große Datei – besser markierte PDFs wählen." : "");
+  };
+  $$("input", m).forEach(i => (i.onchange = size)); size();
+  $("#rClose", m).onclick = closeModal;
+  $("#rGo", m).onclick = async () => {
+    const scope = $("input[name=rscope]:checked", m).value, redline = $("#rRed", m).checked, review = $("#rRev", m).checked;
+    store.set("report", { scope, redline, review });
+    const ids = scope === "marked" ? marked.map(f => f.id) : null;
+    closeModal();
+    await run(() => download("report", { ids, redline, review }, "Offline-Bericht"));
+  };
+}
+
 function helpDialog() {
   const m = modal(`<h2>Kurzanleitung</h2>
     <div class="section">Einlesen</div><div class="note">„Quellordner scannen“ liest die Ordner, die auf dem Server eingerichtet sind.
@@ -658,10 +844,32 @@ const commands = {
   zoomOut: () => viewer.zoom(1 / 1.4),
   rotate: () => viewer.rotate(),
   mono: () => setMono(!viewer.mono),
+  saveAudit: () => run(() => saveAudit()),
+  report: () => state.files.length ? reportDialog() : status("Noch keine PDFs eingelesen."),
   pagePrev: () => viewer.setPage(viewer.page - 1),
   pageNext: () => viewer.setPage(viewer.page + 1),
   openPdf: () => needFile() && window.open(`/api/files/${state.file.id}/pdf`, "_blank", "noopener"),
 };
+
+// Offline-Bericht: Redline-PDF, Review-Excel und Export-Excel sind beim Erstellen eingebettet worden (alle Tags)
+function saveEmbedded(blob, label) {
+  if (!blob) { status(`${label} ist in diesem Bericht nicht enthalten.`); return; }
+  const a = Object.assign(document.createElement("a"), { href: blob.uri, download: blob.name });
+  document.body.appendChild(a); a.click(); a.remove();
+  const note = tblTags.view.length !== state.tags.length ? " (enthält alle Tags – der Tabellenfilter wirkt im Bericht nicht)" : "";
+  status(`${label}: ${blob.name} gespeichert${note}.`);
+}
+if (OFFLINE) {
+  const dl = OFFLINE.downloads || {}, per = id => (dl.per_file || {})[id] || {};
+  Object.assign(commands, {
+    redline: () => needFile() && saveEmbedded(per(state.file.id).redline, "Redline-PDF"),
+    review: () => needFile() && saveEmbedded(per(state.file.id).review, "Review-Excel"),
+    exportXlsx: () => saveEmbedded(dl.export, "Export Excel"),
+    bulk: () => saveEmbedded(dl.review_total, "Review-Excel gesamt"),
+  });
+  const available = { redline: true, review: true, exportXlsx: !!dl.export, bulk: !!dl.review_total };
+  for (const [cmd, ok] of Object.entries(available)) if (ok) SERVER_CMDS.delete(cmd);
+}
 
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-cmd]");
@@ -671,7 +879,8 @@ document.addEventListener("click", e => {
 });
 document.addEventListener("keydown", e => {
   if (e.key === "F3") { e.preventDefault(); step(e.shiftKey ? -1 : 1); }
-  else if (e.key === "F5") { e.preventDefault(); commands.scan(); }
+  else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); commands.saveAudit(); }
+  else if (e.key === "F5") { e.preventDefault(); if (!OFFLINE) commands.scan(); }
   else if (e.key === "Escape") closeModal();
 });
 $("#fileInput").onchange = e => { uploadFiles(e.target.files); e.target.value = ""; };
@@ -680,10 +889,10 @@ $("#allFilter").oninput = e => { tblAll.globalFilter = e.target.value.trim().toL
 
 // PDFs ins Fenster ziehen = hochladen
 let dragDepth = 0;
-window.addEventListener("dragenter", e => { if ([...e.dataTransfer.types].includes("Files")) { dragDepth++; $("#dropHint").classList.add("open"); } });
+window.addEventListener("dragenter", e => { if (!OFFLINE && [...e.dataTransfer.types].includes("Files")) { dragDepth++; $("#dropHint").classList.add("open"); } });
 window.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; $("#dropHint").classList.remove("open"); } });
 window.addEventListener("dragover", e => e.preventDefault());
-window.addEventListener("drop", e => { e.preventDefault(); dragDepth = 0; $("#dropHint").classList.remove("open"); uploadFiles(e.dataTransfer.files); });
+window.addEventListener("drop", e => { e.preventDefault(); if (OFFLINE) return; dragDepth = 0; $("#dropHint").classList.remove("open"); uploadFiles(e.dataTransfer.files); });
 
 // Trennlinien ziehen (Breite/Hoehe wird gemerkt)
 function splitter(el, cssVar, host, horizontal) {
@@ -707,11 +916,21 @@ splitter($("[data-split=left]"), "--files-h", $(".pid-left"), true);
 (async () => {
   state.pipes = !!store.get("pipes", false);
   $$("[data-cmd=pipes]").forEach(b => b.classList.toggle("on", state.pipes));
+  if (OFFLINE) {               // Server-Funktionen ausblenden, leere Menueband-Gruppen ebenso
+    $$("[data-cmd]").forEach(b => { if (SERVER_CMDS.has(b.dataset.cmd)) b.style.display = "none"; });
+    $$(".ribbon .group").forEach(g => { if (!$$("[data-cmd]", g).some(b => b.style.display !== "none")) g.style.display = "none"; });
+    $$("[title]").forEach(b => { if (b.dataset.cmd === "bulk") b.title = "Review-Excel über alle PDFs des Berichts speichern"; });
+  }
+  if (OFFLINE) offlineRestore();          // im Bericht schon erfasste Audit-Eintraege (dieser Browser)
   try {
     const info = await getJson("info");
-    $("#topInfo").textContent = `Version ${info.version} · Server ${location.host}`;
-    document.title = `P3D PDF Reader ${info.version}`;
+    for (const [k, list] of [["review_values", state.reviewValues], ["change_values", state.changeValues], ["review_faulty", state.reviewFaulty]])
+      if (Array.isArray(info[k])) list.splice(0, list.length, ...info[k]);
+    $("#topInfo").textContent = OFFLINE ? `Offline-Bericht „${info.title}“ · erstellt ${info.created} · Version ${info.version}`
+      : `Version ${info.version} · Server ${location.host}`;
+    document.title = OFFLINE ? `${info.title} – P3D PDF Reader` : `P3D PDF Reader ${info.version}`;
     await loadFiles();
+    if (OFFLINE) { status(`Offline-Bericht: ${state.files.length} PDFs. Zoom bis zur Bildauflösung (${info.max_px} px).`); return; }
     const st = await getJson("scan");
     if (st.running) pollScan();
   } catch (e) { status("Server nicht erreichbar: " + e.message); }

@@ -54,7 +54,7 @@ class ReviewDialog(QDialog):
 
         out = QGroupBox("Ausgaben")
         lay = QVBoxLayout(out)
-        self.cb_redline = QCheckBox("Redline-PDF je PDF (Kommentar an jeder Fundstelle, doppelte Tags orange)")
+        self.cb_redline = QCheckBox("Redline-PDF je PDF (Rahmen wie im Viewer: grün korrekt, rot fehlerhaft, doppelte gelb)")
         self.cb_excel_each = QCheckBox("Review-Excel je PDF (Pos.-Nr., Review-Kommentar, Prüfstatus, Bemerkung)")
         self.cb_excel_total = QCheckBox("Review-Excel gesamt über alle gewählten PDFs")
         self.cb_subfolder = QCheckBox("Eigenen Unterordner „Review_<Zeitstempel>“ anlegen")

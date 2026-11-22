@@ -76,6 +76,58 @@ def test_redline(tmp_path):
     assert read_pdf(SAMPLE).tags                      # Original unveraendert lesbar
 
 
+@needs_sample
+def test_redline_colors_like_viewer(tmp_path):
+    """Redline-Rahmen wie im Viewer: gruen korrekt, rot "Korrektur erforderlich", doppelte gelb hinterlegt."""
+    import pymupdf
+    from main_gui_kit.theme import LIGHT
+    from p3d_pdfreader.core.redline import DIRTY, _rgb, write_redline
+    from p3d_pdfreader.core.review_store import key
+    from p3d_pdfreader.gui.appearance import DEFAULT_DIRTY
+    assert DIRTY == DEFAULT_DIRTY
+    r = read_pdf(SAMPLE)
+    bad, good = r.tags[0], next(t for t in r.tags[1:] if not t.duplicate)
+    dup = next(t for t in r.tags if t.duplicate)
+
+    class Store:
+        entries = {key(bad.type, bad.tag): {"Review": "Korrektur erforderlich"}}
+
+    out = tmp_path / "c.pdf"
+    write_redline(r, out, [bad, good, dup], store=Store())
+    near = lambda a, b: all(abs(x - y) < 0.01 for x, y in zip(a, b))  # noqa: E731
+    with pymupdf.open(out) as doc:
+        squares = {a.info["subject"].split("– ")[-1]: a for p in doc for a in p.annots() if a.type[1] == "Square"}
+        assert near(squares[bad.tag].colors["stroke"], _rgb(LIGHT.err))
+        assert near(squares[good.tag].colors["stroke"], _rgb(LIGHT.ok))
+        assert near(squares[dup.tag].colors["fill"], _rgb(DIRTY))
+        assert not squares[good.tag].colors["fill"]
+
+
+@needs_sample
+def test_redline_review_layer(tmp_path):
+    """Einstellung "Layer fuer Review im PDF": alle Kommentare auf der Ebene Review_TT.MM.JJJJ; aus = ohne Ebene."""
+    import pymupdf
+    from p3d_pdfreader.core.redline import review_layer_name, write_redline
+    r = read_pdf(SAMPLE)
+    name = review_layer_name()
+    assert name.startswith("Review_") and len(name) == len("Review_22.11.2026")
+    on, off = tmp_path / "on.pdf", tmp_path / "off.pdf"
+    write_redline(r, on, r.tags[:3], layer=True)
+    write_redline(r, off, r.tags[:3], layer=False)
+    with pymupdf.open(SAMPLE) as doc:
+        plot_layers = {v["name"] for v in doc.get_ocgs().values()}      # Plant-3D-Ebenen bleiben erhalten
+    with pymupdf.open(on) as doc:
+        ocgs = doc.get_ocgs()
+        review = [x for x, v in ocgs.items() if v["name"] == name]
+        assert len(review) == 1 and ocgs[review[0]]["on"]
+        assert plot_layers <= {v["name"] for v in ocgs.values()}
+        annots = list(doc[0].annots())
+        assert annots and all(a.get_oc() == review[0] for a in annots)
+    with pymupdf.open(off) as doc:
+        assert name not in {v["name"] for v in doc.get_ocgs().values()}
+        assert all(a.get_oc() == 0 for a in doc[0].annots())
+
+
 ROTATED = SAMPLES / "SGOPS-P-DL1-PID-00-EQPM-012.pdf"
 
 
@@ -184,3 +236,24 @@ def test_sample_pipe_lines():
     pipes = {t.tag for t in read_pdf(SAMPLE, pipes=True).tags if t.type == "Rohrleitung"}
     assert {'TFHR_SS01_001_1"', 'TFHS_SS01_002_1"', 'PFC_ST10_006_1"', 'TFHR_SS01_004_1 1/2"',
             '203_17_112PFC_ST10_013_1"'} <= pipes
+
+
+def test_autofill_ok_and_review_xlsx_without_xy(tmp_path, monkeypatch):
+    """Autofill OK: Review OK, Datum ohne Uhrzeit, User, WPO = Checked (nur wenn leer); Review-Excel ohne X/Y."""
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path))
+    from p3d_pdfreader.core import review
+    from p3d_pdfreader.core.review_store import ReviewStore
+    pdf = tmp_path / "a.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+    store = ReviewStore(pdf)
+    assert store.autofill_ok("Instrument", "PV-1", "Y.CHECK", "OK")
+    values = store.values("Instrument", "PV-1")
+    assert values[0] == "OK" and values[4] == "Y.CHECK" and values[5] == datetime.now().strftime("%Y-%m-%d")
+    assert values[6] and store.dirty
+    assert not store.autofill_ok("Instrument", "PV-2", "Y.CHECK", "Regelfehler Projektdefinition")
+    assert not store.autofill_ok("Instrument", "PV-3", "Y.CHECK", "")
+    store.set("Instrument", "PV-4", "Review", "OK")
+    store.set("Instrument", "PV-4", "WPO", "W-1")
+    store.autofill_ok("Instrument", "PV-4", "Y.CHECK", "")
+    assert store.values("Instrument", "PV-4")[4] == "W-1"            # vorhandenes WPO bleibt
+    assert "X" not in review.REVIEW_HEADERS and "Y" not in review.REVIEW_HEADERS

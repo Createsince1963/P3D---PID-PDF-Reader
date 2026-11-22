@@ -31,6 +31,16 @@ def main(argv: list[str] | None = None) -> int:
     if "--version" in args:
         print(f"{APP_NAME} {version()}")
         return 0
+    if "--web" in args:                                # Web-Server (auch aus der EXE: <EXE> --web --host ... --port ...)
+        import os
+        for name in ("stdout", "stderr"):              # EXE ohne Konsole: kein stdout -> Ausgaben verwerfen
+            if getattr(sys, name) is None:
+                setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))  # noqa: SIM115
+        from .web.server import main as web_main
+        return web_main([a for a in args if a != "--web"])
+    if "--report" in args:                             # Offline-HTML-Bericht (Variante 1): --report --source <Ordner>
+        from .web.report import main as report_main
+        return report_main([a for a in args if a != "--report"])
     root = str(tool_root())
     if root not in sys.path:
         sys.path.insert(0, root)

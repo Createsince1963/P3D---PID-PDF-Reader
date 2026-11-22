@@ -17,7 +17,7 @@ from .review_store import CHANGE_VALUES, FIELDS, REVIEW_VALUES, ReviewStore
 STATUS_VALUES = tuple(v for v in REVIEW_VALUES if v)
 REVIEW_HEADERS = ["Pos.-Nr.", "PDF", "Zeichnungsnr.", "Rev", "Typ", "Tag", "Seite", "Fundstelle", "Anzahl auf Seite",
                   "Doppelt",
-                  "Review-Kommentar", "X", "Y", *FIELDS]   # FIELDS: Review, Änderung, Neuer Wert, Bemerkung, WPO, Datum, User
+                  "Review-Kommentar", *FIELDS]   # FIELDS: Review, Änderung, Neuer Wert, Bemerkung, WPO, Datum, User
 
 
 @dataclass
@@ -72,8 +72,7 @@ def review_rows(result: PdfResult, tags: list[Tag] | None = None, checker=None) 
         rows.append([p.pos, result.name, result.drawing_no, result.revision, p.tag.type, p.tag.tag, p.page + 1,
                      f"{p.occurrence}/{p.total}", p.total, "Ja" if p.total > 1 else "",
                      *(checker.columns(p.tag.type, p.tag.tag, p.tag.count) if checker is not None else []),
-                     p.comment,
-                     round(p.rect[0], 1), round(p.rect[1], 1), *values])
+                     p.comment, *values])
     return rows
 
 

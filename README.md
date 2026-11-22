@@ -16,10 +16,30 @@ Der Aufbau (Menüband, Blätter, Tabellen, Launcher) entspricht P3D XCHANGE.
 - **Direkt:** `start_pdf_reader.bat` startet die App mit dem zentralen Python `Tools_Central\Python\python\python.exe`. Ein anderes Python lässt sich über die Umgebungsvariable `P3D_PDFREADER_PYTHON` setzen.
 - **EXE:** `build_exe.bat` baut eine einzelne EXE, `build_exe.bat onedir` einen Ordner. Ergebnis in `build_exe\dist\`.
 
+## Offline-HTML-Bericht (Variante 1, ohne Server)
+Eine einzelne HTML-Datei zum Weitergeben per Mail, Freigabe oder SharePoint. Sie läuft im Browser (Edge, Chrome) ohne Server, ohne Internet und ohne Python. Die PDFs braucht sie nicht, die Datei kann also in **jedem** Ordner liegen.
+- **Erstellen:**
+  - App, Gruppe „Web“ › **Offline-Bericht …**: markierte PDFs, sonst alle
+  - Web-Version, Gruppe „4 Export“ › **Offline-Bericht**
+  - Launcher, Karte „Variant 1 · Offline HTML report“: ganzer Ordner, Ergebnis in `data\exports`
+  - Kommandozeile: `python -m p3d_pdfreader --report --source <Ordner> [--out Datei.html] [--no-redline] [--max-px 3000]`
+- **Inhalt:** Tabellen, Filter, Nur doppelte, Fundstellen-Navigation, Viewer mit Zoom bis zur Bildauflösung (3000 px), Drehen, Seiten und Schwarz-Weiß.
+- **Eingebettete Dateien (Download per Klick):**
+  - **Redline-PDF** und **Review-Excel** je PDF
+  - **Export Excel** und **Review-Excel gesamt**
+  - Sie werden beim Erstellen erzeugt und enthalten alle Tags. Ein Filter im Bericht wirkt auf sie nicht.
+- **Audit im Bericht:** Die Audit-Spalten lassen sich wie in der Web-Version ausfüllen. Die Einträge bleiben im Browser des Nutzers. „Review speichern“ speichert sie als **CSV** (öffnet in Excel) mit allen Tags aller PDFs.
+- **Größe:** ca. 0,7 MB je Seite, mit Redline zusätzlich etwa die Größe der PDFs. Bei vielen PDFs besser nur die benötigten markieren.
+- **SharePoint:** SharePoint Online zeigt HTML-Dateien aus Sicherheitsgründen nicht als Webseite an, sondern lädt sie herunter oder zeigt den Quelltext. Den Bericht deshalb herunterladen bzw. über OneDrive synchronisieren und lokal im Browser öffnen, dann funktioniert alles.
+
+## Fernzugriff auf die Desktop-App (Variante 3, Remotedesktop)
+Launcher, Karte „Variant 3 · Remote GUI“ (eingeklappt): Server-PC eintragen, dann „Connect (Remote Desktop)“ (`mstsc /v:<PC>`) oder „Save .rdp file …“ für Kollegen. Auf dem Server-PC muss Remotedesktop eingeschaltet sein. Windows Pro erlaubt nur einen Benutzer gleichzeitig; für mehrere gleichzeitig braucht es einen Windows-Server mit Remotedesktopdiensten (IT).
+
 ## Web-Version (Browser, Firmennetz)
 Ein PC oder Server startet den Web-Server, Kollegen öffnen die Adresse im Browser (Edge, Chrome). Sie brauchen weder Python noch die EXE. Erkennung, Redline, Review-Excel und Export laufen auf dem Server über denselben `core\` wie die Desktop-App. Die Ergebnisse sind deshalb identisch.
 - **Start:**
-  - Launcher, Karte „Web server“: Port (Standard 8765), „Reachable in the network“, Start / Stop / Open in browser. Die Adressen für die Kollegen stehen im Log, z. B. `http://<Rechnername>:8765/`.
+  - **In der App:** Menüband-Gruppe „Web“, Knopf „Web-Server“ (an = grünes Symbol, zeigt die Adressen für die Kollegen) und „Im Browser öffnen“. Der Server läuft als eigener Prozess, bis er ausgeschaltet oder die App geschlossen wird. Läuft schon ein Server auf Port 8765 (z. B. aus dem Launcher), nutzt die App diesen.
+  - Launcher, Karte „Variant 2 · Web server“: Port (Standard 8765), „Reachable in the network“, Start / Stop / Open in browser. Die Adressen für die Kollegen stehen im Log, z. B. `http://<Rechnername>:8765/`.
   - Alternativ `start_web_server.bat` (ohne Argumente im Netzwerk erreichbar, Port 8765) oder `python -m p3d_pdfreader.web --host 0.0.0.0 --port 8765 [--source "\\server\freigabe\PID Plots"]`.
   - Beim ersten Start fragt Windows eventuell nach einer Firewall-Freigabe für Python.
 - **PDFs einlesen:**
@@ -34,7 +54,12 @@ Ein PC oder Server startet den Web-Server, Kollegen öffnen die Adresse im Brows
 - **Ausgaben** kommen als Download in den Browser. Auf dem Server wird nichts gespeichert, die Original-PDFs werden nur gelesen.
 - **Sitzungen:** Jeder Browser hat seine eigene Liste. Hochgeladene PDFs liegen in einem Temp-Ordner und werden nach 12 Stunden ohne Zugriff gelöscht.
 - **Sicherheit:** Der Browser kann keine Pfade angeben. Gelesen wird nur, was in einem Quellordner liegt oder hochgeladen wurde. Es gibt keine Anmeldung: Wer die Adresse im Netz erreicht, kann das Tool nutzen. Den Server deshalb nur im Firmennetz betreiben.
-- **Noch nicht in der Web-Version:** Review-Spalten bearbeiten (Bearbeiten-Modus), Tabellenansichten speichern, Viewer auf 2. Monitor, Einstellungen (Pfade, Tag-Muster) im Browser, Sprachwahl. Diese Einstellungen erfolgen am Server-PC im Desktop-Tool.
+- **Audit-Spalten** in der Tag-Tabelle: Review und Änderung als Auswahlliste, dazu Neuer Wert, Bemerkung und WPO. Datum und User werden automatisch gesetzt.
+  - Bearbeiten per Doppelklick in die Zelle, speichern mit „Review speichern“ oder Strg+S. Beim Wechsel der PDF wird automatisch gespeichert.
+  - Gespeichert wird auf dem Server wie „Review speichern“ der Desktop-App (`data\reviews`, jeder Stand eine neue Datei). Redline, Review-Excel und Desktop-App sehen die Einträge.
+  - „Korrektur erforderlich“ erscheint rot in der Tabelle und im Viewer.
+  - Als User steht der Name, den jeder Browser beim ersten Eintrag einmal abfragt.
+- **Noch nicht in der Web-Version:** Tabellenansichten speichern, Viewer auf 2. Monitor, Einstellungen (Pfade, Tag-Muster) im Browser, Sprachwahl. Diese Einstellungen erfolgen am Server-PC im Desktop-Tool.
 
 ## Projektmodus (Projektdefinitionen wie P3D Tag Compliance)
 - **Aus (Standard):** das Tool arbeitet wie bisher mit den Tag-Mustern, ohne Projektregeln.
@@ -93,7 +118,8 @@ Die Ansicht jeder Tabelle wird automatisch gemerkt. Benannte Ansichten verwaltes
 
 ## Review / Redline
 - **Redline-PDF:** eine Kopie der PDF, das Original bleibt unverändert.
-  - An jeder Fundstelle stehen ein Rahmen und die **Pos.-Nr.** Normale Tags sind rot, doppelte orange.
+  - An jeder Fundstelle stehen ein Rahmen und die **Pos.-Nr.** Farben wie im Viewer: grün = korrekt, rot = fehlerhaft (Review „Korrektur erforderlich“, im Projektmodus Abweichung), doppelte Tags gelb hinterlegt.
+  - Mit **Einstellungen › Layer für Review im PDF** (Standard an) liegen alle Review-Kommentare auf der PDF-Ebene `Review_TT.MM.JJJJ` und lassen sich im PDF-Programm unter „Ebenen“ ein- und ausblenden.
   - Jede Fundstelle trägt einen PDF-Kommentar mit Pos., Typ, Tag und „Fundstelle n / m“. Er erscheint in Acrobat, Bluebeam oder PDF-XChange in der Kommentarliste.
   - Oben links steht ein Übersichtskommentar.
   - Es gilt der Tabellenfilter: Mit „Nur doppelte“ entsteht ein Redline nur mit den doppelten Tags.
@@ -119,7 +145,7 @@ Die Ansicht jeder Tabelle wird automatisch gemerkt. Benannte Ansichten verwaltes
 | Plot-Benutzer | Plotpfad am Blattrand `C:\Users\<name>\…` |
 | Instrument | Kürzel in der Blase plus Nummer darunter, über die Lage zusammengesetzt (`TIT-130`) |
 | Equipment / Armatur / Volltag / Zeichnungsverweis | Regex (`111PMP01`, `VH340`, `203-17-111-TZIT-011`, `…-PID-…`) |
-| Rohrleitung (optional: Menüband › Rohrleitungen) | Regex `pipe_line` (`TFHR_SS01_001_1"`, `PFC_ST10_015_1/2"`), waagerecht und senkrecht; getrennte Teile (`… 1/2"`, `_205_1`) werden zusammengesetzt |
+| Rohrleitung (optional: Menüband › Projekt › Rohrleitungen) | Regex `pipe_line` (`TFHR_SS01_001_1"`, `PFC_ST10_015_1/2"`), waagerecht und senkrecht; getrennte Teile (`… 1/2"`, `_205_1`) werden zusammengesetzt |
 | Gedrehte Plots | Wortpositionen werden in die sichtbare Lage umgerechnet (/Rotate 90/180/270) |
 
 Die Muster stehen in `data\config\tag_patterns.json` und werden beim ersten Start angelegt. Unter **Projekt › Tag-Muster** lassen sich Regex und Ausschlussliste für Kürzel anpassen, z. B. `MIN`, `HALF`, `SHORT`.

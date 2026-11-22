@@ -23,7 +23,7 @@ from PySide6.QtCore import QObject, QPointF, QProcess, QProcessEnvironment, QRec
 from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap, QPolygonF
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
-    QPlainTextEdit, QProgressBar, QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
+    QPlainTextEdit, QProgressBar, QPushButton, QScrollArea, QSizePolicy, QToolButton, QVBoxLayout, QWidget,
 )
 
 HERE = Path(__file__).resolve().parent
@@ -523,21 +523,23 @@ class LauncherWindow(QWidget):
         start.addWidget(b_start)
         start.addWidget(b_exe)
         side.addWidget(self._card("Start", start))
-        side.addWidget(self._card("Web server (browser access, company network)", self._web_card()))
+        side.addWidget(self._card("Variant 1 · Offline HTML report (no server)", self._report_card(), collapsed=True))
+        side.addWidget(self._card("Variant 2 · Web server (browser access, company network)", self._web_card()))
+        side.addWidget(self._card("Variant 3 · Remote GUI (Windows Remote Desktop)", self._remote_card(), collapsed=True))
 
-        side.addWidget(self._card("Quality gate", self._grid((
+        side.addWidget(self._card("Quality gate", collapsed=True, inner=self._grid((
             ("Check environment", self._check_env, "ok"),
             ("Show version (--version)", lambda: self._run_python(["-m", PACKAGE, "--version"], "Version"), ""),
             ("Tests (fast, without GUI)", lambda: self._run_tests(["tests/test_architecture.py", "tests/test_extract.py"], "Tests (fast)"), ""),
             ("Tests (full)", lambda: self._run_tests(["tests"], "Tests (full)"), ""),
         ))))
 
-        side.addWidget(self._card("Build", self._grid((
+        side.addWidget(self._card("Build", collapsed=True, inner=self._grid((
             ("Build Onefile EXE ...", lambda: self._run_build([], "Build Onefile EXE"), ""),
             ("Build Onedir EXE ...", lambda: self._run_build(["onedir"], "Build Onedir EXE"), ""),
         ))))
 
-        side.addWidget(self._card("Folders", self._grid((
+        side.addWidget(self._card("Folders", collapsed=True, inner=self._grid((
             ("Open workspace", lambda: self._open(ROOT), "folder"),
             ("Open data", lambda: self._open(self._data_dir()), "folder"),
             ("Open logs", lambda: self._open(ROOT / "logs"), "folder"),
@@ -598,18 +600,43 @@ class LauncherWindow(QWidget):
         outer.addWidget(left_scroll)
         outer.addLayout(right, 1)
 
-    def _card(self, title: str, inner) -> QFrame:
+    def _card(self, title: str, inner, collapsed: bool | None = None) -> QFrame:
+        """Card with a muted title. ``collapsed`` True/False = the title is a toggle (arrow) that folds the body;
+        True = folded at start (every launcher start), None = plain card that cannot be folded."""
         frame = QFrame()
         frame.setObjectName("Card")
         frame.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)   # a card never grows taller than its content
         lay = QVBoxLayout(frame)
         lay.setContentsMargins(10, 8, 10, 8)
         lay.setSpacing(6)
-        lay.addWidget(_muted(title))
         inner.setContentsMargins(0, 0, 0, 0)
         if not isinstance(inner, QGridLayout):
             inner.setSpacing(6)
-        lay.addLayout(inner)
+        if collapsed is None:
+            lay.addWidget(_muted(title))
+            lay.addLayout(inner)
+            return frame
+        toggle = QToolButton()
+        toggle.setText(title)
+        toggle.setProperty("role", "muted")
+        toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        toggle.setAutoRaise(True)
+        toggle.setCheckable(True)
+        toggle.setCursor(Qt.PointingHandCursor)
+        toggle.setStyleSheet(f"QToolButton {{ border: none; padding: 0; color: {PAL.txt_muted}; background: transparent; }}")
+        body = QWidget()
+        body.setLayout(inner)
+
+        def show(open_: bool) -> None:
+            toggle.setArrowType(Qt.DownArrow if open_ else Qt.RightArrow)
+            toggle.setToolTip("Click to fold" if open_ else "Click to unfold")
+            body.setVisible(open_)
+
+        toggle.toggled.connect(show)
+        toggle.setChecked(not collapsed)
+        show(not collapsed)
+        lay.addWidget(toggle)
+        lay.addWidget(body)
         return frame
 
     @staticmethod
@@ -641,6 +668,7 @@ class LauncherWindow(QWidget):
         self.hs_keep.setChecked(s.value("hsKeepOn", True, type=bool))
         self.web_port.setText(str(s.value("webPort", WEB_PORT) or WEB_PORT))
         self.web_network.setChecked(s.value("webNetwork", True, type=bool))
+        self.remote_host.setText(str(s.value("remoteHost", "") or ""))
         geometry = s.value("geometry")
         if geometry is not None:
             self.restoreGeometry(geometry)
@@ -658,6 +686,7 @@ class LauncherWindow(QWidget):
         s.setValue("hsKeepOn", self.hs_keep.isChecked())
         s.setValue("webPort", self.web_port.text().strip())
         s.setValue("webNetwork", self.web_network.isChecked())
+        s.setValue("remoteHost", self.remote_host.text().strip())
         s.setValue("geometry", self.saveGeometry())
 
     def closeEvent(self, event) -> None:
@@ -904,6 +933,97 @@ class LauncherWindow(QWidget):
         body.addWidget(_muted("Source folders: config\\paths.json of this PC (set in the app under Settings › Paths). "
                               "Colleagues can also upload PDFs.", wrap=True))
         return body
+
+    # ---- variant 1: offline HTML report (python -m p3d_pdfreader --report --source <folder>) -------
+    def _report_card(self) -> QVBoxLayout:
+        body = QVBoxLayout()
+        b_make = _button("Create report from folder ...", ButtonKind.PRIMARY,
+                         "Reads all PDFs of a folder and writes one HTML file (tables, viewer, audit columns, "
+                         "redline PDFs, review Excel) into the export folder; progress in the log", "run")
+        b_make.clicked.connect(self._make_report)
+        b_open = _button("Open report ...", tip="Open an existing report in the browser", expand=False)
+        b_open.clicked.connect(self._open_report)
+        row = QHBoxLayout()
+        row.addWidget(b_make, 1)
+        row.addWidget(b_open)
+        body.addLayout(row)
+        body.addWidget(_muted("The HTML file works without server and internet - send it by mail or put it on a "
+                              "share. In the app: ribbon group Web › Offline report (marked PDFs).", wrap=True))
+        return body
+
+    def _make_report(self) -> None:
+        if self.process is not None and self.process.state() != QProcess.NotRunning:
+            self._log("Another job is still running - wait until it has finished.")
+            return
+        python = self._python_path()
+        if python is None:
+            return
+        folder = QFileDialog.getExistingDirectory(self, "Folder with the PDF plots")
+        if not folder:
+            return
+        label = "Offline HTML report"
+        self.process = self._spawn(str(python), ["-m", PACKAGE, "--report", "--source", folder], label, cwd=ROOT,
+                                   env=self._app_env(ROOT))
+        self.process.finished.connect(lambda code, _status: self._job_finished(code, label))
+
+    def _open_report(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "Open offline report", str(ROOT / "data" / "exports"),
+                                              "HTML (*.html)")
+        if path:
+            os.startfile(path)  # noqa: S606
+
+    # ---- variant 3: the desktop GUI on a server PC, used through Windows Remote Desktop (mstsc) -----
+    def _remote_card(self) -> QVBoxLayout:
+        body = QVBoxLayout()
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Server PC"))
+        self.remote_host = QLineEdit()
+        self.remote_host.setPlaceholderText("computer name or IP of the PC that runs the GUI")
+        row.addWidget(self.remote_host, 1)
+        body.addLayout(row)
+        buttons = QHBoxLayout()
+        b_connect = _button("Connect (Remote Desktop)", ButtonKind.PRIMARY,
+                            "mstsc /v:<server PC> - then start the GUI there (Start GUI / start_pdf_reader.bat)", "run")
+        b_connect.clicked.connect(self._remote_connect)
+        b_rdp = _button("Save .rdp file ...", tip="Connection file for colleagues (double-click opens Remote Desktop)",
+                        expand=False)
+        b_rdp.clicked.connect(self._remote_save_rdp)
+        buttons.addWidget(b_connect, 1)
+        buttons.addWidget(b_rdp)
+        body.addLayout(buttons)
+        body.addWidget(_muted("The server PC needs Remote Desktop switched on (Windows settings, done by the owner or "
+                              "IT). Windows Pro allows one user at a time; several users at once need a Windows "
+                              "Server with Remote Desktop Services (IT).", wrap=True))
+        return body
+
+    def _remote_target(self) -> str:
+        host = self.remote_host.text().strip()
+        if not host or not re.fullmatch(r"[A-Za-z0-9.\-:\[\]]+", host):
+            self._log("Remote GUI: enter the computer name or IP of the server PC first.")
+            return ""
+        return host
+
+    def _remote_connect(self) -> None:
+        host = self._remote_target()
+        if host:
+            subprocess.Popen(["mstsc", f"/v:{host}"])
+            self._log(f"Remote Desktop started: mstsc /v:{host}")
+
+    def _remote_save_rdp(self) -> None:
+        host = self._remote_target()
+        if not host:
+            return
+        path, _ = QFileDialog.getSaveFileName(self, "Save Remote Desktop file",
+                                              str(Path.home() / f"P3D PDF Reader ({host}).rdp"), "Remote Desktop (*.rdp)")
+        if not path:
+            return
+        text = (f"full address:s:{host}\nprompt for credentials:i:1\nscreen mode id:i:2\nuse multimon:i:1\n"
+                "redirectclipboard:i:1\nredirectdrives:i:0\nauthentication level:i:2\n")
+        try:
+            Path(path).write_text(text, encoding="utf-8")
+            self._log(f"Remote Desktop file saved: {path}")
+        except OSError as error:
+            self._log(f"Could not save {path}: {error}")
 
     def _web_port(self) -> str:
         port = self.web_port.text().strip()

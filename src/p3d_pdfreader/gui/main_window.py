@@ -7,6 +7,7 @@ Ansicht), dunkelblauer Tabellenkopf wie in XCHANGE, TableAdminBar fuer benannte 
 from __future__ import annotations
 
 import os
+from contextlib import nullcontext
 from pathlib import Path
 
 from PySide6.QtCore import QModelIndex, Qt, QThread, QTimer
@@ -31,10 +32,10 @@ from ..core.review_store import CHANGE_VALUES, EDIT_FIELDS, FIELDS, REVIEW_VALUE
 from . import appearance, icons, last_paths, table_views
 from .design import NOTE_QSS
 from .paths_dialog import PathsDialog, open_in_explorer
-from . import project_dialog
+from . import project_dialog, web_control
 from .controls import indicator_qss
 from .icons import excel_icon
-from .progress import ProgressDialog
+from .progress import ProgressDialog, progress_task
 from .review_dialog import ReviewDialog
 from .ribbon import Ribbon
 from .ribbon_heads import apply_group_heads
@@ -46,6 +47,9 @@ from .viewer_panel import ViewerPanel
 from .worker import ScanWorker
 
 PIPES_KEY = "read_pipe_lines"       # config/state.json
+LAYER_TIP = ("Redline-PDF: Rahmen, Pos.-Nr. und Kommentare auf eine eigene PDF-Ebene „Review_TT.MM.JJJJ“ (Datum der "
+             "Erstellung) legen – in Acrobat, PDF-XChange oder Bluebeam unter „Ebenen“ ein- und ausblendbar. "
+             "Gilt auch für Bulk, Web-Server und Offline-Bericht.")
 PIPES_TIP = ("Rohrleitungsnummern (z. B. TFHR_SS01_001_1\") als Typ „Rohrleitung“ in die Tag-Liste übernehmen – "
              "waagerecht und senkrecht beschriftet. Umschalten liest die PDFs neu ein.")
 
@@ -53,14 +57,29 @@ FILE_COLS = ["PDF", "Zeichnungsnr.", "Erstellt (PDF)", "Ersteller", "Checked", "
              "Plot-Benutzer", "Anzahl Tags", "Fehler"]
 # FIELDS: Review, Änderung, Neuer Wert, Bemerkung, WPO, Datum, User; CHECK_HEADERS: Projekt-Prüfung, Projekt-Hinweis
 # (nur im Projektmodus sichtbar)
-TAG_COLS = ["Typ", "Tag", "Anzahl", "Seiten", *CHECK_HEADERS, *FIELDS]
+# SCAN_COLS: Schriftfeld-Werte der PDF, hinten angefuegt; nur sichtbar mit "Aus PDF-Scan übernehmen"
+SCAN_COLS = ["Ersteller", "Checked", "Rev", "Rev-Datum", "Rev-Text"]
+TAG_COLS = ["Typ", "Tag", "Anzahl", "Seiten", *CHECK_HEADERS, *FIELDS, *SCAN_COLS]
 FIRST_FIELD = TAG_COLS.index(FIELDS[0])
 CHECK_COL = TAG_COLS.index(CHECK_HEADERS[0])
+SCAN_COL = len(TAG_COLS) - len(SCAN_COLS)
+SCAN_KEY = "tags_scan_fields"       # config/state.json
+SCAN_TIP = ("Aus PDF-Scan übernehmen: Ersteller, Checked, Rev, Rev-Datum und Rev-Text aus dem Schriftfeld der PDF als "
+            "Spalten hinten an die Tag-Tabelle anfügen (bleibt eingeschaltet).")
+AUTOFILL_TIP = ("Autofill OK: bei allen Tags mit Review „OK“ (oder leerem Review und Projekt-Prüfung „OK“) Review = OK, "
+                "User und Datum (heute, ohne Uhrzeit) setzen; leeres WPO bekommt den Checked-Wert aus dem Schriftfeld. "
+                "Danach Speichern.")
 ALL_TAG_COLS = ["PDF", "Zeichnungsnr.", "Typ", "Tag", "Anzahl", *CHECK_HEADERS]
 ALL_CHECK_COL = ALL_TAG_COLS.index(CHECK_HEADERS[0])
+VIEWER_SPLIT = (500, 800)           # Standardteilung Tag-Tabelle : Viewer im Hauptfenster
 PROJECT_MODE_KEY, PROJECT_DB_KEY = "project_mode", "project_db"     # config/state.json
 PROJECT_TIP = ("Projektmodus: Tags werden gegen die Projektdefinitionen geprüft (Codelisten und Tag-Strukturen wie in "
                "P3D Tag Compliance). Aus = Standardmodus ohne Projektdefinitionen.")
+
+
+def scan_values(result: PdfResult) -> list[str]:
+    """Schriftfeld-Werte der PDF in der Reihenfolge ``SCAN_COLS`` (wie in der Dateiliste)."""
+    return [result.author_display, result.checked, result.revision, result.revision_date, result.revision_text]
 
 
 class DuplicateModel(TableDataModel):
@@ -304,6 +323,10 @@ class TagsSheet(Sheet):
         self.tags.table.setItemDelegateForColumn(FIRST_FIELD, ChoiceDelegate(REVIEW_VALUES, False, self.tags.table))
         self.tags.table.setItemDelegateForColumn(FIRST_FIELD + 1, ChoiceDelegate(CHANGE_VALUES, True, self.tags.table))
         strip = ToolStrip("Tags")
+        self.scan_button = strip.add("scan_fields", "Aus PDF-Scan übernehmen", "import", self._toggle_scan_fields,
+                                     SCAN_TIP, checkable=True)
+        self.scan_button.setChecked(bool(last_paths.get_value(SCAN_KEY, False)))
+        self.autofill_button = strip.add("autofill", "Autofill OK", "syscheck", self.autofill_ok, AUTOFILL_TIP)
         self.edit_button = strip.add("edit", "Bearbeiten", "rename", self.set_edit_mode,
                                      "Bearbeiten-Modus: Review, Änderung, Neuer Wert, Bemerkung, WPO eintragen "
                                      "(Datum und User werden automatisch gesetzt)", checkable=True)
@@ -334,9 +357,22 @@ class TagsSheet(Sheet):
         self.preview = self.viewer.preview
         hsplit.addWidget(viewer_host)
         self._viewer_host_layout = host_layout
+        self._hsplit, self._viewer_host = hsplit, viewer_host
         hsplit.setStretchFactor(0, 2)
         hsplit.setStretchFactor(1, 3)
-        hsplit.setSizes([500, 800])
+        hsplit.setSizes(list(VIEWER_SPLIT))
+        # Viewer auf dem 2. Monitor: Hinweis + "Viewer zurückholen" oberhalb der Tag-Tabelle (rechts in der Kopfzeile)
+        self.viewer_away = QWidget()
+        away = QHBoxLayout(self.viewer_away)
+        away.setContentsMargins(8, 0, 0, 0)
+        note = QLabel("PDF-Viewer ist auf dem zweiten Monitor.")
+        note.setStyleSheet(NOTE_QSS)
+        away.addWidget(note)
+        back = action_button("Viewer zurückholen", ButtonKind.SECONDARY)
+        back.clicked.connect(lambda: self.viewer.monitor_button.setChecked(False))
+        away.addWidget(back)
+        self.viewer_away.hide()
+        self.tags.layout().itemAt(0).layout().addWidget(self.viewer_away)
         vsplit.addWidget(hsplit)
         vsplit.setSizes([300, 520])
         self.body_layout.addWidget(vsplit, 1)
@@ -353,7 +389,18 @@ class TagsSheet(Sheet):
         self.tags.table.clicked.connect(self._tag_clicked)
         for keys, slot in (("F3", self.next_occurrence), ("Shift+F3", self.previous_occurrence)):
             QShortcut(QKeySequence(keys), self, activated=slot, context=Qt.ApplicationShortcut)  # auch im Viewer-Fenster
+        self.viewer.detached_changed.connect(self._viewer_detached)
         self.viewer.install(self._viewer_host_layout)
+
+    def _viewer_detached(self, detached: bool) -> None:
+        """2. Monitor: Tag-Tabelle ueber die ganze Breite, Zurueckholen-Knopf ueber der Tabelle. Zurueck: Bereich wieder
+        im Standardverhaeltnis (``VIEWER_SPLIT``) teilen."""
+        self._viewer_host.setVisible(not detached)
+        self.viewer_away.setVisible(detached)
+        if not detached:
+            total = max(sum(self._hsplit.sizes()), self._hsplit.width(), sum(VIEWER_SPLIT))
+            left = round(total * VIEWER_SPLIT[0] / sum(VIEWER_SPLIT))
+            self._hsplit.setSizes([left, total - left])
 
     # --- Tag-Tabelle ---------------------------------------------------------------------------------------------
     def _tag_rows(self) -> list[list]:
@@ -361,10 +408,36 @@ class TagsSheet(Sheet):
         if result is None:
             return []
         checker = self.win.checker
+        scan = scan_values(result) if self.scan_button.isChecked() else [""] * len(SCAN_COLS)
         return [[t.type, t.tag, t.count, t.pages_text,
                  *(checker.columns(t.type, t.tag, t.count) if checker else ["", ""]),
-                 *(self.store.values(t.type, t.tag) if self.store else [""] * len(FIELDS))]
+                 *(self.store.values(t.type, t.tag) if self.store else [""] * len(FIELDS)), *scan]
                 for t in result.tags]
+
+    def _toggle_scan_fields(self, on: bool) -> None:
+        last_paths.set_value(SCAN_KEY, bool(on))
+        self._only_duplicates()
+
+    def apply_scan_columns(self) -> None:
+        on = self.scan_button.isChecked()
+        for c in range(SCAN_COL, len(TAG_COLS)):
+            if self.tags.table.isColumnHidden(c) == on:
+                self.tags.table.setColumnHidden(c, not on)
+
+    def autofill_ok(self) -> None:
+        """Alle OK-Werte der gewaehlten PDF: Review OK, User, Datum (ohne Uhrzeit), WPO = Checked (falls leer)."""
+        result, store = self._store_result, self.store
+        if result is None or store is None:
+            self.win.statusBar().showMessage("Autofill OK: zuerst eine PDF wählen.", 6000)
+            return
+        checker = self.win.checker
+        changed = sum(store.autofill_ok(t.type, t.tag, result.checked,
+                                        checker.columns(t.type, t.tag, t.count)[0] if checker else "")
+                      for t in result.tags)
+        self._only_duplicates()
+        self._store_changed()
+        self.win.statusBar().showMessage(f"Autofill OK: {changed} Tag(s) ausgefüllt – zum Übernehmen Speichern."
+                                         if changed else "Autofill OK: keine OK-Werte zum Ausfüllen.", 8000)
 
     def _only_duplicates(self, on: bool | None = None) -> None:
         """Tag-Tabelle neu fuellen; Filter "Nur doppelte" und (Projektmodus) "Nur Abweichungen"."""
@@ -372,6 +445,7 @@ class TagsSheet(Sheet):
         faults = self.fault_button.isChecked() and self.win.checker is not None
         rows = [r for r in self._tag_rows() if (not on or r[2] > 1) and (not faults or is_fault_status(r[CHECK_COL]))]
         self.tags.set_rows(rows)
+        self.tags.proxy.sourceModel().dataChanged.connect(self._store_changed)   # neues Modell -> neu verbinden
         self.win.apply_project_columns()
         self._hit = None
 
@@ -463,16 +537,32 @@ class TagsSheet(Sheet):
                 self._switching = False
             return
         self._store_result = result
-        self.store = ReviewStore(result.path) if result else None
-        self._only_duplicates()
-        self._store_changed()
-        self.tags.proxy.sourceModel().dataChanged.connect(self._store_changed)
-        self.preview.show_pdf(result.path if result else None)
-        self.show_status()
-        if result:
-            self.preview.show_duplicates([t.hits for t in result.tags if t.duplicate])
+        if result is None:
+            self.store = None
+            self._only_duplicates()
+            self._store_changed()
+            self.preview.show_pdf(None)
+        else:
+            self._load_with_progress(result)
         dups = sum(1 for t in result.tags if t.duplicate) if result else 0
         self.tags.count.setToolTip(i18n.tr(f"{dups} doppelte Tag(s) gelb hinterlegt") if dups else "")
+
+    def _load_with_progress(self, result: PdfResult) -> None:
+        """Tag-Tabelle und PDF der gewaehlten Datei laden - mit Fortschrittsfenster wie in P3D XCHANGE (nach dem Scan
+        im bereits offenen Ladedialog als Schritte 2 und 3)."""
+        open_dlg = self.win._table_progress
+        ctx = nullcontext(open_dlg) if open_dlg is not None else progress_task(self, "PDF wird geladen", steps=2)
+        first = 2 if open_dlg is not None else 1
+        with ctx as dlg:
+            dlg.update_progress(10, f"Tag-Tabelle lesen: {result.name} ({len(result.tags)} Tags)", first)
+            self.store = ReviewStore(result.path)
+            self._only_duplicates()
+            self._store_changed()
+            dlg.update_progress(60, f"PDF öffnen und anzeigen: {result.name} ({result.pages} Seite(n))", first + 1)
+            self.preview.show_pdf(result.path)
+            self.show_status()
+            self.preview.show_duplicates([t.hits for t in result.tags if t.duplicate])
+            dlg.update_progress(100)
 
     # --- Tag-Navigation ------------------------------------------------------------------------------------------
     def _tag_at(self, index: QModelIndex):
@@ -552,6 +642,7 @@ class MainWindow(QMainWindow):
         self._thread: QThread | None = None
         self._worker: ScanWorker | None = None
         self._progress: ProgressDialog | None = None
+        self._table_progress: ProgressDialog | None = None    # offener Ladedialog (Tabellen nach dem Scan)
         self.project: ProjectDB | None = None          # Projektmodus: geoeffnete Projekt-Datenbank
         self.checker = None                            # Projektmodus: Pruefung (project_defs.Checker), sonst None
         self._scan_placeholders = False                # letzter Scan mit Platzhalter-Tags (nur Projektmodus)
@@ -565,6 +656,7 @@ class MainWindow(QMainWindow):
         self.page = TagsSheet(self)                 # vor dem Menueband: es ruft Funktionen der Blaetter auf
         self.all_page = AllTagsSheet()
         self.ribbon = self._build_ribbon()
+        self._show_pipes(bool(last_paths.get_value(PIPES_KEY, False)))
         root.addWidget(self.ribbon)
         self.tabs = QTabWidget()
         self.tabs.setDocumentMode(True)
@@ -589,32 +681,39 @@ class MainWindow(QMainWindow):
         -> 3 Pruefen -> 4 Review/Redline -> 5 Export, zuletzt Hilfe (Nutzervorgabe 2026-11-21). Jede Gruppe hat eine
         dunkelblaue Ueberschrift. Jede Funktion als Symbol (Glyphen-Ergaenzung in ``toolstrip``)."""
         r = Ribbon("P&ID-PDF-Reader")
-        # Projekt: Modus ein/aus (Standard ohne Projektdefinitionen), Projekt waehlen, Verwaltung der Definitionen
+        # Projekt: Projekt waehlen, dann die Umschalter 1. Projektmodus 2. Rohrleitungen (Nutzervorgabe 2026-11-22),
+        # Verwaltung der Definitionen
         g = r.group("Projekt")
-        g.large("project_mode", "Projekt-\nmodus: aus", "project_mode", self.toggle_project_mode)
-        r.buttons["project_mode"].setCheckable(True)
-        r.buttons["project_mode"].setToolTip(PROJECT_TIP)
         self.project_menu = QMenu(self)
         self.project_menu.aboutToShow.connect(self._fill_project_menu)
         g.large("project_pick", "Projekt\nwählen", "project", lambda: None, self.project_menu)
         r.buttons["project_pick"].setToolTip("Projekt anlegen, öffnen oder aus P3D Tag Compliance übernehmen")
+        g.large("project_mode", "Projekt-\nmodus: aus", "project_mode", self.toggle_project_mode)
+        r.buttons["project_mode"].setCheckable(True)
+        r.buttons["project_mode"].setToolTip(PROJECT_TIP)
+        # Rohrleitungsnummern (waagerecht und senkrecht) mit in die Tag-Liste uebernehmen: Umschalter wie der
+        # Projektmodus (an = Symbol gruen), gemerkt je Benutzer
+        g.large("pipes", "Rohr-\nleitungen: aus", "pipe", self._toggle_pipes)
+        r.buttons["pipes"].setCheckable(True)
+        r.buttons["pipes"].setToolTip(PIPES_TIP)
         g.large("project_defs", "Projekt-\ndefinitionen …", "defs", self.edit_project_definitions)
         r.buttons["project_defs"].setToolTip("Projektdefinitionen verwalten: Codelisten, Listen, Tag-Strukturen, "
                                              "Prüfregeln, Excel, Übernahme aus Tag Compliance")
         # Einstellungen gehoeren zur Gruppe Projekt (Nutzervorgabe 2026-11-21)
         g.large("paths", "Pfade", "settings", self.edit_paths)
         g.large("patterns", "Tag-\nMuster", "header", lambda: open_in_explorer(paths.patterns_file()))
+        self.settings_menu = QMenu(self)
+        self.layer_action = self.settings_menu.addAction("Layer für Review im PDF", self._toggle_review_layer)
+        self.layer_action.setCheckable(True)
+        self.layer_action.setChecked(redline.review_layer_enabled())
+        self.layer_action.setToolTip(LAYER_TIP)
+        self.settings_menu.setToolTipsVisible(True)
+        g.large("settings_menu", "Einstel-\nlungen", "settings", lambda: None, self.settings_menu)
+        r.buttons["settings_menu"].setToolTip("Einstellungen: Layer für Review im PDF")
         g = r.group("1  Einlesen")
         g.large("scan", "Quellordner\nscannen", "scan", lambda: self.scan(None))
         g.large("folder", "Ordner\nöffnen …", "folder", self._pick_folder)
         g.large("files", "Dateien\nöffnen …", "files", self._pick_files)
-        # Option: Rohrleitungsnummern (waagerecht und senkrecht) mit in die Tag-Liste uebernehmen, gemerkt je Benutzer
-        self.pipe_menu = QMenu(self)
-        self.pipe_action = self.pipe_menu.addAction("Rohrleitungsnummern mit einlesen", self._toggle_pipes)
-        self.pipe_action.setCheckable(True)
-        self.pipe_action.setChecked(bool(last_paths.get_value(PIPES_KEY, False)))
-        g.large("pipes", "Rohr-\nleitungen", "pipe", lambda: None, self.pipe_menu)
-        r.buttons["pipes"].setToolTip(PIPES_TIP)
         g = r.group("2  Ansicht")
         g.large("sheet_tags", "PID-Tags", "start", lambda: self.tabs.setCurrentWidget(self.page))
         g.large("sheet_all", "Alle Tags", "reports", self.show_all_tags)
@@ -636,6 +735,17 @@ class MainWindow(QMainWindow):
         g.large("xlsx", "Export\nExcel …", "excel_out", lambda: self.export("xlsx"))
         g.large("csv", "Export\nCSV …", "csv_out", lambda: self.export("csv"))
         g.large("open_exports", "Export-\nordner", "folder", lambda: open_in_explorer(paths.exports_dir()))
+        # Web-Version fuer Kollegen im Firmennetz (Server als eigener Prozess, gui/web_control.py)
+        g = r.group("Web")
+        g.large("web_server", "Web-Server\naus", "connect", self.toggle_web_server)
+        r.buttons["web_server"].setCheckable(True)
+        r.buttons["web_server"].setToolTip(web_control.WEB_TIP)
+        g.large("web_open", "Im Browser\nöffnen", "other", self.open_web_version)
+        r.buttons["web_open"].setToolTip("Web-Version auf diesem PC im Browser öffnen (startet den Server bei Bedarf)")
+        g.large("web_report", "Offline-\nBericht …", "report", self.create_offline_report)
+        r.buttons["web_report"].setToolTip("Offline-HTML-Bericht (markierte oder alle PDFs): eine HTML-Datei mit Tabellen, "
+                                           "Viewer, Audit-Spalten, Redline-PDF und Review-Excel – ohne Server, zum "
+                                           "Weitergeben per Mail, Freigabe oder SharePoint")
         g = r.group("Hilfe")
         g.large("help", "Handbuch", "help", self.show_help)
         g.large("about", "Info", "info", self.show_about)
@@ -715,11 +825,25 @@ class MainWindow(QMainWindow):
         if files:
             self.scan(files)
 
+    def _toggle_review_layer(self) -> None:
+        last_paths.set_value(redline.LAYER_KEY, self.layer_action.isChecked())
+        on = (f"auf der Ebene „{redline.review_layer_name()}“" if self.layer_action.isChecked()
+              else "ohne eigene Ebene")
+        self.statusBar().showMessage(f"Redline-PDF: Review-Kommentare {on}.", 8000)
+
     def pipes_enabled(self) -> bool:
-        return self.pipe_action.isChecked()
+        return self.ribbon.buttons["pipes"].isChecked()
+
+    def _show_pipes(self, on: bool) -> None:
+        """Umschalter Rohrleitungen wie der Projektmodus: Text an/aus, Symbol gruen solange an (Kit-Farbe ``ok``)."""
+        button = self.ribbon.buttons["pipes"]
+        button.setChecked(on)
+        self.ribbon.set_text("pipes", "Rohr-\nleitungen: an" if on else "Rohr-\nleitungen: aus")
+        button.setIcon(icons.glyph_icon("pipe", LIGHT.ok, 32) if on else icons.ribbon_icon("pipe", 32))
 
     def _toggle_pipes(self) -> None:
-        """Option merken; bereits eingelesene PDFs mit der neuen Einstellung neu einlesen."""
+        """Menueband: Rohrleitungen ein/aus. Option merken; eingelesene PDFs mit der neuen Einstellung neu einlesen."""
+        self._show_pipes(self.pipes_enabled())
         last_paths.set_value(PIPES_KEY, self.pipes_enabled())
         on = "werden mit eingelesen" if self.pipes_enabled() else "werden nicht eingelesen"
         self.statusBar().showMessage(f"Rohrleitungsnummern {on}.", 8000)
@@ -774,13 +898,20 @@ class MainWindow(QMainWindow):
             self._progress.close()
             self._progress.deleteLater()
             self._progress = None
-        self._refresh()
         errors = sum(1 for r in self.results if r.error)
         tags = sum(len(r.tags) for r in self.results)
+        with progress_task(self, "Tabellen werden geladen", steps=3,
+                           message=f"Dateiliste und „Alle Tags“ aufbauen ({len(self.results)} PDFs, {tags} Tags)") as dlg:
+            self._table_progress = dlg
+            try:
+                dlg.update_progress(5)
+                self._refresh()
+                if self.results:
+                    self.page.files.table.selectRow(0)     # laedt Tag-Tabelle und PDF (Schritte 2 und 3)
+            finally:
+                self._table_progress = None
         self.statusBar().showMessage(f"{'Abgebrochen: ' if cancelled else ''}{len(self.results)} PDF(s), {tags} Tags, "
                                      f"{errors} Fehler")
-        if self.results:
-            self.page.files.table.selectRow(0)
 
     # --- Export / Vorschau / Pfade / Info ------------------------------------------------------------------------
     def export(self, kind: str) -> None:
@@ -820,7 +951,8 @@ class MainWindow(QMainWindow):
         if not path:
             return
         try:
-            count = redline.write_redline(result, path, tags)
+            store = self.page.store if self.page._store_result is result else None   # auch ungespeicherte Eintraege
+            count = redline.write_redline(result, path, tags, store=store, checker=self.checker)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Redline-PDF", f"Redline-PDF konnte nicht geschrieben werden:\n{exc}")
             return
@@ -922,7 +1054,7 @@ class MainWindow(QMainWindow):
                 label = f"„{result.name}“ ({i} von {len(todo)})"
                 for enabled, kind, write in (
                         (opts.redline, "Redline", lambda r=result: redline.write_redline(
-                            r, folder / f"{r.path.stem}_Redline_{stamp}.pdf")),
+                            r, folder / f"{r.path.stem}_Redline_{stamp}.pdf", checker=self.checker)),
                         (opts.excel_each, "Review-Excel", lambda r=result: review.write_review_xlsx(
                             folder / f"{r.path.stem}_Review_{stamp}.xlsx", [r], checker=self.checker))):
                     if not enabled:
@@ -1056,6 +1188,7 @@ class MainWindow(QMainWindow):
                 for c in (first, first + 1):
                     if table.isColumnHidden(c) == on:
                         table.setColumnHidden(c, not on)
+            self.page.apply_scan_columns()           # Schriftfeld-Spalten ("Aus PDF-Scan übernehmen")
         apply()
         QTimer.singleShot(0, apply)
 
@@ -1118,6 +1251,87 @@ class MainWindow(QMainWindow):
         self._update_bands()
         self.page.viewer._page_changed(self.page.preview.page, self.page.preview.page_count())
 
+    # --- Web-Version ---------------------------------------------------------------------------------------------
+    def _web_button(self, on: bool) -> None:
+        button = self.ribbon.buttons["web_server"]
+        button.setChecked(on)
+        button.setText("Web-Server\nan" if on else "Web-Server\naus")
+        button.setIcon(icons.glyph_icon("connect", LIGHT.ok, 32) if on else icons.ribbon_icon("connect", 32))
+
+    def toggle_web_server(self) -> None:
+        if not hasattr(self, "_web"):
+            self._web = web_control.WebServerControl()
+        if self._web.own_running:
+            self._web.stop()
+            self._web_button(False)
+            self.statusBar().showMessage("Web-Server beendet.", 6000)
+            return
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            result = self._web.start()
+        finally:
+            QApplication.restoreOverrideCursor()
+        if result not in ("started", "external"):
+            self._web_button(False)
+            QMessageBox.warning(self, "Web-Server", result)
+            return
+        self._web_button(result == "started")
+        urls = "\n".join(web_control.addresses(self._web.port))
+        intro = ("Der Web-Server läuft." if result == "started" else
+                 f"Auf Port {self._web.port} läuft bereits ein Web-Server (z. B. aus dem Launcher oder "
+                 "start_web_server.bat) – er wird genutzt.")
+        QMessageBox.information(self, "Web-Server", f"{intro}\n\nAdressen für Kollegen im Firmennetz:\n{urls}\n\n"
+                                "Quellordner: Einstellungen › Pfade dieses PCs. Der Server läuft, bis du ihn hier "
+                                "ausschaltest oder die App schließt.")
+
+    def create_offline_report(self) -> None:
+        """Variante 1: Offline-HTML-Bericht der markierten (sonst aller) PDFs (``web/report.py``)."""
+        from PySide6.QtWidgets import QFileDialog, QProgressDialog
+
+        from ..web import report
+        results = [r for r in (self.marked_results() or self.results) if not r.error]
+        if not results:
+            QMessageBox.information(self, "Offline-Bericht", "Noch keine PDFs eingelesen.")
+            return
+        mb = report.estimate_mb(results)
+        if mb > 150 and QMessageBox.question(
+                self, "Offline-Bericht", f"{len(results)} PDFs ergeben etwa {mb:.0f} MB (ohne Redline). "
+                "Trotzdem erstellen?\n\nTipp: nur die benötigten PDFs markieren.") != QMessageBox.Yes:
+            return
+        start = paths.exports_dir() / f"PDF_Reader_Bericht_{paths.file_timestamp()}.html"
+        target, _ = QFileDialog.getSaveFileName(self, "Offline-Bericht speichern", str(start), "HTML (*.html)")
+        if not target:
+            return
+        target = paths.ensure_timestamp(target)
+        dlg = QProgressDialog("Offline-Bericht wird erstellt …", "Abbrechen", 0, len(results), self)
+        dlg.setWindowTitle("Offline-Bericht")
+        dlg.setMinimumDuration(0)
+
+        def progress(i: int, n: int, name: str) -> bool:
+            dlg.setValue(i - 1)
+            dlg.setLabelText(f"{i} / {n}: {name}")
+            QApplication.processEvents()
+            return dlg.wasCanceled()
+
+        try:
+            out = report.write_report(results, target, progress=progress, title=Path(target).stem)
+        except Exception as exc:  # noqa: BLE001
+            dlg.close()
+            QMessageBox.warning(self, "Offline-Bericht", f"Bericht konnte nicht erstellt werden:\n{exc}")
+            return
+        dlg.close()
+        if QMessageBox.question(self, "Offline-Bericht", f"Gespeichert ({out.stat().st_size / 1e6:.1f} MB):\n{out}\n\n"
+                                "Jetzt im Browser öffnen?") == QMessageBox.Yes:
+            os.startfile(str(out))  # noqa: S606
+
+    def open_web_version(self) -> None:
+        if not hasattr(self, "_web"):
+            self._web = web_control.WebServerControl()
+        if not web_control.port_open(self._web.port):
+            self.toggle_web_server()
+        if web_control.port_open(self._web.port):
+            self._web.open_browser()
+
     def show_about(self) -> None:
         QMessageBox.information(self, "Info", f"{APP_NAME} {self.version}\n\nDatenordner: {paths.home_dir()}\n"
                                 f"Tool: {paths.tool_root()}\nPython: {os.sys.version.split()[0]}")
@@ -1134,6 +1348,8 @@ class MainWindow(QMainWindow):
             event.ignore()
             return
         self.page.viewer.close_window()
+        if hasattr(self, "_web"):
+            self._web.stop()                               # nur einen selbst gestarteten Server beenden
         if self.project is not None:
             self.project.close()
         if self._worker:

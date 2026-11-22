@@ -36,7 +36,9 @@ class ViewerWindow(QWidget):
 
 
 class ViewerPanel(QWidget):
-    """Leiste + Vorschau. ``sheet`` liefert Fundstellen-Navigation und Redline (TagsSheet)."""
+    """Leiste + Vorschau. ``sheet`` liefert Fundstellen-Navigation und Redline (TagsSheet).
+    ``detached_changed(bool)``: Viewer ausgelagert (True) / zurueck im Hauptfenster (False) - das Blatt nutzt die Breite."""
+    detached_changed = Signal(bool)
 
     def __init__(self, sheet, app_title: str):
         super().__init__()
@@ -132,6 +134,7 @@ class ViewerPanel(QWidget):
             window.deleteLater()
         self.show()
         last_paths.set_value(STATE_KEY, bool(detached))
+        self.detached_changed.emit(bool(detached))
 
     def _place_on_second_screen(self) -> None:
         own = self.sheet.window().screen()

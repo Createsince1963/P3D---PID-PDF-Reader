@@ -31,13 +31,17 @@ def status_hits(tags, store=None, checker=None) -> tuple[list, list]:
     Projektdefinition passen - ausser der Review hat sie als "OK" oder "Nicht relevant" angenommen.
     Alle anderen gefundenen Tags (auch ohne Review) gelten als korrekt."""
     ok, faulty = [], []
-    entries = store.entries if store is not None else {}
     for t in tags:
-        review = entries.get(key(t.type, t.tag), {}).get("Review", "")
-        bad = review in REVIEW_FAULTY or (checker is not None and review not in REVIEW_ACCEPTED
-                                          and checker.is_fault(t.type, t.tag))
-        (faulty if bad else ok).append(list(t.hits))
+        (faulty if is_faulty(t, store, checker) else ok).append(list(t.hits))
     return ok, faulty
+
+
+def is_faulty(tag, store=None, checker=None) -> bool:
+    """Ein Tag gilt als fehlerhaft (Viewer und Redline rot) - Regel siehe ``status_hits``."""
+    entries = store.entries if store is not None else {}
+    review = entries.get(key(tag.type, tag.tag), {}).get("Review", "")
+    return review in REVIEW_FAULTY or (checker is not None and review not in REVIEW_ACCEPTED
+                                       and checker.is_fault(tag.type, tag.tag))
 
 
 def current_user() -> str:
@@ -115,6 +119,25 @@ class ReviewStore:
     def values(self, tag_type: str, tag: str) -> list[str]:
         entry = self.entries.get(key(tag_type, tag), {})
         return [entry.get(f, "") for f in FIELDS]
+
+    def autofill_ok(self, tag_type: str, tag: str, wpo: str = "", check_status: str = "") -> bool:
+        """Autofill fuer OK-Werte: gilt fuer Review "OK" oder (leerer Review und Projekt-Pruefung "OK"). Leerer Review
+        wird "OK", leeres WPO bekommt ``wpo`` (Checked aus dem Schriftfeld), Datum = heutiges Datum ohne Uhrzeit,
+        User = angemeldeter Benutzer. Rueckgabe: True, wenn der Eintrag geaendert wurde."""
+        entry = self.entries.get(key(tag_type, tag), {})
+        review = entry.get("Review", "")
+        if not (review == "OK" or (not review and check_status == "OK")):
+            return False
+        new = dict({f: "" for f in FIELDS}, **entry)
+        new["Review"] = "OK"
+        if not new.get("WPO") and wpo:
+            new["WPO"] = wpo
+        new["Datum"], new["User"] = datetime.now().strftime("%Y-%m-%d"), current_user()
+        if new == {f: entry.get(f, "") for f in FIELDS}:
+            return False
+        self.entries[key(tag_type, tag)] = new
+        self.dirty = True
+        return True
 
     def set(self, tag_type: str, tag: str, field: str, value: str) -> list[str]:
         """Feld setzen; Datum und User werden automatisch nachgefuehrt. Rueckgabe: alle Felder des Eintrags."""

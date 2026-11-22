@@ -2,60 +2,113 @@
 
 Das Original bleibt unveraendert. Jede Fundstelle bekommt einen Rahmen mit Kommentar (Autor, Betreff "Pos. n - Tag",
 Text) - in Acrobat/Bluebeam/PDF-XChange in der Kommentarliste. Die Pos.-Nr. ist dieselbe wie in der Review-Excel
-(``review.positions``). Normale Tags rot, doppelte Tags (Anzahl > 1) orange; neben jedem Rahmen steht die Pos.-Nr.
-Oben links steht ein Uebersichtskommentar. Nur Seite 1 (Plant-3D-Plots sind einseitig)."""
+(``review.positions``). Farben und Rahmen wie im Viewer der App: korrekte Tags gruen, fehlerhafte (Review "Korrektur
+erforderlich" bzw. im Projektmodus Abweichung) rot, doppelte Tags (Anzahl > 1 auf der Seite) zusaetzlich gelb
+hinterlegt; neben jedem Rahmen steht die Pos.-Nr. in Rahmenfarbe. Oben links steht ein Uebersichtskommentar.
+
+Optional (Einstellung "Layer fuer Review im PDF", Standard an) liegen alle Kommentare auf einer eigenen PDF-Ebene
+(Optional Content Group) ``Review_TT.MM.JJJJ`` - in Acrobat/PDF-XChange/Bluebeam unter "Ebenen" ein- und ausblendbar."""
 from __future__ import annotations
 
+import json
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
 import pymupdf
+from main_gui_kit.theme import LIGHT
 
+from ..paths import config_dir
 from .extract import PdfResult, Tag
 from .review import positions
+from .review_store import ReviewStore, is_faulty
 
 AUTHOR = "P3D PDF Reader"
-RED = (0.85, 0.1, 0.1)
-ORANGE = (0.95, 0.55, 0.0)
-PAD = 2.0                      # Abstand des Rahmens um den Text (PDF-Punkte)
+DIRTY = "#FFF2CC"              # = gui.appearance.DEFAULT_DIRTY (doppelte Tags; appearance importiert Qt)
+PAD = 3.0                      # Abstand des Rahmens um den Text (PDF-Punkte), wie im Web-Viewer
+BORDER = 1.5                   # Rahmenbreite wie im Viewer
+LAYER_KEY = "redline_review_layer"   # config/state.json (Desktop: Projekt › Einstellungen; gilt auch fuer den Web-Server)
 
 
-def write_redline(result: PdfResult, out_path: str | Path, tags: list[Tag] | None = None) -> int:
-    """Redline-PDF schreiben. ``tags`` = Auswahl (z. B. gefilterte Tabelle), sonst alle Tags. Rueckgabe: Anzahl Kommentare."""
+def review_layer_enabled() -> bool:
+    """Einstellung "Layer fuer Review im PDF" (Standard an); ohne Qt lesbar, damit auch der Web-Server sie nutzt."""
+    try:
+        data = json.loads((config_dir() / "state.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return True
+    return bool(data.get(LAYER_KEY, True)) if isinstance(data, dict) else True
+
+
+def review_layer_name(when: datetime | None = None) -> str:
+    return f"Review_{(when or datetime.now()):%d.%m.%Y}"
+
+
+def _rgb(hex_color: str) -> tuple[float, float, float]:
+    h = hex_color.lstrip("#")
+    return tuple(int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+
+
+def write_redline(result: PdfResult, out_path: str | Path, tags: list[Tag] | None = None,
+                  store: ReviewStore | None = None, checker=None, layer: bool | None = None) -> int:
+    """Redline-PDF schreiben. ``tags`` = Auswahl (z. B. gefilterte Tabelle), sonst alle Tags. ``store`` = Review-Eintraege
+    der PDF (sonst der gespeicherte Stand), ``checker`` = Projektpruefung (Projektmodus). ``layer`` = Kommentare auf die
+    Ebene ``Review_TT.MM.JJJJ`` legen (``None`` = Einstellung). Rueckgabe: Anzahl Rahmen."""
     tags = result.tags if tags is None else tags
     out_path = Path(out_path)
+    if store is None:
+        try:
+            store = ReviewStore(result.path)
+        except OSError:
+            store = None
+    ok, bad, dirty = _rgb(LIGHT.ok), _rgb(LIGHT.err), _rgb(DIRTY)
+    faulty = {(t.type, t.tag) for t in tags if is_faulty(t, store, checker)}
     items = positions(tags)
+    layer = review_layer_enabled() if layer is None else layer
     with pymupdf.open(result.path) as doc:
+        ocg = doc.add_ocg(review_layer_name(), on=True) if layer else 0
+
+        def done(annot) -> None:
+            if ocg:
+                annot.set_oc(ocg)
+            annot.update()
+
         for p in items:
             page = doc[p.page]                          # Fundstelle auf ihrer Seite (mehrseitige Plots)
             # Tag-Positionen liegen in der sichtbaren (gedrehten) Lage, Annotationen erwartet PyMuPDF ungedreht
             derotate = page.derotation_matrix
-            color = ORANGE if p.total > 1 else RED
+            wrong = (p.tag.type, p.tag.tag) in faulty
+            color = bad if wrong else ok
             box = pymupdf.Rect(p.rect) + (-PAD, -PAD, PAD, PAD)
             annot = page.add_rect_annot(box * derotate)
-            annot.set_colors(stroke=color)
-            annot.set_border(width=1.5)
+            annot.set_colors(stroke=color, fill=dirty if p.total > 1 else None)
+            annot.set_border(width=BORDER)
+            if p.total > 1:
+                annot.set_blendmode(pymupdf.PDF_BM_Multiply)     # gelb hinterlegt, Plotlinien bleiben sichtbar
             text = f"Pos. {p.pos}\nTyp: {p.tag.type}\nTag: {p.tag.tag}"
             if doc.page_count > 1:
                 text += f"\nSeite: {p.page + 1}"
+            if wrong:
+                text += "\nStatus: fehlerhaft"
             if p.total > 1:
                 text += f"\nDoppelter Tag: Fundstelle {p.occurrence} / {p.total} auf dieser Seite"
             annot.set_info(title=AUTHOR, subject=f"Pos. {p.pos} – {p.tag.tag}", content=text)
-            annot.update()
+            done(annot)
             label = page.add_freetext_annot(
                 pymupdf.Rect(box.x1 + 1, box.y0 - 9, box.x1 + 1 + 8 + 5 * len(str(p.pos)), box.y0) * derotate,
                 str(p.pos), fontsize=6, text_color=color, rotate=page.rotation)
             label.set_info(title=AUTHOR, subject=f"Pos. {p.pos}")      # content = angezeigter Text (die Nummer)
-            label.update()
+            done(label)
         per_type = Counter(t.type for t in tags)
         dups = sum(1 for t in tags if t.duplicate)
         summary = (f"{AUTHOR} – Redline\nDatei: {result.name}\nErstellt: {datetime.now():%Y-%m-%d %H:%M}\n"
                    f"Tags: {len(tags)} ({', '.join(f'{k} {v}' for k, v in sorted(per_type.items()))})\n"
-                   f"Positionen: {len(items)} (Pos.-Nr. wie in der Review-Excel)\nDoppelte Tags (orange): {dups}")
+                   f"Positionen: {len(items)} (Pos.-Nr. wie in der Review-Excel)\n"
+                   f"Rahmen grün = korrekt, rot = fehlerhaft: {len(faulty)} Tag(s)\n"
+                   f"Doppelte Tags (gelb hinterlegt): {dups}"
+                   + (f"\nEbene: {review_layer_name()}" if ocg else ""))
         page = doc[0]
         note = page.add_text_annot(pymupdf.Point(20, 20) * page.derotation_matrix, summary, icon="Note")
         note.set_info(title=AUTHOR, subject="Übersicht")
-        note.update()
+        done(note)
         doc.save(out_path, garbage=3, deflate=True)
     return len(items)

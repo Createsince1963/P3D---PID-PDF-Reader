@@ -4,8 +4,14 @@
     {
       "name": "pdfreader-web",
       "runtimeExecutable": "C:\\Users\\mail\\AI_Coworker_Claude\\Tools_Central\\Python\\python\\python.exe",
-      "runtimeArgs": ["-c", "import sys; r=r'C:\\Users\\mail\\AI_Coworker_Claude\\P3D - Engineering Tools\\P3D - PDF Reader'; sys.path[:0]=[r+'\\src', r]; from p3d_pdfreader.web.server import main; main(['--host','127.0.0.1','--port','8765','--source',r'C:\\Users\\mail\\Downloads\\PID Plots'])"],
-      "port": 8765
+      "runtimeArgs": ["-c", "import sys; r=r'C:\\Users\\mail\\AI_Coworker_Claude\\P3D - Engineering Tools\\P3D - PDF Reader'; sys.path[:0]=[r+'\\src', r]; from p3d_pdfreader.web.server import main; main(['--host','127.0.0.1','--port','8766','--source',r'C:\\Users\\mail\\Downloads\\PID Plots'])"],
+      "port": 8766
+    },
+    {
+      "name": "report-static",
+      "runtimeExecutable": "C:\\Users\\mail\\AI_Coworker_Claude\\Tools_Central\\Python\\python\\python.exe",
+      "runtimeArgs": ["-m", "http.server", "8790", "--bind", "127.0.0.1", "--directory", "C:\\Users\\mail\\AI_Coworker_Claude\\P3D - Engineering Tools\\P3D - PDF Reader\\data\\exports"],
+      "port": 8790
     }
   ]
 }

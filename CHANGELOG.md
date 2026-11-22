@@ -1,5 +1,73 @@
 # Changelog
 
+## 1.0.26 – 2026-11-22
+- **Viewer auf dem 2. Monitor:** die Tag-Tabelle nutzt jetzt die ganze Breite (kein leerer Platzhalter mehr rechts). Hinweis und Knopf **„Viewer zurückholen“** stehen oberhalb der Tag-Tabelle rechts in der Kopfzeile.
+- **Viewer zurückholen** teilt den Bereich wieder im Standardverhältnis (Tag-Tabelle : Viewer = 5 : 8).
+- Test: Zwei-Monitor-Umschalter und neue Knöpfe der Tag-Leiste.
+
+## 1.0.25 – 2026-11-22
+- **Fortschrittsfenster beim Laden** (Fenster wie in P3D XCHANGE, `gui\progress.py`): nach dem Scan „Tabellen werden geladen“ (Dateiliste/Alle Tags, Tag-Tabelle, PDF in drei Schritten); bei Wahl einer anderen PDF „PDF wird geladen“ (Tag-Tabelle lesen, PDF öffnen und anzeigen).
+- **Tabellenanpassungen werden als Standard gemerkt:** neben Breite, Reihenfolge, Sortierung, Filter und Zoom jetzt auch Ein-/Ausblenden über den Spalten-Dialog (Rechtsklick › Spalten …) – gespeichert in `config\table_views.json` und beim nächsten Start bzw. jeder neuen PDF wieder angewendet.
+
+## 1.0.24 – 2026-11-22
+- **Tag-Tabelle, neue Knöpfe vor „Bearbeiten“:**
+  - **Aus PDF-Scan übernehmen** (Umschalter, gemerkt in `config\state.json`): Ersteller, Checked, Rev, Rev-Datum und Rev-Text aus dem Schriftfeld der PDF als Spalten hinten an die Tag-Tabelle (auch im Tabellen-Excel).
+  - **Autofill OK:** bei allen Tags mit Review „OK“ oder leerem Review und Projekt-Prüfung „OK“: Review = OK, User und Datum (heute, ohne Uhrzeit); leeres WPO bekommt den Checked-Wert aus dem Schriftfeld. Danach Speichern (`ReviewStore.autofill_ok`, ohne Qt).
+- **Review-Excel:** Spalten X und Y entfernt; Spaltenbreite (autofit) rechnet fetten Kopf und Filterknopf mit ein, damit Überschriften nicht abgeschnitten werden.
+- Tag-Tabelle: Änderungen nach „Nur doppelte“/Filterwechsel aktivieren „Speichern“ wieder zuverlässig.
+
+## 1.0.23 – 2026-11-22
+- **EXE-Build repariert:** `build_exe.bat` übernahm die Variable `PY` aus `START_LAUNCHER.bat` und baute deshalb mit dem zentralen Python statt in `.venv_build`; PyInstaller brach wegen PyQt5 neben PySide6 ab. Ein anderes Build-Python wird jetzt nur noch über `BUILD_PY` erzwungen.
+- Zusätzlich werden PyQt5, PyQt6 und PySide2 beim Build immer ausgeschlossen.
+
+## 1.0.22 – 2026-11-22
+- **Menüband, Gruppe Projekt:** „Projektmodus“ und „Rohrleitungen“ stehen jetzt direkt hinter „Projekt wählen“ (1. Projektmodus, 2. Rohrleitungen). „Rohrleitungen“ ist ein Umschalter wie der Projektmodus: „Rohrleitungen: an/aus“, Symbol grün solange an; das Untermenü „Rohrleitungsnummern mit einlesen“ entfällt. Gemerkt wie bisher, Umschalten liest geladene PDFs neu ein.
+- Handbuch, README und Übersetzungen angepasst; Test auf den Umschalter umgestellt.
+
+## 1.0.21 – 2026-11-22
+- **Handbuch: neues Kapitel „Ablauf & Bausteine“** mit einem klickbaren Ablaufdiagramm (Eingaben → Kern mit den Schritten 1–5 und Review-Speicher → Oberflächen Desktop-App, Web-Server, Offline-Bericht → Ergebnisse). Klick auf einen Baustein erklärt ihn; die Handbuchsuche findet auch die Erklärungen. Farben nur aus den vorhandenen Handbuch-Variablen.
+
+## 1.0.20 – 2026-11-22
+- **Review-Layer im Redline-PDF:** Rahmen, Pos.-Nr. und Kommentare liegen auf einer eigenen PDF-Ebene `Review_TT.MM.JJJJ` (Erstellungsdatum), in Acrobat, PDF-XChange und Bluebeam unter „Ebenen“ ein- und ausblendbar. Die Ebenen des Plots bleiben erhalten.
+  - Neu im Menüband, Gruppe Projekt: **Einstellungen › Layer für Review im PDF** (Häkchen, Standard an, gemerkt in `config\state.json`).
+  - Gilt für Redline der gewählten PDF, Review Auswahl/Bulk, Web-Server und Offline-Bericht (`redline.review_layer_enabled()`, ohne Qt).
+  - Übersichtskommentar nennt die Ebene.
+- Tests: Review-Layer an/aus, Menüpunkt im Menüband.
+
+## 1.0.19 – 2026-11-22
+- **Redline-PDF mit den Farben und Rahmen des Viewers:** korrekte Tags grün, fehlerhafte rot (Review „Korrektur erforderlich“, im Projektmodus Abweichung ohne angenommenen Review), doppelte Tags zusätzlich gelb hinterlegt (Multiplizieren, Plotlinien bleiben sichtbar). Rahmenabstand 3 pt, Linienbreite 1,5 wie im Viewer; Pos.-Nr. in Rahmenfarbe.
+  - Farben aus `main_gui_kit.theme` (ok/err) und `DEFAULT_DIRTY`; Regel „fehlerhaft“ zentral in `review_store.is_faulty` (Viewer und Redline gleich).
+  - Desktop: Redline der gewählten PDF nutzt auch noch nicht gespeicherte Review-Einträge; Bulk und Web nutzen den gespeicherten Stand.
+  - Kommentar zeigt „Status: fehlerhaft“, Übersichtskommentar zählt fehlerhafte Tags. Bisher: rot/orange.
+- Test: Redline-Farben wie im Viewer.
+
+## 1.0.18 – 2026-11-21
+- Neu: `HANDOFF.md` als Einstieg für neue Entwickler (Struktur, Start, Tests, Regeln, offene Punkte).
+
+## 1.0.17 – 2026-11-21
+- Launcher: Karten „Build“ und „Folders“ sind wie „Quality gate“ einklappbar und starten eingeklappt.
+
+## 1.0.16 – 2026-11-21
+- **Variante 1 „nur HTML“ als Offline-HTML-Bericht** (`web\report.py`): eine einzelne HTML-Datei ohne Server und ohne Internet.
+  - Inhalt: Oberfläche der Web-Version, Scan-Daten und ein JPEG je Seite (3000 px). Tabellen, Filter, Fundstellen-Navigation und Viewer funktionieren darin.
+  - Eingebettet zum Herunterladen: **Redline-PDF und Review-Excel je PDF**, Export Excel, Review-Excel gesamt. Alle werden mit `core` erzeugt und enthalten alle Tags.
+  - Erstellen: App (Gruppe „Web“ › Offline-Bericht …), Web-Version (Gruppe „4 Export“), Launcher (Karte „Variant 1 · Offline HTML report“, ganzer Ordner) oder `python -m p3d_pdfreader --report --source <Ordner>`.
+- **Audit-Spalten in Web-Version und Bericht:** Review, Änderung, Neuer Wert, Bemerkung, WPO sowie automatisch Datum und User.
+  - Bearbeiten per Doppelklick, Auswahllisten aus `review_store`, Speichern mit „Review speichern“ oder Strg+S. „Korrektur erforderlich“ erscheint rot in Tabelle und Viewer.
+  - Web: Gespeichert wird auf dem Server im selben Format wie die Desktop-App (neuer Stand in `data\reviews`, nur geänderte Felder, Einträge anderer Nutzer bleiben). Als User gilt der im Browser angegebene Name. Beim Wechsel der PDF wird automatisch gespeichert.
+  - Bericht: Die Einträge bleiben im Browser. „Review speichern“ lädt eine CSV mit allen Tags herunter. Schon gespeicherte Reviews stehen beim Erstellen im Bericht.
+- Tests: Audit speichern (Feldprüfung, unbekannte Tags, User, Review-Excel), Bericht vollständig inline, Kommandozeile. Der Web-Test-Server nutzt einen eigenen Datenordner.
+- Hinweis SharePoint: HTML-Dateien öffnet SharePoint Online nicht als Webseite. Den Bericht herunterladen oder synchronisieren und lokal öffnen.
+
+## 1.0.15 – 2026-11-21
+- **Web-Version in der App:** neue Menüband-Gruppe **„Web“** (vor „Hilfe“) mit den Knöpfen „Web-Server“ (an/aus; an = grünes Symbol, Meldung mit den Adressen für die Kollegen) und „Im Browser öffnen“. Der Server läuft als eigener Prozess (`python -m p3d_pdfreader --web`, aus der EXE `<EXE> --web`), weil PyMuPDF nicht threadsicher ist. Ein schon laufender Server auf Port 8765 (Launcher, `start_web_server.bat`) wird genutzt statt ein zweiter gestartet. Beim Schließen der App wird nur ein selbst gestarteter Server beendet. Neues Modul `gui\web_control.py`.
+- **Launcher:**
+  - **Quality gate** einklappbar, beim Start eingeklappt (Pfeil im Kartentitel).
+  - Neue Karte **„Variant 3 · Remote GUI“** (eingeklappt): Server-PC eintragen, Remotedesktop verbinden (`mstsc /v:`) oder `.rdp`-Datei für Kollegen speichern. Der Server-PC wird gemerkt.
+  - Die Web-Karte heißt jetzt „Variant 2 · Web server“.
+- Tests: Start/Stopp des Web-Servers über die App (`test_web.py`), Gruppenreihenfolge mit „Web“ (`test_ribbon_menus.py`).
+- Variante 1 („nur HTML“, ohne Server) ist nicht umgesetzt.
+
 ## 1.0.14 – 2026-11-21
 - **Menüband neu geordnet:** Projekt (jetzt mit den Einstellungen Pfade und Tag-Muster) → 1 Einlesen → **2 Ansicht** → 3 Prüfen → 4 Review / Redline → 5 Export → Hilfe. Die eigene Gruppe „Einstellungen“ entfällt; „Ansicht“ steht vor „Prüfen“, die Gruppen sind neu nummeriert (Übersetzungen EN/FR ergänzt).
 - **Projektmodus an = grünes Symbol** (Kit-Farbe `ok`); aus = Standardsymbol.

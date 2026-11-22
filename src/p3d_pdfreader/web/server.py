@@ -62,9 +62,48 @@ def file_json(fid: int, r, origin: str) -> dict:
             "tags": len(r.tags), "duplicates": sum(1 for t in r.tags if t.duplicate), "error": r.error}
 
 
-def tag_json(t) -> dict:
-    return {"type": t.type, "tag": t.tag, "count": t.count, "pages": t.pages_text, "page": t.page,
-            "duplicate": t.duplicate, "hits": _hits(t)}
+def tag_json(t, store=None) -> dict:
+    """``store`` = ``ReviewStore`` der PDF: Audit-/Review-Spalten (Review, Aenderung, ..., Datum, User) mitliefern."""
+    out = {"type": t.type, "tag": t.tag, "count": t.count, "pages": t.pages_text, "page": t.page,
+           "duplicate": t.duplicate, "hits": _hits(t)}
+    if store is not None:
+        from ..core.review_store import FIELDS
+        out["audit"] = dict(zip(FIELDS, store.values(t.type, t.tag)))
+    return out
+
+
+def review_lists() -> dict:
+    """Auswahllisten der Audit-Spalten (eine Quelle: core/review_store.py)."""
+    from ..core.review_store import CHANGE_VALUES, REVIEW_FAULTY, REVIEW_VALUES
+    return {"review_values": list(REVIEW_VALUES), "change_values": list(CHANGE_VALUES),
+            "review_faulty": list(REVIEW_FAULTY)}
+
+
+def review_store(result):
+    from ..core.review_store import ReviewStore
+    return ReviewStore(result.path)
+
+
+def save_audit(result, changes: list, user: str = "") -> int:
+    """Audit-Eintraege aus dem Browser speichern (neuer Stand in ``data\\reviews``, wie "Review speichern" der
+    Desktop-App). Geladen wird der neueste Stand, nur die geaenderten Felder werden gesetzt - Eintraege anderer
+    Nutzer bleiben erhalten. ``user`` = Name aus dem Browser (sonst der Windows-Benutzer des Servers)."""
+    from ..core.review_store import EDIT_FIELDS, key
+    known = {(t.type, t.tag) for t in result.tags}
+    store = review_store(result)
+    n = 0
+    for c in changes:
+        typ, tag, field, value = str(c.get("type", "")), str(c.get("tag", "")), str(c.get("field", "")), \
+            str(c.get("value", "") or "")[:2000]
+        if field not in EDIT_FIELDS or (typ, tag) not in known:
+            continue
+        store.set(typ, tag, field, value)
+        if user:
+            store.entries[key(typ, tag)]["User"] = user[:80]
+        n += 1
+    if n:
+        store.save()
+    return n
 
 
 # ---- Sitzungen ---------------------------------------------------------------------------------------------------
@@ -413,7 +452,7 @@ class Handler(BaseHTTPRequestHandler):
         route = (method, parts[0] if parts else "")
         if route == ("GET", "info"):
             sources = self.app.sources()
-            return self._json({"app": APP_NAME, "version": version(),
+            return self._json({"app": APP_NAME, "version": version(), **review_lists(),
                                "sources": [{"index": i, "path": str(p), "exists": p.exists()}
                                            for i, p in enumerate(sources)]})
         if route == ("POST", "scan"):
@@ -445,8 +484,29 @@ class Handler(BaseHTTPRequestHandler):
         if route == ("GET", "tags"):                       # Blatt "Alle Tags"
             rows = []
             for fid, r in self._results(s, None):
-                rows.extend({"file": fid, "pdf": r.name, "drawing_no": r.drawing_no, **tag_json(t)} for t in r.tags)
+                store = review_store(r)
+                rows.extend({"file": fid, "pdf": r.name, "drawing_no": r.drawing_no, **tag_json(t, store)}
+                            for t in r.tags)
             return self._json(rows)
+        if route == ("POST", "report"):                    # Offline-HTML-Bericht (Variante 1) als Download
+            d = self._payload()
+            from .report import write_report
+            results = [r for _i, r in self._results(s, d.get("ids")) if not r.error]
+            if not results:
+                raise HttpError(400, "Keine PDFs für den Bericht")
+            with tempfile.TemporaryDirectory() as tmp:
+                out = Path(tmp) / "bericht.html"
+                with PDF_LOCK:
+                    write_report(results, out, redline=bool(d.get("redline", True)), review=bool(d.get("review", True)),
+                                 title=str(d.get("title") or "Offline-Bericht")[:80])
+                name = f"PDF_Reader_Bericht_{file_timestamp()}.html"
+                return self._download(name, out.read_bytes())
+        if route == ("POST", "audit"):                     # Audit-Spalten speichern (wie "Review speichern")
+            d = self._payload()
+            r = s.get(int(d["id"]))
+            n = save_audit(r, list(d.get("changes") or []), str(d.get("user") or "").strip())
+            store = review_store(r)
+            return self._json({"saved": n, "tags": [tag_json(t, store) for t in r.tags]})
         if route == ("POST", "redline"):
             d = self._payload()
             return self._download(*build_redline(s.get(int(d["id"])), d.get("tags")))
@@ -468,7 +528,8 @@ class Handler(BaseHTTPRequestHandler):
     def _file_api(self, s: Session, fid: int, what: str, q: dict) -> None:
         r = s.get(fid)
         if what == "tags":
-            return self._json([tag_json(t) for t in r.tags])
+            store = review_store(r)
+            return self._json([tag_json(t, store) for t in r.tags])
         if what == "pages":
             return self._json(page_sizes(r))
         if what == "render":

@@ -17,12 +17,14 @@ def _text_len(value) -> int:
     return max((len(line) for line in str(value).splitlines()), default=0)
 
 
-def autofit(ws, headers: list[str], rows: list[list], extra: int = 3) -> None:
-    """Spaltenbreite nach dem laengsten Inhalt (Kopf + Filterknopf eingerechnet), begrenzt auf ``MAX_WIDTH``."""
+def autofit(ws, headers: list[str], rows: list[list], extra: int = 2) -> None:
+    """Spaltenbreite nach dem laengsten Inhalt, begrenzt auf ``MAX_WIDTH``. Der Kopf ist fett und hat in der
+    Datentabelle einen Filterknopf (ca. 3 Zeichen) - daher etwas breiter gerechnet als die Zellwerte."""
     from openpyxl.utils import get_column_letter
     for c, header in enumerate(headers, start=1):
-        longest = max([_text_len(header) + 2] + [_text_len(r[c - 1]) for r in rows if c - 1 < len(r)])
-        ws.column_dimensions[get_column_letter(c)].width = max(MIN_WIDTH, min(MAX_WIDTH, longest + extra))
+        head = round(_text_len(header) * 1.15) + 5
+        cells = max([_text_len(r[c - 1]) for r in rows if c - 1 < len(r)], default=0) + extra
+        ws.column_dimensions[get_column_letter(c)].width = max(MIN_WIDTH, min(MAX_WIDTH, max(head, cells)))
 
 
 def table_name(text: str, used: set[str]) -> str:

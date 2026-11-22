@@ -67,6 +67,23 @@ details summary{cursor:pointer;padding:6px 10px;font-weight:600;color:var(--head
 details > div{padding:0 12px 8px}
 .shot{max-width:100%;border:1px solid var(--border);border-radius:3px}
 .empty{display:none;padding:20px;color:var(--subtle)}
+/* Ablaufdiagramm der Bausteine */
+.wf{width:100%;height:auto;display:block;margin:6px 0;font-family:"Segoe UI",Arial,sans-serif}
+.wf .lane{fill:var(--band);stroke:var(--border)}
+.wf .lt{fill:var(--head);font-size:13px;font-weight:600}
+.wf .ls{fill:var(--subtle);font-size:10.5px}
+.wf .bx rect{fill:var(--card);stroke:var(--border);stroke-width:1.2}
+.wf .bx.core rect{stroke:var(--headline)}
+.wf .bx.out rect{stroke:var(--accent)}
+.wf .bx{cursor:pointer}
+.wf .bx:hover rect{stroke:var(--accent)}
+.wf .bx.on rect{stroke:var(--accent);stroke-width:2.5}
+.wf .bt{fill:var(--head);font-size:12.5px;font-weight:600}
+.wf .bs{fill:var(--muted);font-size:10.5px}
+.wf .ln{fill:none;stroke:var(--subtle);stroke-width:1.4}
+.wf .ln.dash{stroke-dasharray:4 3}
+.wf .ah{fill:var(--subtle)}
+.wf .lb{fill:var(--subtle);font-size:10px}
 @media (max-width:860px){nav{display:none}main{padding:12px}}
 @media print{header,nav,.cmenu{display:none}section{break-inside:avoid;border:none}body{background:#fff}}
 </style>
@@ -94,6 +111,50 @@ details > div{padding:0 12px 8px}
 </div>
 </section>
 
+<section id="flow" data-title="Ablauf &amp; Bausteine">
+<h2>Ablauf &amp; Bausteine</h2>
+<p>So arbeiten die Bausteine des Programms zusammen: Eingaben werden im Kern in fünf Schritten verarbeitet, die Oberflächen steuern den Kern und zeigen seine Ergebnisse. <b>Klick auf einen Baustein</b> zeigt darunter, was er tut.</p>
+<svg class="wf" id="wf" viewBox="0 0 995 550" role="img" aria-label="Ablaufdiagramm der Bausteine">
+  <defs><marker id="wfa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+  <rect class="lane" x="10" y="10" width="975" height="90" rx="4"/>
+  <rect class="lane" x="10" y="120" width="975" height="180" rx="4"/>
+  <rect class="lane" x="10" y="320" width="975" height="95" rx="4"/>
+  <rect class="lane" x="10" y="445" width="975" height="98" rx="4"/>
+  <text class="lt" x="22" y="52">Eingaben</text><text class="ls" x="22" y="68">nur gelesen</text>
+  <text class="lt" x="22" y="200">Kern</text><text class="ls" x="22" y="216">ohne Oberfläche,</text><text class="ls" x="22" y="230">für alle gleich</text>
+  <text class="lt" x="22" y="362">Oberflächen</text><text class="ls" x="22" y="378">steuern den Kern</text>
+  <text class="lt" x="22" y="490">Ergebnisse</text><text class="ls" x="22" y="506">neue Dateien</text>
+  <!-- Eingaben -> Kern -->
+  <path class="ln" marker-end="url(#wfa)" d="M200,85 V145"/>
+  <path class="ln" marker-end="url(#wfa)" d="M470,85 V112 H255 V145"/>
+  <path class="ln" marker-end="url(#wfa)" d="M780,85 V112 H555 V145"/>
+  <!-- Kern: Schritte 1-5 -->
+  <path class="ln" marker-end="url(#wfa)" d="M283,185 H306"/>
+  <path class="ln" marker-end="url(#wfa)" d="M456,185 H479"/>
+  <path class="ln" marker-end="url(#wfa)" d="M629,185 H652"/>
+  <path class="ln" marker-end="url(#wfa)" d="M802,185 H825"/>
+  <path class="ln dash" marker-start="url(#wfa)" marker-end="url(#wfa)" d="M728,227 V243"/>
+  <!-- Oberflaechen <-> Kern -->
+  <path class="ln" marker-start="url(#wfa)" marker-end="url(#wfa)" d="M260,333 V303"/>
+  <path class="ln" marker-start="url(#wfa)" marker-end="url(#wfa)" d="M555,333 V303"/>
+  <path class="ln" marker-start="url(#wfa)" marker-end="url(#wfa)" d="M850,333 V303"/>
+  <!-- Oberflaechen -> Ergebnisse -->
+  <path class="ln" d="M260,405 V435 M555,405 V435 M232,435 H662"/>
+  <path class="ln" marker-end="url(#wfa)" d="M232,435 V460"/>
+  <path class="ln" marker-end="url(#wfa)" d="M447,435 V460"/>
+  <path class="ln" marker-end="url(#wfa)" d="M662,435 V460"/>
+  <path class="ln" marker-end="url(#wfa)" d="M877,405 V460"/>
+  <g id="wfboxes"></g>
+</svg>
+<div class="detail" id="wfdet"><div class="note">Baustein im Diagramm anklicken …</div></div>
+<h3>Kurz gesagt</h3>
+<ul>
+  <li>Der <b>Kern</b> arbeitet ohne Oberfläche. Desktop-App, Web-Server und Offline-Bericht nutzen ihn unverändert, deshalb liefern alle dieselben Ergebnisse.</li>
+  <li>Die <b>Schritte 1–5</b> entsprechen den Gruppen im Menüband (Einlesen, Ansicht, Prüfen, Review / Redline, Export).</li>
+  <li>Original-PDFs und die Projekt-Datenbank von P3D Tag Compliance werden <b>nur gelesen</b>; alle Ergebnisse sind neue Dateien.</li>
+</ul>
+</section>
+
 <section id="ribbon" data-title="Menüband">
 <h2>Menüband</h2>
 <p>Jede Gruppe hat eine dunkelblaue Überschrift. <b>Klick auf einen Knopf</b> zeigt darunter, was er tut. Die Einstellungen (Pfade, Tag-Muster) stehen in der Gruppe „Projekt“. Ist der Projektmodus an, ist sein Symbol grün.</p>
@@ -102,7 +163,7 @@ details > div{padding:0 12px 8px}
 <h3>Leisten über den Bereichen</h3>
 <ul>
   <li><b>Dateien:</b> Alle markieren, Review markierte …, Excel</li>
-  <li><b>Tags:</b> Bearbeiten, Speichern, Nur doppelte, Filter zurücksetzen, ◀ ▶ Fundstelle, Excel, Redline</li>
+  <li><b>Tags:</b> Aus PDF-Scan übernehmen (Schriftfeld-Spalten Ersteller, Checked, Rev, Rev-Datum, Rev-Text hinten anfügen), Autofill OK (OK-Werte: Review, User, Datum ohne Uhrzeit, WPO = Checked), Bearbeiten, Speichern, Nur doppelte, Filter zurücksetzen, ◀ ▶ Fundstelle, Excel, Redline</li>
   <li><b>PDF-Viewer:</b> Einpassen, Zoom ±, Drehen, Seite ◀ ▶, ◀ ▶ Fundstelle, Redline, Öffnen (Standardprogramm), 2. Monitor</li>
 </ul>
 </section>
@@ -157,7 +218,8 @@ details > div{padding:0 12px 8px}
 <h2>Review / Redline</h2>
 <h3>Redline-PDF</h3>
 <ul>
-  <li>Kopie der PDF, das Original bleibt unverändert. An jeder Fundstelle Rahmen und <b>Pos.-Nr.</b>, normale Tags rot, doppelte orange.</li>
+  <li>Kopie der PDF, das Original bleibt unverändert. An jeder Fundstelle Rahmen und <b>Pos.-Nr.</b>, Farben wie im Viewer: grün korrekt, rot fehlerhaft (Review „Korrektur erforderlich“ bzw. Projekt-Abweichung), doppelte Tags gelb hinterlegt.</li>
+  <li>Mit <b>Einstellungen › Layer für Review im PDF</b> (Gruppe Projekt, Standard an) liegen alle Review-Kommentare auf der PDF-Ebene „Review_TT.MM.JJJJ“ und lassen sich im PDF-Programm unter „Ebenen“ ein- und ausblenden.</li>
   <li>Jede Fundstelle trägt einen PDF-Kommentar (Pos., Typ, Tag, „Fundstelle n / m“) – sichtbar in Acrobat, Bluebeam, PDF-XChange.</li>
   <li>Es gilt der Tabellenfilter: mit „Nur doppelte“ entsteht ein Redline nur mit den doppelten Tags.</li>
 </ul>
@@ -208,7 +270,7 @@ details > div{padding:0 12px 8px}
 <tr><td>Checked, Zeichnungsnr., Rev</td><td>Schriftfeld und letzte Revisionszeile</td></tr>
 <tr><td>Instrument</td><td>Kürzel in der Blase plus Nummer darunter (<code>TIT-130</code>)</td></tr>
 <tr><td>Equipment / Armatur / Volltag</td><td>Tag-Muster (<code>111PMP01</code>, <code>VH340</code>, <code>203-17-111-TZIT-011</code>)</td></tr>
-<tr><td>Rohrleitung (optional)</td><td>Menüband › Rohrleitungen; waagerecht und senkrecht</td></tr>
+<tr><td>Rohrleitung (optional)</td><td>Menüband › Projekt › Rohrleitungen; waagerecht und senkrecht</td></tr>
 </tbody></table></div></details>
 <details><summary>Wo liegen meine Daten?</summary><div>
 <p>Datenordner: <code>%P3D_PDFREADER_HOME%</code>, sonst <code>&lt;Tool&gt;\data</code>, als EXE <code>%LOCALAPPDATA%\P3D_PDFREADER</code>. Darin <code>config\paths.json</code> (Quell-/Exportordner), <code>config\state.json</code>, <code>config\table_views.json</code>, <code>config\tag_patterns.json</code>, <code>logs\</code>, <code>exports\</code>.</p>
@@ -221,16 +283,16 @@ details > div{padding:0 12px 8px}
 <script>
 const R = [
  ["Projekt", [
-  ["project_mode","Projekt-\nmodus","Schaltet die Prüfung gegen Projektdefinitionen ein oder aus. An = Symbol grün. Aus = Standardmodus ohne Projektregeln. Beim Umschalten werden geladene PDFs neu eingelesen."],
   ["project_pick","Projekt\nwählen","Projekt anlegen, öffnen oder aus P3D Tag Compliance übernehmen (pidtag_project.db wird nur gelesen)."],
+  ["project_mode","Projekt-\nmodus","Schaltet die Prüfung gegen Projektdefinitionen ein oder aus. An = Symbol grün. Aus = Standardmodus ohne Projektregeln. Beim Umschalten werden geladene PDFs neu eingelesen."],
+  ["pipes","Rohr-\nleitungen","Rohrleitungsnummern (z. B. TFHR_SS01_001_1\") mit in die Tag-Liste übernehmen, ein oder aus. An = Symbol grün. Wird gemerkt; Umschalten liest geladene PDFs neu ein."],
   ["project_defs","Projekt-\ndefinitionen …","Codelisten, Listen, Tag-Strukturen, PDF-Prüfregeln bearbeiten; Excel-Export/-Import; „Tag testen“."],
   ["paths","Pfade","Quellordner und Exportordner verwalten, Speicherorte öffnen."],
   ["patterns","Tag-\nMuster","Öffnet tag_patterns.json: Regex je Tag-Typ und Ausschlussliste für Kürzel."]]],
  ["1  Einlesen", [
   ["scan","Quellordner\nscannen","Liest alle PDFs der Quellordner (inkl. Unterordner) ein. Taste F5."],
   ["folder","Ordner\nöffnen …","Einen beliebigen Ordner mit PDF-Plots einlesen."],
-  ["files","Dateien\nöffnen …","Einzelne PDF-Dateien wählen und einlesen."],
-  ["pipes","Rohr-\nleitungen","Menü: Rohrleitungsnummern (z. B. TFHR_SS01_001_1\") mit in die Tag-Liste übernehmen. Wird gemerkt; Umschalten liest neu ein."]]],
+  ["files","Dateien\nöffnen …","Einzelne PDF-Dateien wählen und einlesen."]]],
  ["2  Ansicht", [
   ["sheet_tags","PID-Tags","Wechselt zum Blatt „PID-Tags“."],
   ["sheet_all","Alle Tags","Öffnet das Blatt mit den Tags aller PDFs."],
@@ -279,6 +341,60 @@ function show(key) {
 document.querySelectorAll(".step").forEach(s => s.onclick = () => {
   document.getElementById("ribbon").scrollIntoView({behavior: "smooth"}); show(s.dataset.go);
 });
+
+/* Ablaufdiagramm: [Schluessel, x, y, Breite, Hoehe, Art, Titel, Unterzeilen, Erklaerung] */
+const W = [
+ ["pdf", 135, 25, 250, 60, "", "PDF-Plots", ["P&IDs aus AutoCAD Plant 3D, Quellordner"],
+  "PDF-Plots der P&amp;IDs aus den Quellordnern (auch Unterordner) oder einzeln geöffnet. Sie werden nur gelesen, nie verändert."],
+ ["cfg", 430, 25, 250, 60, "", "Einstellungen", ["Pfade, Tag-Muster, gemerkte Ansichten"],
+  "Quell- und Exportordner, Tag-Muster (Regex je Tag-Typ, Ausschlussliste), gemerkte Tabellenansichten und Schalter im Datenordner. Bearbeitung in der Gruppe „Projekt“ (Pfade, Tag-Muster, Einstellungen)."],
+ ["defs", 725, 25, 250, 60, "", "Projektdefinitionen", ["Codelisten, Tag-Strukturen, Prüfregeln"],
+  "Nur im Projektmodus: Codelisten, Listen, Tag-Strukturen und PDF-Prüfregeln eines Projekts. Aus P3D Tag Compliance übernommen (dort nur gelesen) oder selbst angelegt; bearbeitet im Dialog „Projektdefinitionen“ mit Kachel-Editor."],
+ ["s1", 135, 145, 148, 80, "core", "1 · Einlesen", ["Tags, Metadaten,", "Schriftfeld erkennen"],
+  "Erkennung: liest je PDF die Tags (Equipment, Instrument, Armatur, Volltag, optional Rohrleitung) mit jeder Fundstelle, die PDF-Metadaten und das Schriftfeld (Zeichnungsnr., Rev, Ersteller, Checked). In der Desktop-App im Hintergrund mit Fortschritt und Abbruch."],
+ ["s2", 308, 145, 148, 80, "core", "2 · Ansicht", ["Seitenbilder farbig", "oder monochrom"],
+  "Seitenbilder für den PDF-Viewer, farbig oder monochrom. Fundstellen werden mit Rahmen markiert: grün korrekt, rot fehlerhaft, gelb doppelt."],
+ ["s3", 481, 145, 148, 80, "core", "3 · Prüfen", ["Doppelte Tags,", "Projekt-Prüfung"],
+  "Zählt die Fundstellen je Tag (doppelte Tags) und prüft im Projektmodus jeden Tag gegen die Projektdefinitionen (Spalten „Projekt-Prüfung“ und „Projekt-Hinweis“)."],
+ ["s4", 654, 145, 148, 80, "core", "4 · Review", ["Pos.-Nr., Prüfstatus,", "Redline"],
+  "Jede Fundstelle bekommt eine Pos.-Nr. und einen automatischen Review-Kommentar. Daraus entstehen Redline-PDF und Review-Excel – für die gewählte PDF oder im Bulk."],
+ ["store", 654, 245, 148, 38, "core", "Review-Speicher", [],
+  "Die gespeicherten Review-Einträge je PDF (Review, Änderung, Neuer Wert, Bemerkung …), gesichert mit „Review speichern“. Desktop-App, Bulk-Review und Web-Server nutzen denselben Stand."],
+ ["s5", 827, 145, 148, 80, "core", "5 · Export", ["Excel-Datentabellen", "und CSV"],
+  "Schreibt Dateien und Tags als echte Excel-Datentabellen oder als CSV (Trennzeichen ;, UTF-8 mit BOM)."],
+ ["desk", 135, 335, 250, 70, "", "Desktop-App", ["Menüband, Tabellen, PDF-Viewer,", "Dialoge, Kachel-Editor"],
+  "Menüband, Blätter mit Tabellen (Filter, Rechtsklick, gemerkte Ansichten), PDF-Viewer (auch auf dem 2. Monitor) und die Dialoge für Pfade, Projektdefinitionen mit Kachel-Editor und Review Auswahl/Bulk. Startet und stoppt auf Wunsch den Web-Server."],
+ ["web", 430, 335, 250, 70, "", "Web-Server", ["dieselben Funktionen im Browser,", "für Nutzer im Firmennetz"],
+  "Bedienung im Browser für Nutzer im Firmennetz, mit demselben Kern wie die Desktop-App. Start über die Launcher-Karte „Web server“ oder aus der Desktop-App."],
+ ["off", 725, 335, 250, 70, "", "Offline-Bericht", ["eine HTML-Datei,", "ohne Server und Internet"],
+  "Fasst die Ergebnisse in einer einzigen HTML-Datei zusammen, die ohne Server und ohne Internet lesbar ist – zum Weitergeben."],
+ ["r1", 135, 462, 195, 66, "out", "Redline-PDF", ["Rahmen, Pos.-Nr., Kommentare"],
+  "Kopie der PDF mit Rahmen, Pos.-Nr. und PDF-Kommentar je Fundstelle; wahlweise auf der Ebene „Review_TT.MM.JJJJ“."],
+ ["r2", 350, 462, 195, 66, "out", "Review-Excel", ["je PDF oder gesamt"],
+  "Eine Zeile je Fundstelle mit Prüfstatus-Auswahlliste, Bemerkung und Geprüft von/am; je PDF oder gesamt."],
+ ["r3", 565, 462, 195, 66, "out", "Excel / CSV", ["Dateien, Tags, sichtbare Ansicht"],
+  "Export aller Dateien und Tags sowie die sichtbare Ansicht jeder Tabelle (Excel-Symbol in der Tabellenecke)."],
+ ["r4", 780, 462, 195, 66, "out", "HTML-Bericht", ["offline lesbar"],
+  "Der Bericht aus dem Offline-Baustein: eine Datei, im Browser zu öffnen."]
+];
+const wfg = document.getElementById("wfboxes"), wfdet = document.getElementById("wfdet"), NS = "http://www.w3.org/2000/svg";
+function svgEl(tag, attrs, txt) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (txt) e.textContent = txt; return e; }
+for (const [k, x, y, w, h, cls, title, subs, text] of W) {
+  const g = svgEl("g", {class: "bx " + cls, "data-k": k, tabindex: "0"});
+  g.appendChild(svgEl("title", {}, title));
+  g.appendChild(svgEl("rect", {x, y, width: w, height: h, rx: 4}));
+  let ty = y + h / 2 - (16 + 14 * subs.length) / 2 + 12;
+  g.appendChild(svgEl("text", {class: "bt", x: x + w / 2, y: ty, "text-anchor": "middle"}, title));
+  for (const s of subs) { ty += 15; g.appendChild(svgEl("text", {class: "bs", x: x + w / 2, y: ty, "text-anchor": "middle"}, s)); }
+  g.addEventListener("click", () => wfShow(k));
+  g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); wfShow(k); } });
+  wfg.appendChild(g);
+}
+function wfShow(k) {
+  wfg.querySelectorAll(".bx").forEach(g => g.classList.toggle("on", g.dataset.k === k));
+  const b = W.find(i => i[0] === k);
+  wfdet.innerHTML = `<div><h4>${b[6].replace("&", "&amp;")}</h4>${b[8]}</div>`;
+}
 
 /* Kontextmenue-Demo */
 const cm = document.getElementById("cm"), cmx = document.getElementById("cmx"), demo = document.getElementById("demo");
@@ -331,14 +447,15 @@ const io = new IntersectionObserver(entries => entries.forEach(en => {
   if (en.isIntersecting) links.forEach(a => a.classList.toggle("on", a.dataset.id === en.target.id));
 }), {rootMargin: "-60px 0px -70% 0px"});
 sections.forEach(s => io.observe(s));
-const originals = new Map(), LIVE = new Set(["start", "ribbon", "tables"]);   // interaktiv: nicht umschreiben
+const originals = new Map(), LIVE = new Set(["start", "flow", "ribbon", "tables"]);   // interaktiv: nicht umschreiben
 function unmark(s) { if (originals.has(s)) s.innerHTML = originals.get(s); }
 document.getElementById("q").addEventListener("input", e => {
   const q = e.target.value.trim().toLowerCase(); let shown = 0;
   for (const s of sections) {
     if (!LIVE.has(s.id)) unmark(s);
     const hit = !q || s.textContent.toLowerCase().includes(q) ||
-      (s.id === "ribbon" && R.some(([g, it]) => it.some(i => (i[1] + i[2]).toLowerCase().includes(q))));
+      (s.id === "ribbon" && R.some(([g, it]) => it.some(i => (i[1] + i[2]).toLowerCase().includes(q)))) ||
+      (s.id === "flow" && W.some(i => (i[6] + i[8]).toLowerCase().includes(q)));
     s.classList.toggle("hidden", !hit);
     links.find(a => a.dataset.id === s.id).style.display = hit ? "" : "none";
     if (hit) shown++;
@@ -352,6 +469,7 @@ document.getElementById("q").addEventListener("input", e => {
         n.replaceWith(span); }
     }
   }
+  if (q) { const f = W.find(i => (i[6] + i[8]).toLowerCase().includes(q)); if (f) wfShow(f[0]); }
   if (q) { const k = Object.keys(buttons).find(k => (buttons[k].label + buttons[k].text).toLowerCase().includes(q)); if (k) show(k); }
   document.getElementById("empty").style.display = shown ? "none" : "block";
 });

@@ -77,9 +77,13 @@
    "en": "Pipe\nlines",
    "fr": "Tuyau-\nteries"
   },
-  "Rohrleitungsnummern mit einlesen": {
-   "en": "Include pipe line numbers",
-   "fr": "Inclure les numéros de ligne"
+  "Rohr-\nleitungen: an": {
+   "en": "Pipe\nlines: on",
+   "fr": "Tuyau-\nteries : oui"
+  },
+  "Rohr-\nleitungen: aus": {
+   "en": "Pipe\nlines: off",
+   "fr": "Tuyau-\nteries : non"
   },
   "Rohrleitungsnummern (z. B. TFHR_SS01_001_1\") als Typ „Rohrleitung“ in die Tag-Liste übernehmen – waagerecht und senkrecht beschriftet. Umschalten liest die PDFs neu ein.": {
    "en": "Add pipe line numbers (e.g. TFHR_SS01_001_1\") to the tag list as type “Rohrleitung” – labelled horizontally or vertically. Switching re-reads the PDFs.",
@@ -116,6 +120,14 @@
   "Filter zurücksetzen": {
    "en": "Reset filters",
    "fr": "Réinitialiser les filtres"
+  },
+  "Aus PDF-Scan übernehmen": {
+   "en": "Take over from PDF scan",
+   "fr": "Reprendre du scan PDF"
+  },
+  "Autofill OK": {
+   "en": "Autofill OK",
+   "fr": "Remplir auto OK"
   },
   "Tabelle\nbearbeiten": {
    "en": "Edit\ntable",
@@ -236,6 +248,18 @@
   "Sprache der Oberfläche: Deutsch, English, Français": {
    "en": "User interface language: Deutsch, English, Français",
    "fr": "Langue de l'interface : Deutsch, English, Français"
+  },
+  "Einstel-\nlungen": {
+   "en": "Settings",
+   "fr": "Para-\nmètres"
+  },
+  "Layer für Review im PDF": {
+   "en": "Review layer in PDF",
+   "fr": "Calque de revue dans le PDF"
+  },
+  "Einstellungen: Layer für Review im PDF": {
+   "en": "Settings: review layer in PDF",
+   "fr": "Paramètres : calque de revue dans le PDF"
   }
  },
  "Blätter": {
@@ -589,9 +613,9 @@
    "en": "Outputs",
    "fr": "Sorties"
   },
-  "Redline-PDF je PDF (Kommentar an jeder Fundstelle, doppelte Tags orange)": {
-   "en": "Redline PDF per PDF (comment at every occurrence, duplicate tags orange)",
-   "fr": "PDF redline par PDF (commentaire à chaque occurrence, doublons en orange)"
+  "Redline-PDF je PDF (Rahmen wie im Viewer: grün korrekt, rot fehlerhaft, doppelte gelb)": {
+   "en": "Redline PDF per PDF (frames as in the viewer: green correct, red faulty, duplicates yellow)",
+   "fr": "PDF redline par PDF (cadres comme dans la visionneuse : vert correct, rouge erroné, doublons en jaune)"
   },
   "Review-Excel je PDF (Pos.-Nr., Review-Kommentar, Prüfstatus, Bemerkung)": {
    "en": "Review Excel per PDF (item no., review comment, status, remark)",

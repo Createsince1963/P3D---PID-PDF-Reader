@@ -37,10 +37,16 @@ def test_group_heads_on_top_and_settings_after_einlesen(window):
     groups = _group_titles(window.ribbon)
     titles = [g.title.text() for g in groups]
     # Nutzervorgabe 2026-11-21: Einstellungen in der Gruppe Projekt, Ansicht vor Pruefen, neu nummeriert
-    assert titles == ["Projekt", "1  Einlesen", "2  Ansicht", "3  Prüfen", "4  Review / Redline", "5  Export", "Hilfe"]
+    assert titles == ["Projekt", "1  Einlesen", "2  Ansicht", "3  Prüfen", "4  Review / Redline", "5  Export", "Web",
+                      "Hilfe"]
     project = groups[0]
     keys = [k for k, b in window.ribbon.buttons.items() if project.isAncestorOf(b)]
-    assert keys == ["project_mode", "project_pick", "project_defs", "paths", "patterns"]
+    # Nutzervorgabe 2026-11-22: hinter "Projekt waehlen" die Umschalter 1. Projektmodus 2. Rohrleitungen
+    assert keys == ["project_pick", "project_mode", "pipes", "project_defs", "paths", "patterns", "settings_menu"]
+    assert window.ribbon.buttons["pipes"].isCheckable() and window.ribbon.buttons["pipes"].menu() is None
+    # Einstellungen › "Layer fuer Review im PDF" (Nutzervorgabe 2026-11-22), umschaltbar und gemerkt
+    actions = [a.text() for a in window.settings_menu.actions()]
+    assert actions == ["Layer für Review im PDF"] and window.layer_action.isCheckable()
     for group in groups:
         assert group.layout().indexOf(group.title) == 0
         assert group.title.objectName() == "RibbonGroupHead"
