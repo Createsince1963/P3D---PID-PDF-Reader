@@ -17,7 +17,7 @@ from main_gui_kit.buttons import ButtonKind, action_button
 from .. import paths
 from ..core.patterns import TAG_TYPES
 from ..core.project_defs import (DEFAULT_DESIGNS, RULES, SEGMENTS, SETTING_NOTES, SETTINGS, ProjectDB, is_list)
-from . import last_paths
+from . import last_paths, msgbox
 from .design import ERROR_QSS, NOTE_QSS, SECTION_QSS
 from .paths_dialog import open_in_explorer
 from .project_tiles import ColumnTiles, GridEditing, TileList, load_json_meta
@@ -360,9 +360,10 @@ class ProjectDefinitionsDialog(GridEditing, QDialog):
         box.addButton("Abbrechen", QMessageBox.RejectRole)
         box.setDefaultButton(save)
         box.exec()
-        if box.clickedButton() is save:
+        choice = msgbox.clicked(box, save, discard)
+        if choice is save:
             return self.save_table()
-        if box.clickedButton() is discard:
+        if choice is discard:
             self._set_dirty(False)
             return True
         return False

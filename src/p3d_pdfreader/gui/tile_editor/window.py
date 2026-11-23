@@ -16,14 +16,15 @@ from __future__ import annotations
 import json
 import time
 
-from PySide6.QtCore import QEventLoop, QSortFilterProxyModel, Qt, QThread, Signal
+from PySide6.QtCore import QEventLoop, Qt, QThread, Signal
 from PySide6.QtWidgets import (QAbstractItemView, QApplication, QComboBox, QFrame, QHBoxLayout, QLabel, QLineEdit,
                                QMainWindow, QMenu, QMessageBox, QSplitter, QTableView, QVBoxLayout, QWidget)
 
 from main_gui_kit.buttons import ButtonKind, action_button
+from main_gui_kit.tables import MultiColumnFilterProxy, configure_table_view, table_zoom_slider
 
 from ...core.data_link import ImportTable, write_excel
-from .. import appearance, last_paths
+from .. import last_paths
 from ..controls import tip_button
 from ..design import NOTE_QSS, SECTION_QSS, TITLE_QSS
 from . import german
@@ -148,34 +149,71 @@ class TileEditorWindow(QMainWindow):
         return box
 
     def _table_area(self) -> QWidget:
+        """Datentabelle nach dem Tabellenstandard des Tools (1.0.40, wie Dateiliste/Tag-Tabelle): Filterfeld je Spalte
+        (Tippen = Textfilter, Doppelklick = Wertauswahl), Blattfilter, Zeilenzahl, Rechtsklick-Menue (Kopieren,
+        Filtern, Spalten …), Excel-Symbol in der Ecke, Zoom. Reihenfolge und Ausblenden der Spalten bestimmt weiter
+        der Kachel-Editor; gemerkt wird die Ansicht nicht (Spalten aendern sich mit jeder Anpassung)."""
+        from ..data_link_ui import LinkHeaderPainter
+        from ..sheet import _filter_height, mark_active_filters, table_header_qss
+        from ..table_export import export_table_view, install_excel_corner
+        from ..table_menu import install_table_menus
         w = QWidget()
         v = QVBoxLayout(w)
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(4)
+        top = QHBoxLayout()
         self.filter = QLineEdit()
         self.filter.setPlaceholderText("In dieser Tabelle filtern …")
         self.filter.setClearButtonEnabled(True)
-        v.addWidget(self.filter)
+        top.addWidget(self.filter, 1)
+        self.count = QLabel()
+        self.count.setStyleSheet(NOTE_QSS)
+        top.addWidget(self.count)
+        v.addLayout(top)
         self.view = QTableView()
-        self.view.setAlternatingRowColors(True)
-        self.view.verticalHeader().setDefaultSectionSize(22)
+        self.proxy = MultiColumnFilterProxy(self)
+        self.view.setModel(self.proxy)               # noch ohne Daten -> keine gemerkte Ansicht (Kit-Provider)
+        configure_table_view(self.view)
+        self.view.sortByColumn(-1, Qt.AscendingOrder)    # Zeilen in Listenreihenfolge, Sortieren per Klick moeglich
+        self.view.setSelectionBehavior(QAbstractItemView.SelectItems)   # Zellen bearbeiten
         h = self.view.horizontalHeader()
-        h.setStyleSheet(appearance.plain_header_qss())
+        h.setSectionsMovable(False)                  # Reihenfolge = Kacheln
+        h.setStyleSheet(table_header_qss())
         h.setDefaultSectionSize(130)
-        h.setContextMenuPolicy(Qt.CustomContextMenu)
-        h.customContextMenuRequested.connect(lambda p: self._header_menu(h.logicalIndexAt(p), h.mapToGlobal(p)))
+        mark_active_filters(h)
         h.sectionClicked.connect(self._table_to_tile)
+        self.view._shared_header_menu_hook = self._header_hook
         self.view.setEditTriggers(QAbstractItemView.DoubleClicked | QAbstractItemView.EditKeyPressed
                                   | QAbstractItemView.AnyKeyPressed)
-        from ..data_link_ui import LinkHeaderPainter
-        self.painter = LinkHeaderPainter(h, self._link_columns)
+        self.painter = LinkHeaderPainter(h, self._link_columns, _filter_height)
+        excel = install_excel_corner(self.view, "Importliste")
+        install_table_menus(self.view, excel, on_clear_all=self.clear_filters, on_filter=self._count,
+                            on_export=lambda: export_table_view(self.view, "Importliste"))
+        self.view.export_name = lambda: "Importliste"
         v.addWidget(self.view, 1)
-        self.proxy = QSortFilterProxyModel(self)
-        self.proxy.setFilterKeyColumn(-1)
-        self.proxy.setFilterCaseSensitivity(Qt.CaseInsensitive)
-        self.filter.textChanged.connect(self.proxy.setFilterFixedString)
-        self.view.setModel(self.proxy)
+        bottom = QHBoxLayout()
+        bottom.addStretch(1)
+        bottom.addWidget(table_zoom_slider(self.view))
+        v.addLayout(bottom)
+        self.filter.textChanged.connect(lambda text: (self.proxy.set_global_filter(text), self._count()))
+        if hasattr(h, "filterChanged"):
+            h.filterChanged.connect(self._count)
+        self._count()
         return w
+
+    def _count(self) -> None:
+        total = self.proxy.sourceModel().rowCount() if self.proxy.sourceModel() else 0
+        self.count.setText(f"{self.proxy.rowCount()} / {total} Zeilen")
+
+    def clear_filters(self) -> None:
+        """Blattfilter, Spaltenfilter und Wertauswahl zuruecksetzen."""
+        self.filter.clear()
+        for editor in getattr(self.view.horizontalHeader(), "editors", []) or []:
+            editor.clear()
+        self.proxy.column_filters.clear()
+        self.proxy.value_filters.clear()
+        self.proxy.set_global_filter("")
+        self._count()
 
     # --- Oeffnen / Ablauf --------------------------------------------------------------------------------------------
     def open(self) -> None:
@@ -288,10 +326,22 @@ class TileEditorWindow(QMainWindow):
     def _rebuild(self) -> None:
         if self.source is None:
             return
+        old_keys = getattr(self, "_keys", None)
         self.model.reset()
         keys = self.model.keys()
+        header = self.view.horizontalHeader()
+        if keys != old_keys:                         # Spalten geaendert: Filterfelder neu, Spaltenfilter passen nicht mehr
+            self._keys = list(keys)
+            self.proxy.column_filters.clear()
+            self.proxy.value_filters.clear()
+            self.proxy.invalidate()
+            if hasattr(header, "bind_model"):
+                header.bind_model()
+                from ..sheet import mark_active_filters
+                mark_active_filters(header)
         for c, key in enumerate(keys):
             self.view.setColumnHidden(c, self.source.is_hidden(key))
+        self._count()
         for n in (1, 2):
             if self.links[n] and self.links[n] not in keys:
                 self.links[n] = ""
@@ -317,19 +367,18 @@ class TileEditorWindow(QMainWindow):
         keys = self.model.keys()
         return keys[column] if 0 <= column < len(keys) else ""
 
-    def _header_menu(self, column: int, pos) -> None:
+    def _header_hook(self, menu: QMenu, column: int) -> None:
+        """Eintraege im Spaltenkopf-Menue des Tabellenstandards: Datenlink setzen/entfernen, Kachel waehlen."""
         key = self._key_at(column)
         if not key:
             return
-        m = QMenu(self)
+        menu.addSeparator()
         for n in (1, 2):
             if self.links[n] == key:
-                m.addAction(f"{marker(n)} entfernen", lambda n=n: self.set_link(n, ""))
+                menu.addAction(f"{marker(n)} entfernen", lambda n=n: self.set_link(n, ""))
             else:
-                m.addAction(f"Als {marker(n)} setzen ({TABLE_NAMES[n]})", lambda n=n: self.set_link(n, key))
-        m.addSeparator()
-        m.addAction("Kachel dieser Spalte wählen", lambda: self._table_to_tile(column))
-        m.exec(pos)
+                menu.addAction(f"Als {marker(n)} setzen ({TABLE_NAMES[n]})", lambda n=n: self.set_link(n, key))
+        menu.addAction("Kachel dieser Spalte wählen", lambda: self._table_to_tile(column))
 
     def set_link(self, n: int, key: str) -> None:
         self.links[n] = key if key in self.source.keys() else ""

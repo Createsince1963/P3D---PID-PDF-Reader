@@ -104,6 +104,86 @@ def test_edit_mode_save_and_excel_table(app, tmp_path, monkeypatch):
     w.close()
 
 
+def test_no_filters_at_start_and_after_new_data(app, tmp_path, monkeypatch):
+    """1.0.39: gemerkte Filter (Wertauswahl „Checked“, Textfilter) kommen weder beim Start noch nach neuen Daten zurueck;
+    Spaltenbreiten und Co. bleiben gemerkt."""
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path))
+    from PySide6.QtCore import QCoreApplication
+    from p3d_pdfreader.core.extract import PdfResult, Tag
+    from p3d_pdfreader.gui import table_views
+    from p3d_pdfreader.gui.main_window import MainWindow
+    layout = {"column_filters": {"PDF": "zzz"}, "value_filters": {"Checked": []}, "column_widths": {"PDF": 321}}
+    plain = table_views.store()
+    for key in ("auto|files", "named|files"):
+        plain.save(key, "Default", dict(layout))
+    assert table_views.layout_store().load("auto|files") == {"column_widths": {"PDF": 321}}
+    w = MainWindow(app, "test")
+    w.results = [PdfResult(path=tmp_path / "a.pdf", drawing_no="A", tags=[Tag(tag="XV-1", type="Instrument")]),
+                 PdfResult(path=tmp_path / "b.pdf", drawing_no="B", tags=[])]
+    w._refresh()
+    for _ in range(5):
+        QCoreApplication.processEvents()
+    proxy = w.page.files.proxy
+    assert not proxy.column_filters and not proxy.value_filters
+    assert proxy.rowCount() == 2
+    w.close()
+
+
+def test_table_preview_uses_tag_table_columns(app, tmp_path, monkeypatch):
+    """1.0.40: Tabellen-Vorschau = Tags aller PDFs mit den Spalten der Tag-Tabelle (Reihenfolge, Ausblendung wie
+    eingestellt), ohne X/Y; ungespeicherte Review-Eintraege der gewaehlten PDF sind enthalten."""
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path))
+    from p3d_pdfreader.core.extract import PdfResult, Tag
+    from p3d_pdfreader.gui.main_window import FIRST_FIELD, TAG_COLS, MainWindow
+    w = MainWindow(app, "test")
+    a = PdfResult(path=tmp_path / "a.pdf", drawing_no="DWG-A", tags=[Tag(tag="XV-1", type="Instrument")])
+    b = PdfResult(path=tmp_path / "b.pdf", drawing_no="DWG-B",
+                  tags=[Tag(tag="PI-2", type="Instrument"), Tag(tag="VH1", type="Armatur")])
+    w.results = [a, b]
+    w._refresh()
+    page = w.page
+    page.files.table.setCurrentIndex(page.files.proxy.index(0, 0))
+    page.edit_button.setChecked(True)
+    assert page.tags.proxy.setData(page.tags.proxy.index(0, FIRST_FIELD), "OK")
+    page.edit_button.setChecked(False)
+    view = page.tags.table
+    view.setColumnHidden(TAG_COLS.index("Seiten"), True)
+    header = view.horizontalHeader()
+    header.moveSection(header.visualIndex(TAG_COLS.index("Review")), 0)       # Review ganz nach vorn
+    w.show_table_preview()
+    t = w.preview_page.tags
+    assert w.tabs.currentWidget() is w.preview_page
+    assert t.headers[:4] == ["PDF", "Zeichnungsnr.", "Review", "Typ"]
+    assert "Seiten" not in t.headers and "X" not in t.headers and "Y" not in t.headers
+    rows = {(r[0], r[t.headers.index("Tag")]): r for r in t.rows()}
+    assert len(rows) == 3 and rows[(page._store_result.name, page.tags.rows()[0][1])][2] == "OK"
+    assert page.save_review()                                # sonst fragt close() modal nach
+    w.close()
+
+
+def test_msgbox_clicked_survives_translation(app):
+    """Uebersetzter Dialog (Englisch): der gemerkte Button wird trotz neuem Python-Wrapper erkannt (Bug 1.0.37:
+    "Discard" wirkte wie "Cancel", Fenster liess sich mit ungespeicherten Review-Eintraegen nicht schliessen)."""
+    from PySide6.QtCore import QTimer
+    from PySide6.QtWidgets import QMessageBox
+    from p3d_pdfreader import i18n
+    from p3d_pdfreader.gui import msgbox
+    previous = i18n._state.get("lang")
+    i18n.install(app, "en")
+    try:
+        for label in ("Discard", "Save", "Cancel"):
+            box = QMessageBox(QMessageBox.Question, "Review-Einträge", "x")
+            save = box.addButton("Speichern", QMessageBox.AcceptRole)
+            discard = box.addButton("Verwerfen", QMessageBox.DestructiveRole)
+            box.addButton("Abbrechen", QMessageBox.RejectRole)
+            QTimer.singleShot(50, lambda b=box, t=label: next(x for x in b.buttons() if x.text() == t).click())
+            box.exec()
+            expected = {"Discard": discard, "Save": save, "Cancel": None}[label]
+            assert msgbox.clicked(box, save, discard) is expected
+    finally:
+        i18n._state["lang"] = previous
+
+
 @needs_sample
 def test_choose_tags_when_filter_active(app, tmp_path, monkeypatch):
     """Ohne Filter alle Tags; mit "Nur doppelte" Rueckfrage (hier: "Alle Tags" gewaehlt -> alle)."""

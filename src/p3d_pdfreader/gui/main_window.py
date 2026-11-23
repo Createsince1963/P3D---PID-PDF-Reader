@@ -14,11 +14,10 @@ from PySide6.QtCore import QModelIndex, Qt, QThread, QTimer
 from PySide6.QtGui import QBrush, QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QApplication, QComboBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu,
                                QMessageBox, QSplitter, QStatusBar, QStyledItemDelegate, QTabBar, QTableView,
-                               QTabWidget, QVBoxLayout, QWidget)
+                               QTabWidget, QToolButton, QVBoxLayout, QWidget)
 
 from main_gui_kit.branding import HeaderBanner
 from main_gui_kit.buttons import ButtonKind, action_button
-from main_gui_kit.preview import DataPreviewDialog
 from main_gui_kit.tables import (MultiColumnFilterProxy, TableAdminBar, TableDataModel, apply_table_layout,
                                  configure_table_view, table_zoom_slider)
 from main_gui_kit.theme import LIGHT, ThemeManager
@@ -32,7 +31,7 @@ from ..core.review_store import CHANGE_VALUES, EDIT_FIELDS, FIELDS, REVIEW_VALUE
 from . import appearance, icons, last_paths, table_views
 from .design import NOTE_QSS
 from .paths_dialog import PathsDialog, open_in_explorer
-from . import project_dialog, table_profiles, web_control
+from . import msgbox, project_dialog, table_profiles, web_control
 from .controls import indicator_qss
 from .data_link_ui import LinkController
 from .icons import excel_icon
@@ -78,6 +77,11 @@ VIEWER_SPLIT = (500, 800)           # Standardteilung Tag-Tabelle : Viewer im Ha
 DATA_LINK_TIP = ("Datenlink: Excel-Liste (z. B. Instrumenten-Gesamtliste) importieren, im Kachel-Editor prüfen und "
                  "bearbeiten, Datenlink 1 (Zeichnung) und 2 (Tag) setzen. In den Tabellen per Rechtsklick auf den "
                  "Spaltenkopf das Datenlink-Feld wählen (Kopf dunkelgrün) – dann erscheinen die Listenspalten.")
+JOIN_TIP = ("Abgleich der Tag-Tabelle mit der Importliste (Datenlink 2, mit Datenlink 1 je Zeichnung):\n"
+            "• PDF-Tags → Importliste: alle Tags der PDF mit den passenden Listenwerten\n"
+            "• Importliste → PDF-Tags: alle Zeilen der Liste zu dieser Zeichnung, getroffene mit ihrem PDF-Tag\n"
+            "• Tags beider Listen: alles zusammen\n"
+            "Fehlende Werte stehen als „n.a.“ da.")
 PROJECT_MODE_KEY, PROJECT_DB_KEY = "project_mode", "project_db"     # config/state.json
 PROJECT_TIP = ("Projektmodus: Tags werden gegen die Projektdefinitionen geprüft (Codelisten und Tag-Strukturen wie in "
                "P3D Tag Compliance). Aus = Standardmodus ohne Projektdefinitionen.")
@@ -86,6 +90,17 @@ PROJECT_TIP = ("Projektmodus: Tags werden gegen die Projektdefinitionen geprüft
 def file_row(r: list) -> list:
     """Zeile der Dateiliste (``FILE_COLS``) aus einer Zeile von ``export.file_rows``."""
     return [r[0], r[1], r[2], r[3], r[5], r[7], r[8], r[9], r[11], r[15], r[17]]
+
+
+def na_tag_row() -> list:
+    """Zeile der Tag-Tabelle fuer eine Importzeile ohne PDF-Tag: alle Tool-Spalten „n.a.“ (Anzahl 0)."""
+    row: list = [data_link.NA] * len(TAG_COLS)
+    row[2] = 0
+    return row
+
+
+def is_na_row(row: list) -> bool:
+    return bool(row) and row[0] == data_link.NA
 
 
 def scan_values(result: PdfResult) -> list[str]:
@@ -135,7 +150,8 @@ class ReviewModel(DuplicateModel):
 
     def flags(self, index):
         flags = super().flags(index)
-        if self.edit_mode and self.store is not None and index.column() in self._edit_cols:
+        if (self.edit_mode and self.store is not None and index.column() in self._edit_cols
+                and not is_na_row(self.rows[index.row()])):    # Importzeile ohne PDF-Tag: kein Review-Eintrag
             flags |= Qt.ItemIsEditable
         return flags
 
@@ -350,7 +366,21 @@ class TagsSheet(Sheet):
         self.fault_button = strip.add("deviations", "Nur Abweichungen", "deviations", self._only_duplicates,
                                       "Projektmodus: nur Tags mit Befund zeigen (Code unvollständig, Code fehlt, Regelfehler)",
                                       checkable=True)
-        strip.add("filter_reset", "Filter zurücksetzen", "filter_reset", self.reset_tag_filters)
+        strip.add("filter_reset", "Filter zurücksetzen", "filter_reset", self.reset_tag_filters,
+                  "Filter der Tag-Tabelle zurücksetzen (geschieht auch bei jedem PDF-Wechsel)")
+        # Abgleich mit der Importliste (Datenlink 2, 1.0.38): Richtung waehlen, fehlende Werte = „n.a.“
+        self.join_button = strip.add("join", "Abgleich", "import", lambda: None, JOIN_TIP)
+        self.join_button.setPopupMode(QToolButton.InstantPopup)
+        join_menu = QMenu(self.join_button)
+        self._join_actions = []
+        for key, label in data_link.JOIN_MODES.items():
+            act = join_menu.addAction(label)
+            act.setCheckable(True)
+            act.setData(key)
+            act.triggered.connect(lambda _c=False, k=key: self.set_join_mode(k))
+            self._join_actions.append(act)
+        join_menu.aboutToShow.connect(self._mark_join_mode)
+        self.join_button.setMenu(join_menu)
         strip.separator()
         strip.add("prev", "", "prev", self.previous_occurrence, "Vorherige Fundstelle (Umschalt+F3)")
         strip.add("next", "Fundstelle", "next", self.next_occurrence, "Nächste Fundstelle (F3)")
@@ -388,6 +418,9 @@ class TagsSheet(Sheet):
         vsplit.setSizes([300, 520])
         self.body_layout.addWidget(vsplit, 1)
 
+        # Programmstart: keine Filter in Dateiliste und Tag-Tabelle (auch nicht aus einem benannten Layout, 1.0.39)
+        self.files.clear_filters()
+        self.tags.clear_filters()
         self.files.table.export_name = lambda: "PID_Dateien"
         self.tags.table.export_name = self._tags_export_name
         self.files.table.selectionModel().currentRowChanged.connect(self._file_changed)
@@ -415,23 +448,45 @@ class TagsSheet(Sheet):
 
     # --- Tag-Tabelle ---------------------------------------------------------------------------------------------
     def _tag_rows(self) -> list[list]:
-        result = self._store_result
+        return self.tag_rows_for(self._store_result, self.store)
+
+    def tag_rows_for(self, result: PdfResult | None, store: ReviewStore | None) -> list[list]:
+        """Zeilen der Tag-Tabelle (Spalten ``self.tags.headers``) fuer eine PDF - auch fuer die Tabellen-Vorschau aller
+        PDFs (1.0.40)."""
         if result is None:
             return []
         checker = self.win.checker
         scan = scan_values(result) if self.scan_button.isChecked() else [""] * len(SCAN_COLS)
         rows = [[t.type, t.tag, t.count, t.pages_text,
                  *(checker.columns(t.type, t.tag, t.count) if checker else ["", ""]),
-                 *(self.store.values(t.type, t.tag) if self.store else [""] * len(FIELDS)), *scan]
+                 *(store.values(t.type, t.tag) if store else [""] * len(FIELDS)), *scan]
                 for t in result.tags]
-        # Datenlink 2: Zusatzspalten aus der Importtabelle (Feld per Rechtsklick auf den Spaltenkopf)
+        # Datenlink 2: Zusatzspalten aus der Importtabelle (Feld per Rechtsklick auf den Spaltenkopf). Abgleich (1.0.38):
+        # PDF-Tags -> Liste, Liste -> PDF-Tags oder beide; was in einer Liste fehlt, steht als „n.a.“ da.
         links = self.win.links
         field = links.fields.get("tags", "")
         if links.active(2) and field in TAG_COLS:
             c, file_value = TAG_COLS.index(field), self.win.file_link_value(result)
-            for row in rows:
-                row.extend(links.tag_values(row[c], file_value))
+            out = []
+            for i, hits in links.tag_join([r[c] for r in rows], file_value):
+                row = rows[i] if i is not None else na_tag_row()
+                out.append(row + links.join_values(hits))
+            rows = out
         return rows
+
+    def set_join_mode(self, mode: str) -> None:
+        self.win.links.set_join_mode(mode)
+        self._mark_join_mode()
+        self._only_duplicates()
+        label = data_link.JOIN_MODES.get(self.win.links.join_mode, "")
+        self.win.statusBar().showMessage(f"Abgleich Tag-Tabelle ↔ Importliste: {label}"
+                                         + ("" if self.win.links.active(2) else
+                                            " (wirkt, sobald Datenlink 2 aktiv ist)"), 8000)
+
+    def _mark_join_mode(self) -> None:
+        mode = self.win.links.join_mode
+        for act in self._join_actions:
+            act.setChecked(act.data() == mode)
 
     def _toggle_scan_fields(self, on: bool) -> None:
         last_paths.set_value(SCAN_KEY, bool(on))
@@ -522,14 +577,23 @@ class TagsSheet(Sheet):
         box.addButton("Abbrechen", QMessageBox.RejectRole)
         box.setDefaultButton(save)
         box.exec()
-        if box.clickedButton() is save:
+        choice = msgbox.clicked(box, save, discard)
+        if choice is save:
             return self.save_review()
-        if box.clickedButton() is discard:
+        if choice is discard:
             self.store.load()
             self._store_changed()
             self._only_duplicates()
             return True
         return False
+
+    def _default_tag_filters(self) -> None:
+        """Wie „Filter zurücksetzen“, aber ohne die Tag-Tabelle dabei neu zu fuellen (das folgt beim Laden der PDF)."""
+        for button in (self.dup_button, self.fault_button):
+            button.blockSignals(True)
+            button.setChecked(False)
+            button.blockSignals(False)
+        self.tags.clear_filters()
 
     def reset_tag_filters(self) -> None:
         self.dup_button.setChecked(False)
@@ -558,6 +622,7 @@ class TagsSheet(Sheet):
                 self._switching = False
             return
         self._store_result = result
+        self._default_tag_filters()                    # 1.0.38: neue PDF -> Filter der Tag-Tabelle auf Standard
         if result is None:
             self.store = None
             self._only_duplicates()
@@ -661,6 +726,18 @@ class LinkReviewSheet(Sheet):
         self.body_layout.addWidget(self.tags, 1)
 
 
+class PreviewSheet(Sheet):
+    """Tabellen-Vorschau (1.0.40): Tags aller PDFs mit den Spalten der Tag-Tabelle - Reihenfolge und Sichtbarkeit wie
+    vom Nutzer in der Tag-Tabelle eingestellt, Review-, Projekt-, Scan- und Datenlink-Spalten inklusive, ohne X/Y.
+    Standard-Tabelle des Tools (Filter, Wertauswahl, Spalten), Excel ueber das Symbol in der Tabellenecke."""
+
+    def __init__(self):
+        super().__init__("Tabellen-Vorschau", "Tags aller PDFs – Spalten wie in der Tag-Tabelle", closable=True)
+        self.tags = DataTable("table_preview", "Tags aller PDFs", ["PDF", "Zeichnungsnr."], count_col=None)
+        self.tags.table.export_name = lambda: "PID_Tags_Vorschau"
+        self.body_layout.addWidget(self.tags, 1)
+
+
 class MainWindow(QMainWindow):
     def __init__(self, app, version: str):
         super().__init__()
@@ -693,6 +770,7 @@ class MainWindow(QMainWindow):
         self.links.install("tags", self.page.tags, TAG_COLS)
         self.all_page = AllTagsSheet()
         self.review_page = LinkReviewSheet()
+        self.preview_page = PreviewSheet()
         self.ribbon = self._build_ribbon()
         self._show_pipes(bool(last_paths.get_value(PIPES_KEY, False)))
         root.addWidget(self.ribbon)
@@ -705,6 +783,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         self.all_page.header.close_requested.connect(lambda: self._close_widget(self.all_page))
         self.review_page.header.close_requested.connect(lambda: self._close_widget(self.review_page))
+        self.preview_page.header.close_requested.connect(lambda: self._close_widget(self.preview_page))
         self.tabs.addTab(self.page, "PID-Tags")
         for side in (QTabBar.RightSide, QTabBar.LeftSide):
             self.tabs.tabBar().setTabButton(0, side, None)
@@ -863,7 +942,8 @@ class MainWindow(QMainWindow):
     def _clear_filters(self) -> None:
         self.page.dup_button.setChecked(False)
         self.page.fault_button.setChecked(False)
-        for table in (self.page.files, self.page.tags, self.all_page.tags, self.review_page.tags):
+        for table in (self.page.files, self.page.tags, self.all_page.tags, self.review_page.tags,
+                      self.preview_page.tags):
             table.clear_filters()
 
     def _update_bands(self) -> None:
@@ -1160,9 +1240,10 @@ class MainWindow(QMainWindow):
         box.addButton(QMessageBox.Cancel)
         box.setDefaultButton(every)
         box.exec()
-        if box.clickedButton() is only:
+        choice = msgbox.clicked(box, only, every)
+        if choice is only:
             return visible
-        if box.clickedButton() is every:
+        if choice is every:
             return list(result.tags)
         return None
 
@@ -1266,9 +1347,45 @@ class MainWindow(QMainWindow):
             open_in_explorer(folder)
         return folder
 
+    def preview_columns(self) -> list[int]:
+        """Spalten der Tag-Tabelle wie vom Nutzer eingestellt: sichtbare, in angezeigter Reihenfolge."""
+        view = self.page.tags.table
+        header = view.horizontalHeader()
+        count = len(self.page.tags.headers)
+        order = [header.logicalIndex(v) for v in range(header.count())]
+        return [c for c in order if 0 <= c < count and not view.isColumnHidden(c)]
+
+    def preview_table(self, progress=None) -> tuple[list[str], list[list]]:
+        """Kopf und Zeilen der Tabellen-Vorschau: PDF, Zeichnungsnr. + Spalten der Tag-Tabelle (ohne X/Y)."""
+        page = self.page                           # Kopf der Tag-Tabelle ist aktuell (jede Aenderung fuellt sie neu)
+        cols = self.preview_columns()
+        headers = ["PDF", "Zeichnungsnr."] + [page.tags.headers[c] for c in cols]
+        rows = []
+        for n, result in enumerate(self.results, start=1):
+            store = page.store if result is page._store_result else ReviewStore(result.path)  # auch ungespeicherte
+            for row in page.tag_rows_for(result, store):
+                rows.append([result.name, result.drawing_no, *(row[c] if c < len(row) else "" for c in cols)])
+            if progress is not None and n % 25 == 0:
+                progress(n)
+        return headers, rows
+
     def show_table_preview(self) -> None:
-        DataPreviewDialog("Tabellen-Vorschau: Tags aller PDFs", export.TAG_HEADERS, export.tag_rows(self.results),
-                          self).exec()
+        """Tabellen-Vorschau als Blatt (1.0.40, vorher Dialog mit festen Spalten und X/Y)."""
+        if not self.results:
+            QMessageBox.information(self, "Tabellen-Vorschau", "Noch keine PDFs eingelesen.")
+            return
+        total = len(self.results)
+        with progress_task(self, "Tabellen-Vorschau wird erzeugt", steps=2,
+                           message=f"Tags aller PDFs mit den Spalten der Tag-Tabelle ({total} PDFs)") as dlg:
+            headers, rows = self.preview_table(
+                lambda n: dlg.update_progress(min(90, round(n * 90 / total)), f"PDF {n} von {total}", 1))
+            dlg.update_progress(95, f"Tabelle anzeigen ({len(rows)} Zeilen)", 2)
+            self.preview_page.tags.headers = headers
+            self.preview_page.tags.set_rows(rows)
+            self.preview_page.set_band(f"{total} PDFs · {len(rows)} Zeilen · {len(headers)} Spalten")
+        if self.tabs.indexOf(self.preview_page) < 0:
+            self.tabs.addTab(self.preview_page, "Tabellen-Vorschau")
+        self.tabs.setCurrentWidget(self.preview_page)
 
     def edit_paths(self) -> None:
         PathsDialog(self).exec()
@@ -1311,7 +1428,7 @@ class MainWindow(QMainWindow):
         box.setDefaultButton(take)
         box.exec()
         action = {take: project_dialog.import_project, open_: project_dialog.open_project,
-                  new: project_dialog.new_project}.get(box.clickedButton())
+                  new: project_dialog.new_project}.get(msgbox.clicked(box, take, open_, new))
         path = action(self) if action else None
         return bool(path) and self.activate_project(path)
 

@@ -17,13 +17,14 @@ from PySide6.QtCore import QEvent, QObject, Qt
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import QApplication, QInputDialog, QMenu, QMessageBox
 
-from ..core.data_link import DataLink, ImportTable, read_sheet, sheet_names
+from ..core.data_link import JOIN_MODES, JOIN_PDF, DataLink, ImportTable, read_sheet, sheet_names
 from ..paths import config_dir
 from . import appearance, last_paths
 
 LINK_COLOR = appearance.ACCENT_CHOICES[1]      # dunkelgruen (#1B6B5A), passend zum dunkelblauen Tabellenkopf
 FIELDS_KEY = "data_link_fields"                # config/state.json: {"files": Spaltenname, "tags": Spaltenname}
 IMPORT_DIR = "last_data_link_dir"              # config/state.json: zuletzt gewaehlter Ordner der Importliste
+JOIN_KEY = "data_link_join"                    # config/state.json: Abgleich der Tag-Tabelle (pdf / list / both)
 HITS = "Datenlink-Treffer"
 TABLE_NAMES = {1: "Tabelle 1 – Dateien", 2: "Tabelle 2 – Tags"}
 PREFERRED_SHEET = "Gesamtliste"                # Gesamtliste aus P3D InstrumentationList
@@ -209,13 +210,32 @@ class LinkController:
         if not self.active(1):
             return []
         rows = self.link.file_rows(value)
-        return [len(rows), *self.link.values(rows)]
+        return [len(rows), *self.link.values_or_na(rows)]
 
     def tag_values(self, value, file_value=None) -> list:
         if not self.active(2):
             return []
         rows = self.link.tag_rows(value, file_value if self.active(1) else None)
-        return [len(rows), *self.link.values(rows)]
+        return [len(rows), *self.link.values_or_na(rows)]
+
+    # --- Abgleich Tag-Tabelle <-> Importliste (1.0.38) -----------------------------------------------------------
+    @property
+    def join_mode(self) -> str:
+        mode = last_paths.get_value(JOIN_KEY, JOIN_PDF)
+        return mode if mode in JOIN_MODES else JOIN_PDF
+
+    def set_join_mode(self, mode: str) -> None:
+        last_paths.set_value(JOIN_KEY, mode if mode in JOIN_MODES else JOIN_PDF)
+
+    def tag_join(self, values: list, file_value=None) -> list[tuple[int | None, list[int]]]:
+        """Zeilen der Tag-Tabelle nach gewaehltem Abgleich (``DataLink.tag_join``)."""
+        if not self.active(2):
+            return [(i, []) for i in range(len(values))]
+        return self.link.tag_join(values, file_value if self.active(1) else None, self.join_mode)
+
+    def join_values(self, rows: list[int]) -> list:
+        """Treffer + Listenspalten einer Zeile; ohne Importzeile „n.a.“."""
+        return [len(rows), *self.link.values_or_na(rows)]
 
     # --- Rechtsklick auf den Spaltenkopf --------------------------------------------------------------------------
     def install(self, key: str, data_table, base: list[str]) -> None:

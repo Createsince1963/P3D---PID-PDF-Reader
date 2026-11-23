@@ -19,6 +19,7 @@ Namen, Export ja/nein) und das Ergebnis (``headers``/``rows``, ``hidden`` = nich
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
 from pathlib import Path
@@ -26,6 +27,10 @@ from pathlib import Path
 FILE_NAME = "data_link.json"
 MAX_JOINED = 5          # hoechstens so viele verschiedene Werte je Zelle, wenn mehrere Importzeilen passen
 JOIN = " | "
+NA = "n.a."             # fehlender Wert beim Abgleich (Tag nur in einer der beiden Listen)
+JOIN_PDF, JOIN_LIST, JOIN_BOTH = "pdf", "list", "both"
+JOIN_MODES = {JOIN_PDF: "PDF-Tags → Importliste", JOIN_LIST: "Importliste → PDF-Tags",
+              JOIN_BOTH: "Tags beider Listen"}
 
 
 def cell_text(value) -> str:
@@ -49,6 +54,20 @@ def suffixes(value: str) -> list[str]:
     """Alle Endungen ab einem Bindestrich (ohne den Wert selbst): „a-b-c“ -> „b-c“, „c“."""
     parts = value.split("-")
     return ["-".join(parts[i:]) for i in range(1, len(parts)) if "-".join(parts[i:])]
+
+
+_COPY_RE = re.compile(r"\s*\(\d+\)$")
+
+
+def file_variants(value) -> list[str]:
+    """Wert eines Datenlink-1-Felds und seine Varianten: ohne „.pdf“, dann zusaetzlich ohne Kopie-Zusatz „ (2)“."""
+    text = str(value or "").strip()
+    out = [text]
+    stem = text[:-4] if text.casefold().endswith(".pdf") else text
+    for v in (stem, _COPY_RE.sub("", stem)):
+        if v and v not in out:
+            out.append(v)
+    return out
 
 
 def sheet_names(path) -> list[str]:
@@ -230,7 +249,16 @@ class DataLink:
         return n in self._idx and bool(self.fields.get("files" if n == 1 else "tags"))
 
     def file_rows(self, value) -> list[int]:
-        return self._idx[1].find(value) if self.active(1) else []
+        """Importzeilen einer Zeichnung. Ohne Treffer zaehlt der Wert ohne Dateiendung „.pdf“ und ohne Kopie-Zusatz
+        „ (2)“ (1.0.40: Datenlink-Feld „PDF“ = Dateiname, Importliste „P&ID No.“ ohne Endung - sonst fand keine
+        Zeichnung und damit kein Tag einen Treffer)."""
+        if not self.active(1):
+            return []
+        for v in file_variants(value):
+            hits = self._idx[1].find(v)
+            if hits:
+                return hits
+        return []
 
     def tag_rows(self, value, file_value=None) -> list[int]:
         """Importzeilen zu einem Wert der Tag-Tabelle; mit aktivem Datenlink 1 nur Zeilen derselben Zeichnung."""
@@ -251,7 +279,7 @@ class DataLink:
             if not norm(v):
                 continue
             total += 1
-            hits += bool(idx.find(v))
+            hits += bool(self.file_rows(v)) if n == 1 and self.active(1) else bool(idx.find(v))
         return hits, total
 
     def samples(self, n: int, limit: int = 3) -> list[str]:
@@ -267,6 +295,39 @@ class DataLink:
                 if len(out) >= limit:
                     break
         return out
+
+    def drawing_rows(self, file_value=None) -> list[int]:
+        """Importzeilen einer Zeichnung (Datenlink 1); ohne aktiven Datenlink 1 alle Zeilen."""
+        if self.active(1) and file_value is not None:
+            return self.file_rows(file_value)
+        return list(range(len(self.table.rows)))
+
+    def tag_join(self, values: list, file_value=None, mode: str = None) -> list[tuple[int | None, list[int]]]:
+        """Abgleich der Tag-Tabelle einer PDF mit der Importtabelle (1.0.38). ``values`` = Wert des Datenlink-Felds je
+        Tool-Zeile. Rueckgabe: ``(Index der Tool-Zeile oder None, Importzeilen)`` in Anzeigereihenfolge.
+
+        * ``JOIN_PDF``  – alle Tags der PDF, dazu die passenden Importwerte (bisheriges Verhalten),
+        * ``JOIN_LIST`` – alle Importzeilen der Zeichnung: getroffene mit ihrem PDF-Tag, die uebrigen ohne PDF-Tag,
+        * ``JOIN_BOTH`` – beides: alle PDF-Tags und dahinter die Importzeilen, die kein PDF-Tag getroffen hat."""
+        mode = mode or JOIN_PDF
+        if not self.active(2):
+            return [(i, []) for i in range(len(values))]
+        hits = [self.tag_rows(v, file_value) for v in values]
+        out: list[tuple[int | None, list[int]]] = [(i, h) for i, h in enumerate(hits)
+                                                   if mode != JOIN_LIST or h]
+        if mode == JOIN_PDF:
+            return out
+        taken = {i for h in hits for i in h}
+        key = self.table.headers.index(self.table.link(2))
+        for i in self.drawing_rows(file_value):
+            row = self.table.rows[i]
+            if i not in taken and cell_text(row[key] if key < len(row) else ""):
+                out.append((None, [i]))
+        return out
+
+    def values_or_na(self, rows: list[int]) -> list[str]:
+        """Wie ``values``; ohne Importzeile „n.a.“ in jeder Spalte."""
+        return self.values(rows) if rows else [NA] * len(self.columns)
 
     def values(self, rows: list[int]) -> list[str]:
         """Werte der uebergebenen Spalten; bei mehreren Treffern verschiedene Werte mit „ | “ verbunden."""

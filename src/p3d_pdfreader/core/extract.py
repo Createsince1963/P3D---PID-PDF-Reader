@@ -140,6 +140,41 @@ def _lines(words, x_min: float, y_min: float, tol: float = 2.5) -> list[list]:
     return [sorted(r, key=lambda w: w[0]) for r in rows]
 
 
+def _font_size(w) -> float:
+    """Schriftgroesse eines Worts = kuerzere Seite seines Rahmens (senkrecht geschriebene Verweise haben einen hohen,
+    schmalen Rahmen und galten sonst als groesste Schrift - falsche Zeichnungsnummer, 1.0.38)."""
+    return min(w[2] - w[0], w[3] - w[1])
+
+
+def _drawing_no_fallback(words, width: float, height: float) -> str:
+    """Zeichnungsnummer, wenn sie nicht ganz rechts im Schriftfeld steht (z. B. Schriftfeld mit Kunden- und
+    Exyte-Nummer: Nummer beginnt bei ~82 % der Breite, 1.0.38). Gesucht wird im unteren Zehntel ab 60 % der Breite,
+    aber nur in deutlich groesserer Schrift als der uebliche Text - so zaehlen Anschlussverweise auf andere
+    Zeichnungen (normale Schrift) nicht."""
+    sizes = sorted(s for s in map(_font_size, words) if s > 0)
+    if not sizes:
+        return ""
+    usual = sizes[len(sizes) // 2]
+    numbers = [w for w in words if _DRAWING_NO_RE.search(w[4]) and w[1] > height * 0.9 and w[0] >= width * 0.6
+               and _font_size(w) >= usual * 1.3]
+    return max(numbers, key=_font_size)[4] if numbers else ""
+
+
+def _value_below(label, right: float, lines: list[list]) -> str:
+    """Wert direkt unter einem Schriftfeld-Label („CHECKED:“ / naechste Zeile „I.MURALT“): die Zeile, die hoechstens
+    eine halbe Schrifthoehe unter dem Label beginnt, in der Spalte des Labels (bis zum naechsten Label rechts). Zeilen
+    mit einem weiteren Label oder einem Doppelpunkt-Begriff zaehlen nicht."""
+    h = label[3] - label[1]
+    for row in lines:
+        cell = [w for w in row if label[0] - h * 0.5 <= w[0] < right]
+        if not cell or not (label[1] + h * 0.5 < min(w[1] for w in cell) <= label[3] + h * 0.5):
+            continue
+        if any(w[4].upper() in TITLE_LABELS or w[4].endswith(":") for w in cell):
+            continue
+        return " ".join(w[4] for w in cell if w[4] not in ("-", ":")).strip()
+    return ""
+
+
 def _title_block(result: PdfResult, words, width: float, height: float, pat: Patterns) -> None:
     for w in words:
         m = _USER_RE.search(w[4])
@@ -147,6 +182,7 @@ def _title_block(result: PdfResult, words, width: float, height: float, pat: Pat
             result.plot_user = m.group(1)
             break
     lines = _lines(words, width * 0.85, height * 0.45)
+    alone = []                                       # Labels ohne jeden Text rechts daneben (Wert evtl. darunter)
     for row in lines:
         labels = [i for i, w in enumerate(row) if w[4].upper() in TITLE_LABELS]
         for n, i in enumerate(labels):
@@ -156,10 +192,19 @@ def _title_block(result: PdfResult, words, width: float, height: float, pat: Pat
             attr = {"DESIGNED": "designed", "DRAWN": "drawn", "CHECKED": "checked", "DATE": "title_date"}.get(label)
             if attr and value and value.upper() != "NA":
                 setattr(result, attr, value)
+            elif attr and end == i + 1:
+                alone.append((attr, row[i], row[labels[n + 1]][0] if n + 1 < len(labels) else width))
+    for attr, label, right in alone:                 # 1.0.38: Name in der 2. Zeile (Platz im Plankopf zu knapp)
+        if not getattr(result, attr):
+            value = _value_below(label, right, lines)
+            if value and value.upper() != "NA":
+                setattr(result, attr, value)
     # Zeichnungsnummer: groesste Schrift mit -PID- im Schriftfeld
     numbers = [w for row in lines for w in row if _DRAWING_NO_RE.search(w[4]) and w[1] > height * 0.9]
     if numbers:
-        result.drawing_no = max(numbers, key=lambda w: w[3] - w[1])[4]
+        result.drawing_no = max(numbers, key=_font_size)[4]
+    else:
+        result.drawing_no = _drawing_no_fallback(words, width, height)
     # Revisionszeilen: <Rev> <TT MON JJJJ> <Text ...> <Kuerzel> <Kuerzel> <Kuerzel>
     best = None
     for row in lines:

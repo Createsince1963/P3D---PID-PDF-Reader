@@ -21,6 +21,50 @@ def test_pdf_date():
     assert pdf_date("") is None
 
 
+def test_drawing_no_left_of_title_column_and_vertical_references():
+    """1.0.38: Zeichnungsnummer ab ~82 % der Breite (Schriftfeld mit Kunden-/Exyte-Nummer) wird gefunden; senkrechte
+    Verweise (hoher, schmaler Rahmen) und Anschlussverweise in normaler Schrift zaehlen nicht."""
+    from p3d_pdfreader.core.extract import PdfResult, _title_block
+    from p3d_pdfreader.core.patterns import load
+    W, H = 1684.0, 1191.0
+    text = [(100 + i, 300, 160 + i, 310, f"TXT{i}") for i in range(20)]          # uebliche Schrift ~10
+    words = text + [
+        (1221.1, 1100.3, 1350.1, 1110.2, "SGOPS-P-DS1-PID-01-UWWX-001"),         # Verweis, normale Schrift
+        (1388.2, 1113.4, 1590.7, 1129.3, "SGOPS-P-DS1-PID-00-CONG-007"),         # Nummer, x0 = 82 %
+    ]
+    r = PdfResult(Path("SGOPS-P-DS1-PID-00-CONG-007.pdf"))
+    _title_block(r, words, W, H, load())
+    assert r.drawing_no == "SGOPS-P-DS1-PID-00-CONG-007"
+    W, H = 2384.0, 1684.0
+    words = text + [
+        (2040.7, 1554.3, 2050.6, 1651.1, "SGOPS-P-DL1-PID-00-UAIR-008"),         # senkrechter Verweis
+        (2088.4, 1606.5, 2290.4, 1622.4, "SGOPS-P-DL1-PID-00-UAIR-003"),
+    ]
+    r = PdfResult(Path("SGOPS-P-DL1-PID-00-UAIR-003.pdf"))
+    _title_block(r, words, W, H, load())
+    assert r.drawing_no == "SGOPS-P-DL1-PID-00-UAIR-003"
+
+
+def test_title_value_in_second_line():
+    """1.0.38: „CHECKED:“ ohne Wert daneben, Name in der Zeile darunter; „DESIGNED: -“ holt nichts von unten."""
+    from p3d_pdfreader.core.extract import PdfResult, _title_block
+    from p3d_pdfreader.core.patterns import load
+    W, H = 1191.0, 842.0
+    words = [(100 + i, 300, 160 + i, 306, f"TXT{i}") for i in range(20)] + [
+        (1105.9, 701.7, 1132.7, 708.1, "CHECKED:"),
+        (994.1, 705.1, 1022.6, 711.4, "DESIGNED:"), (1026.2, 705.1, 1028.0, 711.4, "-"),
+        (1050.7, 705.1, 1071.8, 711.4, "DRAWN:"), (1075.2, 705.1, 1094.0, 711.4, "K.VIDIC"),
+        (1106.4, 708.0, 1130.6, 714.3, "I.MURALT"),
+        (994.1, 719.0, 1004.2, 725.3, "JOB"), (1005.6, 719.0, 1016.3, 725.3, "NO.:"),
+        (1020.0, 719.0, 1043.4, 725.3, "SG.01010"),
+        (1105.9, 719.0, 1121.2, 725.3, "DATE:"), (1126.1, 719.0, 1131.9, 725.3, "04"),
+        (1133.3, 719.0, 1144.8, 725.3, "MAR"), (1146.3, 719.0, 1157.8, 725.3, "2026"),
+    ]
+    r = PdfResult(Path("x.pdf"))
+    _title_block(r, words, W, H, load())
+    assert (r.checked, r.drawn, r.designed, r.title_date) == ("I.MURALT", "K.VIDIC", "", "04 MAR 2026")
+
+
 @needs_sample
 def test_sample_metadata_and_title_block():
     r = read_pdf(SAMPLE)

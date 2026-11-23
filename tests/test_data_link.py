@@ -105,6 +105,21 @@ def test_tile_editor_window_full(app, tmp_path):
         assert win.links == {1: "", 2: "Tag"} and "Datenlink 2" in win.model.headerData(1, Qt.Horizontal)
         win.link_boxes[1].setCurrentIndex(win.link_boxes[1].findData("P&ID No."))
         assert win.links[1] == "P&ID No." and win._link_columns() == {0, 1}
+        # 1.0.40: Tabellenstandard - Filterfeld je Spalte, Wertauswahl, Blattfilter, Zeilenzahl, Kopf-Menue
+        header = win.view.horizontalHeader()
+        assert len(header.editors) == len(HEAD)
+        win.proxy.set_filter_values(HEAD.index("P&ID No."), ["SGOPS-P-DL1-PID-00-EQPM-124"])
+        win._count()
+        assert win.proxy.rowCount() == 3 and win.count.text() == "3 / 4 Zeilen"
+        win.filter.setText("exakt")
+        assert win.proxy.rowCount() == 1
+        win.clear_filters()
+        assert win.proxy.rowCount() == 4 and not win.proxy.value_filters
+        from PySide6.QtWidgets import QMenu
+        menu = QMenu()
+        win._header_hook(menu, HEAD.index("Service"))
+        assert any("Als Datenlink 2 setzen" in a.text() for a in menu.actions())
+        assert [win.proxy.index(r, 0).data() for r in range(4)] == [r[0] for r in ROWS]   # Listenreihenfolge
         ctl, keys = win.panel.controller, win.panel.model.keys()
         assert ctl.setExport(keys.index("Leer"), False)                        # Leer nicht uebergeben
         ctl.moveColumn(keys.index("Service"), 0)
@@ -194,6 +209,75 @@ def test_help_workflow_data():
             assert (help_dir / fig["img"]).is_file() and fig["marks"]
             for m in fig["marks"]:
                 assert 0 <= m["pin"][0] <= 100 and 0 <= m["pin"][1] <= 100 and m["title"] and m["text"]
+
+
+def test_file_link_by_pdf_name(tmp_path):
+    """1.0.40: Datenlink-Feld „PDF“ (Dateiname mit .pdf, ggf. Kopie „ (2)“) findet die Zeichnung der Importliste,
+    damit auch die Tags dieser PDF (Beispiel PIT-107 in UTLY-002)."""
+    from p3d_pdfreader.core.data_link import file_variants
+    assert file_variants("A-PID-1 (2).PDF") == ["A-PID-1 (2).PDF", "A-PID-1 (2)", "A-PID-1"]
+    link = DataLink(_table(tmp_path), {"files": "PDF", "tags": "Tag"})
+    assert link.file_rows("SGOPS-P-DL1-PID-00-EQPM-124.pdf") == [1, 2, 3]
+    assert link.file_rows("SGOPS-P-DL1-PID-00-EQPM-124 (3).pdf") == [1, 2, 3]
+    assert link.tag_rows("XV-332", "SGOPS-P-DL1-PID-00-EQPM-124.pdf") == [1]
+    assert link.match_count(1, ["SGOPS-P-DL1-PID-00-EQPM-122.pdf", "X.pdf"]) == (1, 2)
+
+
+def test_tag_join_modes(tmp_path):
+    """1.0.38: PDF -> Liste, Liste -> PDF, beide; Importzeilen nur der eigenen Zeichnung; fehlend = n.a."""
+    from p3d_pdfreader.core.data_link import JOIN_BOTH, JOIN_LIST, JOIN_PDF, NA
+    link = DataLink(_table(tmp_path), {"files": "Zeichnungsnr.", "tags": "Tag"})
+    dwg = "SGOPS-P-DL1-PID-00-EQPM-124"
+    values = ["XV-332", "XV-777"]                         # XV-332 -> Zeile 1, XV-777 nicht in der Liste
+    assert link.tag_join(values, dwg, JOIN_PDF) == [(0, [1]), (1, [])]
+    assert link.tag_join(values, dwg, JOIN_LIST) == [(0, [1]), (None, [2]), (None, [3])]
+    assert link.tag_join(values, dwg, JOIN_BOTH) == [(0, [1]), (1, []), (None, [2]), (None, [3])]
+    assert link.values_or_na([]) == [NA] * len(link.columns)
+    no_dwg = DataLink(_table(tmp_path), {"tags": "Tag"})  # ohne Datenlink 1: alle Importzeilen
+    assert [i for i, _h in no_dwg.tag_join(["PV-330A"], None, JOIN_BOTH)] == [0, None, None, None]
+
+
+def test_tag_table_join_and_filter_reset(app, tmp_path, monkeypatch):
+    """Tag-Tabelle: Abgleich „beide“ zeigt Importzeilen ohne PDF-Tag mit n.a. (nicht bearbeitbar); PDF-Wechsel setzt
+    die Filter der Tag-Tabelle zurueck."""
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path))
+    from p3d_pdfreader import paths
+    from p3d_pdfreader.core.data_link import JOIN_BOTH, JOIN_LIST, NA
+    from p3d_pdfreader.core.extract import PdfResult, Tag
+    from p3d_pdfreader.gui import main_window
+    _table(tmp_path).save(paths.config_dir())
+    w = main_window.MainWindow(app, "test")
+    a = PdfResult(path=tmp_path / "a.pdf", drawing_no="SGOPS-P-DL1-PID-00-EQPM-124",
+                  tags=[Tag(tag="XV-332", type="Instrument"), Tag(tag="XV-777", type="Instrument")])
+    b = PdfResult(path=tmp_path / "b.pdf", drawing_no="SGOPS-P-DL1-PID-00-EQPM-122",
+                  tags=[Tag(tag="XV-332", type="Instrument")])
+    w.results = [a, b]
+    w._refresh()
+    w.links.set_field("files", "Zeichnungsnr.")
+    w.links.set_field("tags", "Tag")
+    page = w.page
+    page.files.table.setCurrentIndex(page.files.proxy.index(0, 0))
+    page.set_join_mode(JOIN_BOTH)
+    headers, rows = page.tags.headers, page.tags.rows()
+    service = headers.index("Service")
+    assert [r[1] for r in rows] == ["XV-332", "XV-777", NA, NA]
+    assert rows[1][service] == NA and rows[2][service] == "Inlet A4" and rows[2][2] == 0
+    page.edit_button.setChecked(True)
+    model = page.tags.proxy.sourceModel()
+    assert not (model.flags(model.index(2, main_window.FIRST_FIELD)) & Qt.ItemIsEditable)
+    assert model.flags(model.index(0, main_window.FIRST_FIELD)) & Qt.ItemIsEditable
+    page.edit_button.setChecked(False)
+    page.set_join_mode(JOIN_LIST)
+    assert [r[1] for r in page.tags.rows()] == ["XV-332", NA, NA]
+    # Filter setzen, PDF wechseln -> Standard
+    page.tags.filter.setText("XV")
+    page.dup_button.setChecked(True)
+    page.files.table.setCurrentIndex(page.files.proxy.index(1, 0))
+    assert page._store_result is b
+    assert page.tags.filter.text() == "" and not page.dup_button.isChecked()
+    assert page.tags.proxy.rowCount() == page.tags.proxy.sourceModel().rowCount()
+    w.links.set_join_mode("pdf")
+    w.close()
 
 
 def test_match_count_and_samples(tmp_path):

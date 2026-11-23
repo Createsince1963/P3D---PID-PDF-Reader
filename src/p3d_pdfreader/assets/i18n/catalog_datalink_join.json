@@ -1,0 +1,17 @@
+{
+ "_info": "Texte zum Abgleich Tag-Tabelle <-> Importliste und zum Filter-Reset (1.0.38). Format wie catalog.json.",
+ "Datenlink-Abgleich": {
+  "Abgleich": {"en": "Matching", "fr": "Rapprochement"},
+  "PDF-Tags → Importliste": {"en": "PDF tags → import list", "fr": "Tags PDF → liste d'import"},
+  "Importliste → PDF-Tags": {"en": "Import list → PDF tags", "fr": "Liste d'import → tags PDF"},
+  "Tags beider Listen": {"en": "Tags of both lists", "fr": "Tags des deux listes"},
+  "Filter der Tag-Tabelle zurücksetzen (geschieht auch bei jedem PDF-Wechsel)": {
+   "en": "Reset the tag table filters (also happens whenever another PDF is selected)",
+   "fr": "Réinitialiser les filtres du tableau des tags (aussi à chaque changement de PDF)"
+  },
+  "Abgleich der Tag-Tabelle mit der Importliste (Datenlink 2, mit Datenlink 1 je Zeichnung):\n• PDF-Tags → Importliste: alle Tags der PDF mit den passenden Listenwerten\n• Importliste → PDF-Tags: alle Zeilen der Liste zu dieser Zeichnung, getroffene mit ihrem PDF-Tag\n• Tags beider Listen: alles zusammen\nFehlende Werte stehen als „n.a.“ da.": {
+   "en": "Match the tag table with the import list (data link 2, per drawing with data link 1):\n• PDF tags → import list: all tags of the PDF with the matching list values\n• Import list → PDF tags: all list rows of this drawing, matched ones with their PDF tag\n• Tags of both lists: everything together\nMissing values are shown as “n.a.”.",
+   "fr": "Rapprocher le tableau des tags avec la liste d'import (lien de données 2, par plan avec le lien 1) :\n• Tags PDF → liste d'import : tous les tags du PDF avec les valeurs de la liste\n• Liste d'import → tags PDF : toutes les lignes de la liste pour ce plan, celles trouvées avec leur tag PDF\n• Tags des deux listes : tout ensemble\nLes valeurs manquantes sont affichées « n.a. »."
+  }
+ }
+}
