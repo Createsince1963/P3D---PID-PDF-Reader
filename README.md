@@ -11,7 +11,7 @@ Der Aufbau (Menüband, Blätter, Tabellen, Launcher) entspricht P3D XCHANGE. Akt
   - App oder EXE starten
   - Quality gate: Umgebung prüfen, `--version`, Architekturtest, Tests
   - EXE bauen
-  - Ordner öffnen
+  - Ordner öffnen („Open data“ = Datenordner der App, siehe Pfade)
   - Portable Kopie (USB, Firmen-Laptop)
   - Hotspot
   - **Web-Server** (Browser-Zugriff im Firmennetz, siehe unten)
@@ -165,7 +165,7 @@ Die Ansicht jeder Tabelle (Spaltenreihenfolge, Breiten, Ausblenden, Sortierung, 
   - Zielordner wählbar, optional mit Unterordner `Review_<Zeitstempel>`. Die Auswahl wird gemerkt.
 
 ## Export
-- **Export Excel:** Blätter „Dateien“ und „Tags“ über alle PDFs (Tags mit Seiten, X/Y der ersten Fundstelle, gespeicherten Review-Spalten und im Projektmodus den Prüfspalten).
+- **Export Excel:** Blätter „Dateien“ und „Tags“ über alle PDFs (Tags: PDF, Zeichnungsnr., Typ, Tag, Anzahl, Seiten, gespeicherte Review-Spalten, im Projektmodus die Prüfspalten; ohne X/Y seit 1.0.42).
 - **Export CSV:** Tags plus `_Dateien.csv`, getrennt mit `;`, UTF-8 mit BOM.
 - Für eine Tabelle genau so, wie sie im Tool eingestellt ist: Tabellen-Vorschau bzw. das Excel-Symbol der jeweiligen Tabelle.
 

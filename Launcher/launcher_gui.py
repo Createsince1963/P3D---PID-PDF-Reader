@@ -414,10 +414,11 @@ Launcher of this copy (start, environment check, folders, hotspot):
    {COMPANY_PYTHON}; any other python.exe: set P3D_PDFREADER_PYTHON.)
   Tests and the EXE build are not part of this copy - those launcher buttons only work in the full workspace.
 
-Settings, mapping, licence/access and logs are created by the app in the subfolders "config" and "logs" of this copy.
-Licence/access (security.sqlite) is not copied: set it up on the new computer in the Administrator area.
+The app creates its data folder "data" in this copy on first start: settings and the imported list (data\\config),
+review entries (data\\reviews), projects (data\\projects), exports and logs. Another location: set P3D_PDFREADER_HOME.
 
-Not in this copy on purpose: project data (Input, Export List, Output), tests, tools, build files.
+Not in this copy on purpose: the data of the source computer (settings, reviews, projects, exports, logs), tests,
+tools, build files. A project file (.db) can be copied separately and opened in the app (Projekt wählen > Projekt öffnen).
 """
         (self.dest / "INSTALL.txt").write_text(text, encoding="utf-8")
         return f"Python {py or '?'}"
@@ -542,7 +543,7 @@ class LauncherWindow(QWidget):
         side.addWidget(self._card("Folders", collapsed=True, inner=self._grid((
             ("Open workspace", lambda: self._open(ROOT), "folder"),
             ("Open data", lambda: self._open(self._data_dir()), "folder"),
-            ("Open logs", lambda: self._open(ROOT / "logs"), "folder"),
+            ("Open logs", lambda: self._open(self._data_dir() / "logs"), "folder"),
             ("Open dist", lambda: self._open(ROOT / "build_exe" / "dist"), "folder"),
             ("Open EXE data", lambda: self._open(self._exe_data_dir()), "folder"),
         ))))
@@ -750,8 +751,11 @@ class LauncherWindow(QWidget):
 
     @staticmethod
     def _data_dir() -> Path:
-        """Data folder of the app when run from source (paths.TOOL_ROOT = workspace): settings, mapping, licence in config\\."""
-        return ROOT / "config"
+        """Data folder of the app when run from source - same rule as ``p3d_pdfreader.paths.home_dir()``:
+        %P3D_PDFREADER_HOME%, else <workspace>\\data (config, reviews, projects, exports, logs). 1.0.42: before it
+        opened <workspace>\\config, which the app does not use."""
+        env = os.environ.get(ENV_HOME, "").strip()
+        return Path(env) if env else ROOT / "data"
 
     @staticmethod
     def _exe_data_dir() -> Path:

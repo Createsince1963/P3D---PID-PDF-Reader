@@ -11,7 +11,7 @@ from .review_store import FIELDS, ReviewStore
 FILE_HEADERS = ["PDF", "Zeichnungsnr.", "Erstellt (PDF)", "Ersteller", "Drawn", "Checked", "Datum Schriftfeld", "Rev",
                 "Rev-Datum", "Rev-Text", "Rev-Kuerzel", "Plot-Benutzer", "Creator", "Seiten", "Groesse KB",
                 "Anzahl Tags", "Ordner", "Fehler"]
-TAG_HEADERS = ["PDF", "Zeichnungsnr.", "Typ", "Tag", "Anzahl", "Seiten", "X", "Y"]
+TAG_HEADERS = ["PDF", "Zeichnungsnr.", "Typ", "Tag", "Anzahl", "Seiten"]   # ohne X/Y seit 1.0.42 (Nutzervorgabe)
 
 
 def file_rows(results: list[PdfResult]) -> list[list]:
@@ -27,7 +27,7 @@ def tag_rows(results: list[PdfResult], review: bool = False, checker=None) -> li
     for r in results:
         store = ReviewStore(r.path) if review else None
         for t in r.tags:
-            row = [r.name, r.drawing_no, t.type, t.tag, t.count, t.pages_text, t.x, t.y]
+            row = [r.name, r.drawing_no, t.type, t.tag, t.count, t.pages_text]
             if store:
                 row += store.values(t.type, t.tag)
             if checker is not None:

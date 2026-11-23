@@ -114,7 +114,7 @@ ol.pins li b{display:block}
 </head>
 <body>
 <header>
-  <h1>P3D PDF Reader – Handbuch</h1><span class="ver">ab Version 1.0.11</span>
+  <h1>P3D PDF Reader – Handbuch</h1><span class="ver">Stand Version 1.0.42</span>
   <input id="q" type="search" placeholder="Im Handbuch suchen … (z. B. Redline, F3, Filter)" aria-label="Suchen">
 </header>
 <div class="wrap">
@@ -194,7 +194,7 @@ ol.pins li b{display:block}
 <h3>Leisten über den Bereichen</h3>
 <ul>
   <li><b>Dateien:</b> Alle markieren, Review markierte …, Excel</li>
-  <li><b>Tags:</b> Aus PDF-Scan übernehmen (Schriftfeld-Spalten Ersteller, Checked, Rev, Rev-Datum, Rev-Text hinten anfügen), Autofill OK (OK-Werte: Review, User, Datum ohne Uhrzeit, WPO = Checked), Bearbeiten, Speichern, Nur doppelte, Filter zurücksetzen, ◀ ▶ Fundstelle, Excel, Redline</li>
+  <li><b>Tags:</b> Aus PDF-Scan übernehmen (Schriftfeld-Spalten Ersteller, Checked, Rev, Rev-Datum, Rev-Text hinten anfügen), Autofill OK (OK-Werte: Review, User, Datum ohne Uhrzeit, WPO = Checked), Bearbeiten, Speichern, Nur doppelte, Nur Abweichungen, Filter zurücksetzen, <b>Abgleich</b> (Richtung des Abgleichs mit der Importliste, siehe Kapitel „Datenlink“), ◀ ▶ Fundstelle, Excel, Redline</li>
   <li><b>PDF-Viewer:</b> Einpassen, Zoom ±, Drehen, Seite ◀ ▶, ◀ ▶ Fundstelle, Redline, Öffnen (Standardprogramm), 2. Monitor</li>
 </ul>
 </section>
@@ -203,9 +203,15 @@ ol.pins li b{display:block}
 <h2>Blatt „PID-Tags“</h2>
 <ol>
   <li><b>Dateien</b> – eine Zeile je PDF: Zeichnungsnr., Erstellt (PDF), Ersteller, Checked, Rev, Rev-Datum, Rev-Text, Plot-Benutzer, Anzahl Tags, Fehler. Mehrere PDFs mit <kbd>Strg</kbd>- oder <kbd>Umschalt</kbd>-Klick markieren (z. B. für den Review).</li>
-  <li><b>Tags der gewählten PDF</b> – Typ, Tag, Anzahl und Review-Spalten. Zeilen mit Anzahl &gt; 1 (doppelte Tags) sind <mark>gelb</mark> hinterlegt.</li>
+  <li><b>Tags der gewählten PDF</b> – Typ, Tag, Anzahl, Seiten und Review-Spalten (im Projektmodus Projekt-Prüfung und -Hinweis, mit Datenlink 2 die Spalten der Importliste). Zeilen mit Anzahl &gt; 1 (doppelte Tags) sind <mark>gelb</mark> hinterlegt.</li>
   <li><b>PDF-Viewer</b> – Fundstellen doppelter Tags sind gelb hinterlegt.</li>
 </ol>
+<h3>Andere PDF wählen</h3>
+<ul>
+  <li>Gibt es ungespeicherte Review-Einträge, fragt das Tool: <b>Speichern</b>, <b>Verwerfen</b> (gespeicherten Stand wieder laden) oder <b>Abbrechen</b> (bei der bisherigen PDF bleiben).</li>
+  <li>Die Filter der Tag-Tabelle (Blattfilter, Spaltenfilter, „Nur doppelte“, „Nur Abweichungen“) werden auf Standard zurückgesetzt – jede PDF beginnt mit allen Tags.</li>
+  <li>Beim Programmstart sind in Dateiliste und Tag-Tabelle keine Filter aktiv.</li>
+</ul>
 <h3>Fundstellen</h3>
 <ul>
   <li><b>Eine Fundstelle:</b> Klick oder Pfeiltasten markieren den Tag und zoomen darauf.</li>
@@ -218,7 +224,8 @@ ol.pins li b{display:block}
 
 <section id="tables" data-title="Tabellen &amp; Rechtsklick">
 <h2>Tabellen &amp; Rechtsklick</h2>
-<p>Alle Tabellen haben den Standard von P3D XCHANGE: Filter je Spalte (Doppelklick = Wertauswahl), Filter über das ganze Blatt, Sortierung, Zoom und gemerkte Ansichten (<i>Save / Load / Reset Layout</i>).</p>
+<p>Alle Tabellen haben den Standard von P3D XCHANGE: Filter je Spalte (Doppelklick = Wertauswahl), Filter über das ganze Blatt, Sortierung, Zoom und gemerkte Ansichten (<i>Save / Load / Reset Layout</i>). Das gilt auch für die Datentabelle im Kachel-Editor.</p>
+<p><b>Was gemerkt wird:</b> Spaltenreihenfolge, Breiten, ausgeblendete Spalten, Sortierung und Zoom jeder Tabelle. Filter merken Dateiliste und Tag-Tabelle bewusst nicht – sie starten immer ohne Filter. Die Ansicht <b>aller</b> Tabellen auf einmal sichert „2 Ansicht › Tabellenprofil“ als Datei.</p>
 <h3>Rechtsklick – ausprobieren</h3>
 <p class="note">Rechtsklick (oder langer Druck) auf eine Zelle der Beispieltabelle öffnet das Menü wie in der App; ein Klick auf einen Eintrag erklärt ihn.</p>
 <div class="demo" id="demo">
@@ -254,7 +261,7 @@ ol.pins li b{display:block}
     <ul>
       <li><b>1 Kachel-Editor</b> (oben): Menüband <i>Start</i> (Rückgängig/Wiederholen, Aus-/einblenden, <b>Export ja/nein</b>, Kacheln gruppieren, Spalte zurücksetzen/duplizieren, Spalten hinzufügen, Als Excel speichern), <i>Umwandeln</i> (Leerzeichen, Bereinigen, GROSS/klein, Ersetzen, Text ergänzen, Extrahieren, Teilen, Füllen) und <i>Spalte hinzufügen</i> (Wenn … dann …, Liste prüfen, Aus Liste, Ja/Nein-, Indexspalte). Jede Spalte ist eine Kachel: ziehen = verschieben, Doppelklick = umbenennen. Kacheln im Bereich <b>Nicht exportiert</b> werden nicht an das Tool übergeben.</li>
       <li><b>2 Seitenleiste</b> (rechts): aktive Kachel, Gruppe und Verlauf aller Schritte; einklappbar oder als eigenes Fenster lösbar.</li>
-      <li><b>3 Datentabelle</b> (unten): die Liste, wie sie übergeben wird. Zellen der Originalspalten per Doppelklick bearbeiten. Klick auf einen Spaltenkopf wählt die Kachel.</li>
+      <li><b>3 Datentabelle</b> (unten): die Liste, wie sie übergeben wird – mit den Standard-Tabellenfunktionen: Filterfeld je Spalte (Tippen = Textfilter, Doppelklick = Wertauswahl), Blattfilter mit Zeilenzahl, Rechtsklick-Menü (Kopieren, nach Wert filtern, Filter zurücksetzen, Spalten …, Nach Excel …), Excel-Symbol in der Ecke, Zoom. Zellen der Originalspalten per Doppelklick bearbeiten. Klick auf einen Spaltenkopf wählt die Kachel; Reihenfolge und Ausblenden bestimmen die Kacheln.</li>
     </ul></li>
   <li><b>Datenlink 1</b> (zu Tabelle 1 – Dateien, z. B. „P&amp;ID No.“) und <b>Datenlink 2</b> (zu Tabelle 2 – Tags, z. B. „Tag“) per Rechtsklick auf den Tabellenkopf oder Auswahlfeld setzen; der Spaltenkopf wird dunkelgrün. <b>Übernehmen und verlinken</b> speichert Originalliste, Anpassung und Ergebnis (<code>config\data_link.json</code>); beim nächsten Öffnen sind alle Schritte wieder da.</li>
   <li><b>Anpassung speichern / laden …</b> sichert alle Schritte als Datei und wendet sie auf eine neue Version der Liste an. <b>Andere Excel-Liste …</b> wendet die aktuelle Anpassung sofort auf die neue Liste an. <b>Als Excel speichern …</b> schreibt die angepasste Liste als Excel-Datei (nur exportierte Spalten), die sich wieder mit „Liste importieren“ einlesen lässt.</li>
@@ -262,9 +269,20 @@ ol.pins li b{display:block}
 </ol>
 <ul>
   <li><b>Dateien</b> bekommt die Spalte „Datenlink-Treffer“ (Zeilen der Liste zu dieser Zeichnung).</li>
-  <li><b>Tags</b> bekommt „Datenlink-Treffer“ und alle übergebenen Spalten der Liste (gleichnamige mit „ (Liste)“). 0 Treffer = Tag fehlt in der Liste.</li>
-  <li><b>Abgleich:</b> ohne Groß-/Kleinschreibung und Leerzeichen; ohne exakten Treffer zählt die Endung ab einem Bindestrich – „301-30-149-<b>TI-300</b>“ passt zum Tag „TI-300“. Sind beide Datenlinks aktiv, zählen für einen Tag nur Listenzeilen derselben Zeichnung. Mehrere Treffer: verschiedene Werte mit „ | “ verbunden.</li>
+  <li><b>Tags</b> bekommt „Datenlink-Treffer“ und alle übergebenen Spalten der Liste (gleichnamige mit „ (Liste)“). 0 Treffer = Tag fehlt in der Liste; die Listenspalten stehen dann auf <b>„n.a.“</b>.</li>
+  <li><b>Abgleich:</b> ohne Groß-/Kleinschreibung und Leerzeichen; ohne exakten Treffer zählt die Endung ab einem Bindestrich – „301-30-149-<b>TI-300</b>“ passt zum Tag „TI-300“. Beim Zeichnungsabgleich zählen „.pdf“ und ein Kopie-Zusatz wie „ (2)“ nicht – das Datenlink-Feld darf also auch „PDF“ (Dateiname) sein. Sind beide Datenlinks aktiv, zählen für einen Tag nur Listenzeilen <b>derselben Zeichnung</b>: erst muss die Zeichnung passen, dann der Tag. Mehrere Treffer: verschiedene Werte mit „ | “ verbunden.</li>
+  <li><b>Findet ein Tag keinen Treffer, obwohl er in der Liste steht?</b> Zuerst in der Dateiliste „Datenlink-Treffer“ der PDF prüfen: steht dort 0, passt die Zeichnung nicht zur Spalte der Liste (Datenlink-Feld bzw. Datenlink 1 prüfen).</li>
 </ul>
+<h3>Abgleich-Richtung der Tag-Tabelle</h3>
+<p>Leiste der Tag-Tabelle › <b>Abgleich</b> (wird gemerkt):</p>
+<ul>
+  <li><b>PDF-Tags → Importliste</b> (Standard): alle Tags der PDF mit den passenden Listenwerten.</li>
+  <li><b>Importliste → PDF-Tags:</b> alle Zeilen der Liste zu dieser Zeichnung; getroffene mit ihrem PDF-Tag. Zeigt, was in der Liste steht, aber im Plan fehlt.</li>
+  <li><b>Tags beider Listen:</b> alle PDF-Tags und dahinter die Listenzeilen ohne PDF-Tag.</li>
+</ul>
+<p>Fehlende Werte stehen als <b>„n.a.“</b> da. Zeilen ohne PDF-Tag lassen sich nicht bearbeiten (kein Review-Eintrag).</p>
+<h3>Review Importliste</h3>
+<p>„3 Prüfen › Review Importliste“ öffnet ein eigenes Blatt mit einem <b>Prüfergebnis</b> je Zeile über alle PDFs: <b>OK</b> (Tag im PDF und in der Liste), <b>Nicht in Liste</b>, <b>Fehlt im PDF</b> (Zeile der Liste zu einer gescannten Zeichnung) und <b>Zeichnung nicht gescannt</b>. Rechts die exportierten Spalten der Liste, „Importzeilen“ nennt die Zeilennummern. Zählung je Ergebnis im Blattkopf, Excel über das Symbol in der Tabellenecke.</p>
 </section>
 
 <section id="review" data-title="Review / Redline">
@@ -277,7 +295,7 @@ ol.pins li b{display:block}
   <li>Es gilt der Tabellenfilter: mit „Nur doppelte“ entsteht ein Redline nur mit den doppelten Tags.</li>
 </ul>
 <h3>Review-Excel</h3>
-<p>Blatt „Review“ mit einer Zeile je Fundstelle: Pos.-Nr. (wie im Redline; im Bulk <code>&lt;PDF-Nr&gt;.&lt;Pos&gt;</code>), PDF, Zeichnungsnr., Rev, Typ, Tag, Fundstelle, Anzahl, Doppelt, Review-Kommentar, <b>Prüfstatus</b> (Offen, OK, Korrektur erforderlich, Klärung, Nicht relevant), Bemerkung, Geprüft von/am. Dazu Blätter „Dateien“ und „Info“.</p>
+<p>Blatt „Review“ mit einer Zeile je Fundstelle: Pos.-Nr. (wie im Redline; im Bulk <code>&lt;PDF-Nr&gt;.&lt;Pos&gt;</code>), PDF, Zeichnungsnr., Rev, Typ, Tag, Seite, Fundstelle, Anzahl auf Seite, Doppelt, im Projektmodus Projekt-Prüfung und -Hinweis, Review-Kommentar, dann die Review-Spalten der Tag-Tabelle: <b>Review</b> und <b>Änderung</b> (Auswahllisten), Neuer Wert, Bemerkung, WPO, Datum, User. Keine X/Y-Koordinaten. Dazu Blätter „Dateien“ und „Info“.</p>
 <h3>Review Auswahl/Bulk</h3>
 <p>Markierte oder alle PDFs; Ausgaben ankreuzen (Redline je PDF, Review-Excel je PDF, Review-Excel gesamt); Zielordner, optional Unterordner <code>Review_&lt;Zeitstempel&gt;</code>.</p>
 <h3>Tabelle bearbeiten</h3>
@@ -297,9 +315,10 @@ ol.pins li b{display:block}
 <section id="export" data-title="Export">
 <h2>Export</h2>
 <ul>
-  <li><b>Export Excel:</b> Blätter „Dateien“ und „Tags“ über alle PDFs.</li>
+  <li><b>Export Excel:</b> Blätter „Dateien“ und „Tags“ über alle PDFs (Tags: PDF, Zeichnungsnr., Typ, Tag, Anzahl, Seiten, Review-Spalten, im Projektmodus die Prüfspalten – ohne X/Y).</li>
   <li><b>Export CSV:</b> Tags plus <code>_Dateien.csv</code>, Trennzeichen <code>;</code>, UTF-8 mit BOM.</li>
   <li><b>Excel-Symbol</b> in jeder Tabelle: sichtbare Ansicht, Dateiname mit PDF-/Tabellenname und Zeitstempel.</li>
+  <li><b>Tabellen-Vorschau</b> („2 Ansicht“): Tags aller PDFs genau mit den Spalten, wie die Tag-Tabelle eingestellt ist (inkl. Datenlink-Spalten und Abgleich), dann über das Excel-Symbol sichern.</li>
 </ul>
 </section>
 
@@ -320,13 +339,14 @@ ol.pins li b{display:block}
 <table class="t"><thead><tr><th>Feld</th><th>Quelle</th></tr></thead><tbody>
 <tr><td>Erstellt</td><td>PDF-Metadaten (Plotzeitpunkt)</td></tr>
 <tr><td>Ersteller</td><td>Schriftfeld <code>DRAWN:</code> → letzte Revisionszeile → PDF-Author → Plot-Benutzer</td></tr>
-<tr><td>Checked, Zeichnungsnr., Rev</td><td>Schriftfeld und letzte Revisionszeile</td></tr>
+<tr><td>Checked, Designed, Datum, Rev</td><td>Schriftfeld und letzte Revisionszeile. Steht neben „CHECKED:“ nichts, gilt der Text direkt darunter (Name in der zweiten Zeile).</td></tr>
+<tr><td>Zeichnungsnr.</td><td>Größte Schrift mit „-PID-“ unten im Schriftfeld; auch wenn sie weiter links steht (Schriftfeld mit Kunden- und Exyte-Nummer). Senkrecht geschriebene Verweise zählen nicht. Die Nummer erscheint nicht als Tag.</td></tr>
 <tr><td>Instrument</td><td>Kürzel in der Blase plus Nummer darunter (<code>TIT-130</code>)</td></tr>
 <tr><td>Equipment / Armatur / Volltag</td><td>Tag-Muster (<code>111PMP01</code>, <code>VH340</code>, <code>203-17-111-TZIT-011</code>)</td></tr>
 <tr><td>Rohrleitung (optional)</td><td>Menüband › Projekt › Rohrleitungen; waagerecht und senkrecht</td></tr>
 </tbody></table></div></details>
 <details><summary>Wo liegen meine Daten?</summary><div>
-<p>Datenordner: <code>%P3D_PDFREADER_HOME%</code>, sonst <code>&lt;Tool&gt;\data</code>, als EXE <code>%LOCALAPPDATA%\P3D_PDFREADER</code>. Darin <code>config\paths.json</code> (Quell-/Exportordner), <code>config\state.json</code>, <code>config\table_views.json</code>, <code>config\tag_patterns.json</code>, <code>logs\</code>, <code>exports\</code>.</p>
+<p>Datenordner: <code>%P3D_PDFREADER_HOME%</code>, sonst <code>&lt;Tool&gt;\data</code>, als EXE <code>%LOCALAPPDATA%\P3D_PDFREADER</code>. Darin <code>config\paths.json</code> (Quell-/Exportordner), <code>config\state.json</code>, <code>config\table_views.json</code>, <code>config\tag_patterns.json</code>, <code>config\data_link.json</code> (Importliste), <code>reviews\</code> (Review-Einträge, jeder Stand eine Datei), <code>projects\</code>, <code>logs\</code>, <code>exports\</code>. Im Launcher öffnet „Open data“ diesen Ordner.</p>
 <p>Projekt › <b>Pfade</b>: Quellordner hinzufügen/entfernen, Exportordner wählen. Projekt › <b>Tag-Muster</b>: Regex und Ausschlussliste anpassen.</p></div></details>
 <details><summary>Warum erscheint Equipment doppelt?</summary><div>
 <p>Equipment steht oft zusätzlich in der Equipment-Tabelle am Blattfuß und zählt dann als doppelter Tag – das kann gewollt sein.</p></div></details>
@@ -404,7 +424,8 @@ const R = [
   ["pipes","Rohr-\nleitungen","Rohrleitungsnummern (z. B. TFHR_SS01_001_1\") mit in die Tag-Liste übernehmen, ein oder aus. An = Symbol grün. Wird gemerkt; Umschalten liest geladene PDFs neu ein."],
   ["project_defs","Projekt-\ndefinitionen …","Codelisten, Listen, Tag-Strukturen, PDF-Prüfregeln bearbeiten; Excel-Export/-Import; „Tag testen“."],
   ["paths","Pfade","Quellordner und Exportordner verwalten, Speicherorte öffnen."],
-  ["patterns","Tag-\nMuster","Öffnet tag_patterns.json: Regex je Tag-Typ und Ausschlussliste für Kürzel."]]],
+  ["patterns","Tag-\nMuster","Öffnet tag_patterns.json: Regex je Tag-Typ und Ausschlussliste für Kürzel."],
+  ["settings_menu","Einstel-\nlungen","Layer für Review im PDF: Rahmen, Pos.-Nr. und Kommentare des Redline-PDFs auf eine eigene PDF-Ebene „Review_TT.MM.JJJJ“ legen (Standard an)."]]],
  ["1  Einlesen", [
   ["scan","Quellordner\nscannen","Liest alle PDFs der Quellordner (inkl. Unterordner) ein. Taste F5."],
   ["folder","Ordner\nöffnen …","Einen beliebigen Ordner mit PDF-Plots einlesen."],
@@ -414,12 +435,14 @@ const R = [
   ["sheet_tags","PID-Tags","Wechselt zum Blatt „PID-Tags“."],
   ["sheet_all","Alle Tags","Öffnet das Blatt mit den Tags aller PDFs."],
   ["monitor","Viewer\n2. Monitor","PDF-Viewer in eigenem Fenster (z. B. auf dem zweiten Bildschirm). Wird gemerkt."],
-  ["preview","Tabellen-\nVorschau …","Vorschau der aktuellen Tabelle."]]],
+  ["preview","Tabellen-\nVorschau …","Eigenes Blatt mit den Tags aller PDFs: vorne PDF und Zeichnungsnr., dann die Spalten der Tag-Tabelle in der eingestellten Reihenfolge und Sichtbarkeit, ohne X/Y. Excel über das Symbol in der Tabellenecke."],
+  ["table_profile","Tabellen-\nprofil","Ansicht aller Tabellen (Spalten, Breiten, Sortierung, Zoom) als Datei speichern oder laden."]]],
  ["3  Prüfen", [
   ["prev","Fundstelle\nzurück","Vorherige Fundstelle des gewählten Tags. Umschalt+F3."],
   ["next","Fundstelle\nweiter","Nächste Fundstelle des gewählten Tags; nach der letzten die Übersicht. F3."],
   ["dups","Nur doppelte\nTags","Zeigt nur Tags, die mehrfach in der PDF stehen."],
   ["deviations","Nur Projekt-\nabweichungen","Nur Tags mit Befund der Projekt-Prüfung (nur im Projektmodus aktiv)."],
+  ["link_review","Review\nImportliste","Eigenes Blatt: alle PDF-Tags gegen die Importliste – OK, Nicht in Liste, Fehlt im PDF, Zeichnung nicht gescannt. Siehe Kapitel „Datenlink“."],
   ["filter_reset","Filter\nzurücksetzen","Blattfilter, Spaltenfilter, Wertauswahl und „Nur …“-Schalter in allen Tabellen zurücksetzen."],
   ["edit","Tabelle\nbearbeiten","Review-Spalten der Tag-Tabelle bearbeiten (Review, Änderung, Neuer Wert, Bemerkung …)."],
   ["save","Review\nspeichern","Review-Einträge sichern. Strg+S."]]],
@@ -428,7 +451,7 @@ const R = [
   ["redline","Redline-PDF\ngewählte PDF","Kopie der gewählten PDF mit Rahmen, Pos.-Nr. und Kommentar je Fundstelle (Tabellenfilter gilt)."],
   ["review_xlsx","Review-Excel\ngewählte PDF","Excel mit einer Zeile je Fundstelle, Prüfstatus-Auswahlliste und Bemerkung."]]],
  ["5  Export", [
-  ["xlsx","Export\nExcel …","Dateien und Tags aller PDFs als Excel."],
+  ["xlsx","Export\nExcel …","Dateien und Tags aller PDFs als Excel (Tags ohne X/Y, mit Review- und Prüfspalten)."],
   ["csv","Export\nCSV …","Tags als CSV (;) plus _Dateien.csv."],
   ["open_exports","Export-\nordner","Öffnet den Exportordner im Explorer."]]],
  ["Hilfe", [

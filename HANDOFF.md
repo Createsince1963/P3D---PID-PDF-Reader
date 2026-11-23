@@ -1,4 +1,4 @@
-# HANDOFF – P3D PDF Reader (Stand 1.0.41, 2026-11-23)
+# HANDOFF – P3D PDF Reader (Stand 1.0.42, 2026-11-23)
 
 Einstieg für neue Entwickler. Funktionen aus Nutzersicht: `README.md`. Historie mit Begründungen: `CHANGELOG.md`
 (oben = neu). Projektregeln: `CLAUDE.md` (liegt nur lokal, steht in `.gitignore`; die Regeln sind unten zusammengefasst).
@@ -23,7 +23,7 @@ Excel-Liste ab (Datenlink) und erzeugt Redline-PDFs und Review-Excel. Ein Kern, 
 | `src\p3d_pdfreader\column_editor\` | **Kopie des Kachel-Editors aus Tag Compliance – nicht von Hand ändern** (`QUELLE.md`); Einbindung in `gui\tile_editor\` |
 | `Launcher\` | `START_LAUNCHER.bat`, `launcher_gui.py` (Start, Quality gate, EXE, portable Kopie, Hotspot, Web-Server) |
 | `data\` (in `.gitignore`) | Datenordner im Entwicklungsbetrieb: `config\` (Einstellungen, Importliste), `reviews\`, `projects\`, `exports\`, `logs\` |
-| `config\` (Wurzel, **nicht in Git**) | Alte Projektdefinitionen/Listen (Okt. 2026). Die App liest sie nicht (sie nutzt `data\config`); Nutzerdaten, nicht löschen, mit dem Nutzer klären |
+| `config\` (Wurzel, **nicht in Git**) | Alte Projektdefinitionen/Listen (Okt. 2026). Weder App noch Launcher nutzen sie (beide: `data\`); Nutzerdaten, nicht löschen, mit dem Nutzer klären |
 | `tools\` | Generatoren: Handbuch-Bilder (`make_help_images`, `make_help_workflow`), i18n-Katalog, Versionsinfo für EXE, `translate_column_editor` |
 | `tests\` | pytest, siehe unten |
 
@@ -66,14 +66,13 @@ Excel-Liste ab (Datenlink) und erzeugt Redline-PDFs und Review-Excel. Ein Kern, 
 - Nach GUI-Änderungen: Handbuch-Bilder mit `tools\make_help_images.py` bzw. `tools\make_help_workflow.py` neu erzeugen (Workflow-Bilder mit `QT_QPA_PLATFORM=windows`, sonst fehlt die QML-Schrift).
 
 ## Aktueller Stand / offene Punkte
-- Programmstand **1.0.40** (Commit `304fba7`), Tests 75/75 grün; 1.0.41 ändert nur die Dokumentation. Ungetrackt und bewusst nicht committet: `Anpassung_Importliste_*.json`, `Tabellenprofil_*.json` (vom Nutzer gespeicherte Dateien), `build_exe\`, `config\`.
-- **Handbuch** (`assets\help\handbuch.html`) beschreibt 1.0.38–1.0.40 noch nicht: Abgleich-Menü der Tag-Tabelle, „n.a.“, Tabellen-Vorschau als Blatt, Filter-Reset beim PDF-Wechsel, Standard-Tabellenfunktionen im Kachel-Editor.
+- Stand **1.0.42**, Tests 76/76 grün (ganze Suite ca. 8 Minuten). Ungetrackt und bewusst nicht committet: `Anpassung_Importliste_*.json`, `Tabellenprofil_*.json` (vom Nutzer gespeicherte Dateien), `build_exe\`, `config\`.
+- Erledigt in 1.0.42: Handbuch auf Stand 1.0.42, Launcher „Open data/logs“ zeigt auf den Datenordner der App, Export Excel/CSV ohne X/Y.
+- **Handbuch-Workflow-Bilder** (`tools\make_help_workflow.py`, `img\wf_*.png`) zeigen noch den Stand vor 1.0.38 (z. B. ohne Knopf „Abgleich“). Neu erzeugen, wenn die Oberfläche fertig abgenommen ist (mit `QT_QPA_PLATFORM=windows`).
 - **i18n:** Texte der neuen Tabellen-Vorschau und des Kachel-Editor-Zeilenzählers sind nur deutsch; `i18n.untranslated()` listet fehlende Texte zur Laufzeit.
-- **Export Excel/CSV** (Menüband „5 Export“) enthält bei den Tags noch X/Y (`core.export.TAG_HEADERS`); die Tabellen-Vorschau nicht mehr. Mit dem Nutzer klären, ob X/Y auch dort entfallen sollen.
 - **Web-Version** kennt Datenlink, Abgleich, Tabellen-Vorschau und Projektmodus nicht (siehe README, „Noch nicht in der Web-Version“).
-- **Launcher, Datenordner:** `Launcher\launcher_gui.py` `_data_dir()` öffnet `<Tool>\config`, die App schreibt aber nach `<Tool>\data\config` (`paths.home_dir()`). Vermutlich alter Stand – prüfen und angleichen.
 - **Datenlink-Feld „PDF“:** funktioniert seit 1.0.40. Empfehlung an Nutzer bleibt „Zeichnungsnr.“, weil sie unabhängig vom Dateinamen ist.
-- Alles aus 1.0.38–1.0.40 ist mit Tests und Skripten auf den echten Testdaten geprüft, aber noch nicht vom Nutzer in der laufenden App abgenommen.
+- Alles aus 1.0.38–1.0.42 ist mit Tests und Skripten auf den echten Testdaten geprüft, aber noch nicht vom Nutzer in der laufenden App abgenommen.
 
 ## Typischer Arbeitsablauf
 1. `CHANGELOG.md` oben und diese Datei lesen, `git status` prüfen.

@@ -94,6 +94,18 @@ def test_export(tmp_path):
     assert (tmp_path / "x.csv").read_text(encoding="utf-8-sig").startswith("PDF;")
 
 
+def test_export_tags_without_xy(tmp_path):
+    """1.0.42: Export Excel/CSV (Tags) ohne X/Y; Spaltenzahl der Zeilen passt zum Kopf."""
+    import openpyxl
+    from p3d_pdfreader.core.extract import PdfResult, Tag
+    results = [PdfResult(path=tmp_path / "a.pdf", drawing_no="DWG-A", tags=[Tag(tag="XV-1", type="Instrument")])]
+    headers = export.tag_headers(True)
+    rows = export.tag_rows(results, True)
+    assert "X" not in headers and "Y" not in headers and len(rows[0]) == len(headers)
+    ws = openpyxl.load_workbook(export.write_xlsx(tmp_path / "x.xlsx", results))["Tags"]
+    assert [c.value for c in ws[1]] == headers
+
+
 def test_path_settings(tmp_path, monkeypatch):
     monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path))
     s = PathSettings.load()

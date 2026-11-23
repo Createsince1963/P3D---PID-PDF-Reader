@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.42 – 2026-11-23
+- **Export Excel/CSV ohne X/Y:** Das Blatt „Tags“ (Export Excel), die Tag-CSV und der CSV-Export der Web-Version enthalten keine X/Y-Koordinaten mehr – wie Review-Excel und Tabellen-Vorschau (`core.export.TAG_HEADERS`).
+- **Launcher, Karte „Folders“:** „Open data“ öffnet jetzt den Datenordner der App (`%P3D_PDFREADER_HOME%`, sonst `<Tool>\data`) statt `<Tool>\config`, den die App nicht nutzt; „Open logs“ entsprechend `<Datenordner>\logs`. Der INSTALL-Text der portablen Kopie beschreibt den Datenordner richtig (Hinweise auf Lizenz/„security.sqlite“ aus der XCHANGE-Vorlage entfernt).
+- **Handbuch auf Stand 1.0.42:** Menüband mit den Knöpfen Einstellungen, Tabellenprofil und Review Importliste (Symbole neu erzeugt), neuer Abschnitt „Andere PDF wählen“ (Rückfrage zu ungespeicherten Reviews, Filter-Reset, Start ohne Filter), was Tabellen sich merken, Kachel-Editor-Tabelle mit Standardfunktionen, Datenlink: Zeichnung mit „.pdf“, Fehlersuche bei 0 Treffern, Abgleich-Richtung und „n.a.“, Review Importliste, Tabellen-Vorschau, Review-Excel- und Export-Spalten, Erkennung von Zeichnungsnummer und Plankopf-Namen, Datenordner.
+
 ## 1.0.41 – 2026-11-23
 - **Dokumentation für die Übergabe an einen neuen Entwickler** (kein Programmcode geändert):
   - `HANDOFF.md` neu geschrieben: Stand 1.0.40, Verzeichnisse inkl. Datenlink, Kachel-Editor und Projekteinstellungen, wichtige Abläufe im Code (Scan, PDF-Wechsel, Tag-Tabelle, Review-Einträge, Datenlink, Tabellenstandard), Stolperfallen aus der Praxis, offene Punkte.
