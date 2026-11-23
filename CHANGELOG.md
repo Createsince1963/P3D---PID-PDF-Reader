@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.41 – 2026-11-23
+- **Dokumentation für die Übergabe an einen neuen Entwickler** (kein Programmcode geändert):
+  - `HANDOFF.md` neu geschrieben: Stand 1.0.40, Verzeichnisse inkl. Datenlink, Kachel-Editor und Projekteinstellungen, wichtige Abläufe im Code (Scan, PDF-Wechsel, Tag-Tabelle, Review-Einträge, Datenlink, Tabellenstandard), Stolperfallen aus der Praxis, offene Punkte.
+  - `README.md` nachgezogen: Datenlink mit Kachel-Editor, Abgleich und Review Importliste, Review-Einträge in der Tag-Tabelle, Tabellen-Vorschau, Projekt mit allen Einstellungen, Menüband und Leisten, Filterverhalten, Erkennung von Zeichnungsnummer und Plankopf-Namen, Pfade, Aufbau, Tests (PowerShell). Veraltete Angabe korrigiert: Review-Excel hat seit 1.0.24 keine X/Y-Spalten.
+
 ## 1.0.40 – 2026-11-23
 - **Fehler behoben: Datenlink fand Tags nicht, obwohl sie in der Importliste stehen** (Beispiel PIT-107 in SGOPS-P-HS1-PID-00-UTLY-002, Importzeile 4). Ursache: Das Datenlink-Feld der Dateiliste war „PDF“ (Dateiname mit „.pdf“), die Importliste hat „P&ID No.“ ohne Endung. Dadurch fand keine Zeichnung ihre Zeilen, und weil mit Datenlink 1 nur Tags derselben Zeichnung zählen, blieb jeder Tag ohne Treffer. Der Zeichnungsabgleich ignoriert jetzt die Endung „.pdf“ und einen Kopie-Zusatz wie „ (2)“ (`core.data_link.file_variants`). Testdaten: vorher 0 von 663 PDFs mit Zeichnungstreffer, jetzt 108 (alle Zeichnungen der Importliste).
 - **Tabellen-Vorschau neu** (Menüband „2 Ansicht“ › Tabellen-Vorschau): als eigenes Blatt wie „Review Importliste“ statt Dialog. Zeigt die Tags aller PDFs mit den Spalten der Tag-Tabelle in der Reihenfolge und Sichtbarkeit, die du dort eingestellt hast (Review-, Projekt-, PDF-Scan- und Datenlink-Spalten, Abgleich wie gewählt), davor PDF und Zeichnungsnr. X/Y entfallen. Ungespeicherte Review-Einträge der gewählten PDF sind enthalten. Standard-Tabelle mit Filtern und Excel über das Symbol in der Tabellenecke.
