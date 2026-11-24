@@ -172,10 +172,10 @@ def test_main_window_link_fields_and_columns(app, tmp_path, monkeypatch):
     act = next(a for a in menu.actions() if "Datenlink-Feld setzen" in a.text())
     act.trigger()
     assert w.links.fields == {"files": "Zeichnungsnr."}
-    fh, n = w.page.files.headers, len(main_window.FILE_COLS)
-    assert fh[n] == HITS and w.page.files.rows()[0][n] == 3        # Datenlink 1: Treffer + Listenspalten
-    assert "Service" in fh and w.page.files.rows()[0][fh.index("Service")] == "Inlet A2 | Inlet A4 | Exakt"
-    assert w.links.link.columns and len(fh) == n + 1 + len(w.links.link.columns)
+    # 1.0.44: Dateiliste zeigt keine Importspalten, Datenlink 1 bleibt aktiv (Abgleich)
+    assert w.page.files.headers == main_window.FILE_COLS
+    assert w.links.active(1) and w.links.link.columns
+    assert len(w.links.link.file_rows("SGOPS-P-DL1-PID-00-EQPM-124")) == 3
     w.links.set_field("tags", "Tag")
     w.page._store_result, w.page.store = result, None
     w.page._only_duplicates()

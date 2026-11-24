@@ -1185,13 +1185,8 @@ class MainWindow(QMainWindow):
 
     def _refresh(self) -> None:
         rows = [file_row(r) for r in export.file_rows(self.results)]
-        field = self.links.fields.get("files", "")
-        extra = self.links.file_extra(FILE_COLS) if field in FILE_COLS else []
-        if extra:
-            c = FILE_COLS.index(field)
-            for row in rows:
-                row.extend(self.links.file_values(row[c]))
-        self.page.files.headers = FILE_COLS + extra
+        # 1.0.44: Dateiliste zeigt keine Importspalten (nur die Tag-Tabelle); Datenlink 1 wirkt weiter im Abgleich
+        self.page.files.headers = list(FILE_COLS)
         self.page.files.set_rows(rows)
         self._refresh_tags()
 

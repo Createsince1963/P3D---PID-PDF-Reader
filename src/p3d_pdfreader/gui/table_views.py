@@ -23,17 +23,27 @@ FILTER_KEYS = ("column_filters", "value_filters")
 NO_FILTER_TABLES = ("files", "tags", "tags_link")      # tags_link = Tag-Tabelle mit Importspalten (1.0.43)
 
 
-class LayoutStore(ViewSettingsStore):
-    """Gemerkte Ansicht ohne Filter fuer die Schluessel ``no_filter`` (Laden und Speichern)."""
+# Tabellen ohne gemerkte Spaltenbreiten (1.0.44, Nutzervorgabe: untere Tabelle Spaltenbreite Autofit als Standard).
+# Das Kit speichert sonst jede Breite; beim Laden gelten alle Spalten dann als „vom Nutzer gesetzt“ und werden nie mehr
+# automatisch angepasst. Benannte Ansichten (``named|…``) behalten ihre Breiten.
+NO_WIDTH_TABLES = ("tags", "tags_link")
 
-    def __init__(self, path, no_filter: tuple[str, ...] = ()):
+
+class LayoutStore(ViewSettingsStore):
+    """Gemerkte Ansicht ohne Filter (``no_filter``) bzw. ohne Spaltenbreiten (``no_width``), Laden und Speichern."""
+
+    def __init__(self, path, no_filter: tuple[str, ...] = (), no_width: tuple[str, ...] = ()):
         super().__init__(path)
         self.no_filter = set(no_filter)
+        self.no_width = set(no_width)
 
     def _strip(self, key: str, settings: dict) -> dict:
-        if key not in self.no_filter or not isinstance(settings, dict):
+        if not isinstance(settings, dict):
             return settings
-        return {k: v for k, v in settings.items() if k not in FILTER_KEYS}
+        drop = set(FILTER_KEYS) if key in self.no_filter else set()
+        if key in self.no_width:
+            drop.add("column_widths")
+        return {k: v for k, v in settings.items() if k not in drop} if drop else settings
 
     def load(self, key: str, profile: str | None = None) -> dict:
         return self._strip(key, super().load(key, profile))
@@ -48,7 +58,8 @@ def store() -> ViewSettingsStore:
 
 def layout_store() -> LayoutStore:
     """Speicher der automatisch gemerkten Ansichten (``auto|…``)."""
-    return LayoutStore(config_dir() / FILE_NAME, tuple("auto|" + k for k in NO_FILTER_TABLES))
+    return LayoutStore(config_dir() / FILE_NAME, tuple("auto|" + k for k in NO_FILTER_TABLES),
+                       tuple("auto|" + k for k in NO_WIDTH_TABLES))
 
 
 def table_key(view) -> str:

@@ -21,7 +21,8 @@ from ..core.data_link import JOIN_MODES, JOIN_PDF, DataLink, ImportTable, read_s
 from ..paths import config_dir
 from . import appearance, last_paths
 
-LINK_COLOR = appearance.ACCENT_CHOICES[1]      # dunkelgruen (#1B6B5A), passend zum dunkelblauen Tabellenkopf
+IMPORT_ACCENT = appearance.ACCENT_CHOICES[0]   # Standard-Akzentblau (#0F5EA8): Importspalten hellblau (1.0.44)
+LINK_COLOR = appearance.ACCENT_CHOICES[1]     # dunkelgruen (#1B6B5A), passend zum dunkelblauen Tabellenkopf
 FIELDS_KEY = "data_link_fields"                # config/state.json: {"files": Spaltenname, "tags": Spaltenname}
 IMPORT_DIR = "last_data_link_dir"              # config/state.json: zuletzt gewaehlter Ordner der Importliste
 JOIN_KEY = "data_link_join"                    # config/state.json: Abgleich der Tag-Tabelle (pdf / list / both)
@@ -39,8 +40,8 @@ def link_marker(n: int) -> str:
 # Kopf dunkelgruen
 # ----------------------------------------------------------------------------------------------------------------
 def import_color() -> QColor:
-    """Heller Kopf der Importspalten: Datenlink-Gruen, stark zu Weiss aufgehellt (keine eigene Farbe)."""
-    return mix(QColor(LINK_COLOR), QColor("white"), 0.2)
+    """Heller Kopf der Importspalten: Standard-Akzentblau, stark zu Weiss aufgehellt (keine eigene Farbe)."""
+    return mix(QColor(IMPORT_ACCENT), QColor("white"), 0.2)
 
 
 def mix(a: QColor, b: QColor, share_a: float) -> QColor:
@@ -107,7 +108,7 @@ class LinkHeaderPainter(QObject):
                     small.setItalic(True)
                     small.setPointSizeF(max(6.0, small.pointSizeF() * 0.8))
                     painter.setFont(small)
-                    painter.setPen(QColor(LINK_COLOR))
+                    painter.setPen(QColor(IMPORT_ACCENT))
                     tag_w = painter.fontMetrics().horizontalAdvance(IMPORT_LABEL)
                     if tag_w + 30 < w:
                         painter.drawText(rect.adjusted(0, 0, -5, 0), Qt.AlignRight | Qt.AlignVCenter
@@ -116,7 +117,7 @@ class LinkHeaderPainter(QObject):
                 f = h.font()
                 f.setBold(True)
                 painter.setFont(f)
-                painter.setPen(QColor(LINK_COLOR) if is_import else QColor("white"))
+                painter.setPen(QColor(IMPORT_ACCENT) if is_import else QColor("white"))
                 painter.drawText(rect.adjusted(6, 0, -4, 0), Qt.AlignLeft | Qt.AlignVCenter | Qt.TextSingleLine,
                                  painter.fontMetrics().elidedText(text, Qt.ElideRight, room))
         finally:

@@ -117,6 +117,12 @@ def test_no_filters_at_start_and_after_new_data(app, tmp_path, monkeypatch):
     for key in ("auto|files", "named|files"):
         plain.save(key, "Default", dict(layout))
     assert table_views.layout_store().load("auto|files") == {"column_widths": {"PDF": 321}}
+    # 1.0.44: Tag-Tabelle ohne gemerkte Breiten (Autofit), benannte Ansichten behalten sie
+    for key in ("auto|tags", "auto|tags_link", "named|tags"):
+        plain.save(key, "Default", dict(layout))
+    assert table_views.layout_store().load("auto|tags") == {}
+    assert table_views.layout_store().load("auto|tags_link") == {}
+    assert table_views.store().load("named|tags")["column_widths"] == {"PDF": 321}
     w = MainWindow(app, "test")
     w.results = [PdfResult(path=tmp_path / "a.pdf", drawing_no="A", tags=[Tag(tag="XV-1", type="Instrument")]),
                  PdfResult(path=tmp_path / "b.pdf", drawing_no="B", tags=[])]

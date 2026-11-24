@@ -1,4 +1,4 @@
-# HANDOFF – P3D PDF Reader (Stand 1.0.43, 2026-11-23)
+# HANDOFF – P3D PDF Reader (Stand 1.0.45, 2026-11-24)
 
 Einstieg für neue Entwickler. Funktionen aus Nutzersicht: `README.md`. Historie mit Begründungen: `CHANGELOG.md`
 (oben = neu). Projektregeln: `CLAUDE.md` (liegt nur lokal, steht in `.gitignore`; die Regeln sind unten zusammengefasst).

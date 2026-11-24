@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.45 – 2026-11-24
+- **Tag-Tabelle (untere Tabelle): Spaltenbreite Autofit als Standard.** Die Breiten werden nicht mehr in der automatisch gemerkten Ansicht gespeichert (`table_views.NO_WIDTH_TABLES`), sonst galten nach dem ersten Speichern alle Spalten als „vom Nutzer gesetzt“ und wurden nie mehr angepasst. Reihenfolge, Ausblendung und Sortierung bleiben gemerkt; benannte Ansichten („Save Layout“) behalten ihre Breiten.
+
+## 1.0.44 – 2026-11-24
+- **Dateiliste (obere Tabelle) ohne Importspalten:** Treffer und Listenspalten des Datenlinks stehen nur noch in der Tag-Tabelle. Datenlink 1 (Zeichnung) bleibt aktiv und wirkt weiter im Abgleich.
+- **Kopf der Importspalten hellblau statt grün** (Standard-Akzentblau, aufgehellt; Schrift und Hinweis „Import“ in Akzentblau). Das Datenlink-Feld selbst bleibt dunkelgrün.
+
 ## 1.0.43 – 2026-11-23
 - **Tag-Tabelle (Review-Tabelle), Leiste „Tags“ – Importliste:**
   - **Importspalten** (Schalter ⇄): Spalten der verlinkten Importliste ein- oder ausblenden, gemerkt. Beide Ansichten haben ein **eigenes gemerktes Layout** (`auto|tags` ohne, `auto|tags_link` mit Importspalten) – Ausblenden, Link aufheben oder neu Einlesen ändert das Layout der Review-Spalten nicht.
