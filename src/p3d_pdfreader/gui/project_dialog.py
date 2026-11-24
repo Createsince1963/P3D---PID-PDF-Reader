@@ -32,7 +32,7 @@ DB_FILTER = "Projekt-Datenbank (*.db);;Alle Dateien (*.*)"
 
 HINTS = {
     SEGMENTS: "Quelle: Tabelle (z. B. def_function_codes), Liste mit Spalte (list:media|Medium Code (Fluid)), "
-              "const:TEXT (feste Zeichen), seq:3 (laufende Nummer, 3 Stellen), free (freier Text). prefix/suffix = "
+              "const:TEXT (feste Zeichen), seq:3 (laufende Nummer, 3 Stellen), free (freier Text), alnum (nur Buchstaben/Ziffern). prefix/suffix = "
               "Trennzeichen davor/danach, required/visible = yes/no. Eine Tag-Struktur = alle Zeilen mit gleichem "
               "tag_type, Reihenfolge nach pos.",
     RULES: "pdf_type = Tag-Typ des PDF Readers (" + ", ".join(TAG_TYPES) + "); tag_type = Tag-Struktur mit Segmenten "

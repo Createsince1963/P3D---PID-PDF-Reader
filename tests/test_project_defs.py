@@ -361,3 +361,21 @@ def test_project_settings_roundtrip(tmp_path):
     state = json.loads((cfg / "state.json").read_text(encoding="utf-8"))
     assert state == {"fremd": 2, "data_link_fields": {"tags": "Tag"}}
     db.close()
+
+
+def test_instrument_tag_without_dash(tmp_path):
+    """Projektregel: Instrument-Tag ohne Bindestrich (VX130 korrekt, VX-130 falsch); alte Standard-Struktur wird migriert."""
+    db = ProjectDB.create(tmp_path / "P.db", "P")
+    chk = db.checker()
+    assert chk.check("Instrument", "VX130").status == OK
+    assert chk.check("Instrument", "VX-130").status == FAULT
+    assert chk.check("Instrument", "PDIT410").status == OK
+    db.con.execute(f"update {SEGMENTS} set source='free', suffix='-' where tag_type='PDF_INSTRUMENT' and pos=1")
+    db.con.commit()
+    db.close()
+    db = ProjectDB(tmp_path / "P.db")                 # Oeffnen migriert den alten Standard
+    try:
+        assert db.checker().check("Instrument", "VX130").status == OK
+        assert db.checker().check("Instrument", "VX-130").status == FAULT
+    finally:
+        db.close()

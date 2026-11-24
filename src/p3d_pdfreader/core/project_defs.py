@@ -88,7 +88,7 @@ LIST_NAME = re.compile(r"^[a-z][a-z0-9_]{0,29}$")
 RESERVED = {t.replace("def_", "") for t, _, _ in DEF_TABLES} | {t for t, _, _ in TOOL_TABLES}
 TRUE = {"1", "yes", "ja", "true", "x", "y", "j", "wahr", "on"}
 
-FREE, CONST, SEQ = "free", "const", "seq"
+FREE, CONST, SEQ, ALNUM = "free", "const", "seq", "alnum"
 
 #: Mitgelieferte Tag-Strukturen fuer die Tag-Typen des PDF Readers (Schreibweise auf dem Plot). Nur angelegt, wenn
 #: die Struktur im Projekt fehlt; danach frei aenderbar. Segment: (Name, Quelle, Beispiel, davor, danach, Pflicht).
@@ -118,8 +118,8 @@ DEFAULT_DESIGNS = {
         ("System", "def_system_codes", "17", "", "_", True),
         ("Unit", "seq:3", "111", "", "_", True),
         ("Tag", "free", "TZIT-011", "", "", True)]),
-    "PDF_INSTRUMENT": ("Instrument (Blase), z. B. TIT-130 (Kuerzel + Nummer, vom PDF Reader mit - verbunden)", [
-        ("Function", "free", "TIT", "", "-", True),
+    "PDF_INSTRUMENT": ("Instrument (Blase), z. B. TIT130 (Kuerzel + Nummer ohne Trennzeichen; TIT-130 ist falsch)", [
+        ("Function", "alnum", "TIT", "", "", True),
         ("Number", "seq:3", "130", "", "", True)]),
 }
 DEFAULT_RULES = [("Equipment", "PDF_EQUIPMENT"), ("Armatur", "PDF_VALVE"), ("Rohrleitung", "PDF_PIPE_LINE"),
@@ -212,7 +212,22 @@ class ProjectDB:
             self.con.execute("alter table def_lists add column rev integer not null default 1")
         for k, v in DEFAULT_SETTINGS.items():
             self.con.execute("insert or ignore into settings(key,value) values(?,?)", (k, v))
+        self._migrate_instrument()
         self.con.commit()
+
+    def _migrate_instrument(self) -> None:
+        """Alte Standard-Struktur PDF_INSTRUMENT (Kuerzel, Trennzeichen "-", Nummer) auf die Schreibweise ohne
+        Trennzeichen (VX130) umstellen. Nur wenn sie noch dem alten Standard entspricht; eigene Aenderungen bleiben."""
+        rows = self.con.execute(f"select pos,source,prefix,suffix from {SEGMENTS} where tag_type='PDF_INSTRUMENT' "
+                                "order by pos").fetchall()
+        if [tuple(r) for r in rows] != [(1, "free", "", "-"), (2, "seq:3", "", "")]:
+            return
+        note, segs = DEFAULT_DESIGNS["PDF_INSTRUMENT"]
+        self.con.execute(f"update {SEGMENTS} set source='alnum', suffix='' where tag_type='PDF_INSTRUMENT' and pos=1")
+        example = "".join(f"{pre}{sample}{suf}" for _n, _s, sample, pre, suf, _r in segs)
+        structure = "".join(f"{pre}{name}{suf}" for name, _s, _x, pre, suf, _r in segs)
+        self.con.execute(f"update {STRUCTURES} set example=?, structure=?, note=? where tag_type='PDF_INSTRUMENT'",
+                         (example, structure, note))
 
     # --- Meta ---------------------------------------------------------------------------------------------------
     def meta(self, key: str, default: str = "") -> str:
@@ -550,6 +565,8 @@ class ProjectDB:
         kind, ref = _split(source)
         if kind == FREE:
             return "freier Text"
+        if kind == ALNUM:
+            return "Buchstaben/Ziffern ohne Trennzeichen"
         if kind == CONST:
             return f"Konstante „{ref}“"
         if kind == SEQ:
@@ -566,6 +583,8 @@ def _split(source: str) -> tuple[str, str]:
     s = str(source or "")
     if not s or s == FREE:
         return FREE, ""
+    if s == ALNUM:
+        return ALNUM, ""
     for kind in (CONST, SEQ):
         if s.startswith(kind + ":"):
             return kind, s[len(kind) + 1:]
@@ -684,6 +703,9 @@ class Checker:
             elif kind == SEQ:
                 core, loose = r"\d{%d}" % _seq_width(ref), r"[0-9X?]{%d}" % _seq_width(ref)
                 unknown = None
+            elif kind == ALNUM:
+                core, loose = r"[A-Za-z0-9]+", r"[A-Za-z0-9?]+"
+                unknown = None
             elif kind == "table":
                 vals = db.source_values(ref)
                 if vals and len(vals) < Checker.MAX_VALUES:
@@ -760,7 +782,7 @@ class Checker:
                     out.append((INCOMPLETE, f"{seg.name} „{v}“ ist ein Platzhalter"))
                 else:
                     out.append((CODE_MISSING, f"{seg.name} „{v}“ nicht in {seg.title}"))
-            elif seg.kind == FREE and "?" in v:
+            elif seg.kind in (FREE, ALNUM) and "?" in v:
                 out.append((INCOMPLETE, f"{seg.name} „{v}“ enthält „?“"))
         return out
 

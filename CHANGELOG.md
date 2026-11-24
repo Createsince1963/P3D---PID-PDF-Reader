@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.46 – 2026-11-24
+- **Projektregel Instrument: Tag ohne Bindestrich.** `PDF_INSTRUMENT` ist jetzt Kürzel + Nummer ohne Trennzeichen (`VX130` korrekt, `VX-130` = Regelfehler Projektdefinition). Dafür gibt es die neue Segment-Quelle `alnum` (nur Buchstaben/Ziffern, sonst hätte „freier Text“ `VX-` als Kürzel akzeptiert). Projekt-Datenbanken mit der alten Standard-Struktur (Kürzel + `-` + Nummer) werden beim Öffnen automatisch umgestellt; selbst geänderte Strukturen bleiben unberührt.
+
 ## 1.0.45 – 2026-11-24
 - **Tag-Tabelle (untere Tabelle): Spaltenbreite Autofit als Standard.** Die Breiten werden nicht mehr in der automatisch gemerkten Ansicht gespeichert (`table_views.NO_WIDTH_TABLES`), sonst galten nach dem ersten Speichern alle Spalten als „vom Nutzer gesetzt“ und wurden nie mehr angepasst. Reihenfolge, Ausblendung und Sortierung bleiben gemerkt; benannte Ansichten („Save Layout“) behalten ihre Breiten.
 
