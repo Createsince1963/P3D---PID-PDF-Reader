@@ -161,6 +161,73 @@ def test_table_preview_uses_tag_table_columns(app, tmp_path, monkeypatch):
     w.close()
 
 
+def test_review_table_cell_menu_paste_remove_autofill(app, tmp_path, monkeypatch):
+    """1.0.43: Rechtsklick der Review-Tabelle (Einfuegen, Wert uebernehmen, leeren, Zeilen aus Review nehmen /
+    wiederherstellen / zeigen), Strg+V-Logik, Autofill-Knopf blau bis gespeichert."""
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path))
+    from PySide6.QtCore import QItemSelectionModel, Qt
+    from PySide6.QtWidgets import QMenu
+    from p3d_pdfreader.core.extract import PdfResult, Tag
+    from p3d_pdfreader.core.review_store import ReviewStore
+    from p3d_pdfreader.gui.main_window import FIRST_FIELD, MainWindow
+    w = MainWindow(app, "test")
+    a = PdfResult(path=tmp_path / "a.pdf", drawing_no="DWG-A", checked="R.CORNA",
+                  tags=[Tag(tag=f"XV-{i}", type="Instrument") for i in (1, 2, 3)])
+    w.results = [a]
+    w._refresh()
+    page = w.page
+    page.files.table.setCurrentIndex(page.files.proxy.index(0, 0))
+    view, proxy = page.tags.table, page.tags.proxy
+    view.sortByColumn(1, Qt.AscendingOrder)
+
+    def select(rows, col=FIRST_FIELD):
+        view.selectionModel().clearSelection()
+        view.selectionModel().setCurrentIndex(proxy.index(rows[0], col), QItemSelectionModel.NoUpdate)
+        for r in rows:
+            view.selectionModel().select(proxy.index(r, col), QItemSelectionModel.Select)
+    select([0, 1, 2])
+    menu = QMenu()
+    page._cell_menu(menu, proxy.index(0, FIRST_FIELD))
+    texts = [x.text() for x in menu.actions() if x.text()]
+    assert "Einfügen (Strg+V)" in texts and "Zellen leeren" in texts
+    assert "Zeile(n) aus Review nehmen (3)" in texts
+    # Einfuegen: ein Wert -> alle markierten Zeilen; Block -> ab aktueller Zelle
+    QApplication.clipboard().setText("Klärung")
+    assert page.paste_cells() == 3
+    assert {page.tags.rows()[r][FIRST_FIELD] for r in range(3)} == {"Klärung"}
+    select([0])
+    QApplication.clipboard().setText("OK\nOffen")
+    assert page.paste_cells() == 2
+    assert [proxy.index(r, FIRST_FIELD).data() for r in range(3)] == ["OK", "Offen", "Klärung"]
+    select([0, 1, 2])
+    assert page.fill_cells(FIRST_FIELD, "Nicht relevant") == 3 and page.save_button.isEnabled()
+    assert page.save_review()
+    # Zeile aus dem Review nehmen, zeigen, wiederherstellen
+    select([1])
+    assert page.remove_rows() == 1 and proxy.rowCount() == 2
+    page.toggle_show_removed()
+    assert proxy.rowCount() == 3
+    model = proxy.sourceModel()
+    removed_row = next(r for r in range(3) if model.is_removed(r))
+    assert not model.can_set(removed_row, FIRST_FIELD) and model.rows[removed_row][1] == "XV-2"
+    assert page.save_review() and ReviewStore(a.path).is_removed("Instrument", "XV-2")
+    select([proxy.mapFromSource(model.index(removed_row, 0)).row()])
+    assert page.remove_rows(False) == 1
+    page.toggle_show_removed()
+    assert proxy.rowCount() == 3
+    # Autofill: blau bis gespeichert
+    select([0, 1, 2])
+    page.fill_cells(FIRST_FIELD, "OK")                            # Review OK, WPO leer -> Autofill setzt Checked
+    page.fill_cells(FIRST_FIELD + 4, "")
+    assert page.save_review()
+    page.autofill_button.click()
+    assert page.autofill_button.isChecked()
+    assert page.save_review() and not page.autofill_button.isChecked()
+    page.autofill_button.click()                                  # nichts mehr zu fuellen -> bleibt grau
+    assert not page.autofill_button.isChecked()
+    w.close()
+
+
 def test_msgbox_clicked_survives_translation(app):
     """Uebersetzter Dialog (Englisch): der gemerkte Button wird trotz neuem Python-Wrapper erkannt (Bug 1.0.37:
     "Discard" wirkte wie "Cancel", Fenster liess sich mit ungespeicherten Review-Eintraegen nicht schliessen)."""

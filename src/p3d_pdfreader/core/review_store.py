@@ -63,6 +63,7 @@ class ReviewStore:
     def __init__(self, pdf_path: str | Path):
         self.pdf_path = Path(pdf_path)
         self.entries: dict[str, dict[str, str]] = {}
+        self.removed: set[str] = set()                # aus dem Review genommene Tags (Schluessel, 1.0.43)
         self.dirty = False
         self.load()
 
@@ -102,11 +103,14 @@ class ReviewStore:
             data = {}
         entries = data.get("entries", {}) if isinstance(data, dict) else {}
         self.entries = {k: {f: str(v.get(f, "") or "") for f in FIELDS} for k, v in entries.items() if isinstance(v, dict)}
+        removed = data.get("removed", []) if isinstance(data, dict) else []
+        self.removed = {str(k) for k in removed} if isinstance(removed, list) else set()
         self.dirty = False
 
     def save(self) -> Path:
         payload = {"pdf": str(self.pdf_path.resolve()), "saved": timestamp(), "user": current_user(),
-                   "entries": {k: v for k, v in self.entries.items() if any(v.get(f) for f in EDIT_FIELDS)}}
+                   "entries": {k: v for k, v in self.entries.items() if any(v.get(f) for f in EDIT_FIELDS)},
+                   "removed": sorted(self.removed)}
         folder = self.history_dir
         folder.mkdir(parents=True, exist_ok=True)
         target, n = folder / f"{self.pdf_path.stem}_Review_{file_timestamp()}.json", 2
@@ -148,3 +152,33 @@ class ReviewStore:
         entry["Datum"], entry["User"] = timestamp(), current_user()
         self.dirty = True
         return [entry.get(f, "") for f in FIELDS]
+
+    # --- Tags aus dem Review nehmen (1.0.43, Nutzervorgabe) ---------------------------------------------------------
+    # Ein Tag, den das Tool zwar gefunden hat, der aber nicht in den Review gehoert (z. B. Fehlerkennung), wird hier
+    # vermerkt: er fehlt dann in Tag-Tabelle, Viewer-Rahmen, Redline, Review-Excel, Export und Vorschau. Wiederherstellen
+    # jederzeit; wirksam nach dem Speichern wie jeder Review-Eintrag. Die PDF bleibt unveraendert.
+    def is_removed(self, tag_type: str, tag: str) -> bool:
+        return key(tag_type, tag) in self.removed
+
+    def set_removed(self, pairs, removed: bool = True) -> int:
+        """``pairs`` = [(Typ, Tag), …] aus dem Review nehmen bzw. wiederherstellen. Rueckgabe: Anzahl geaendert."""
+        changed = 0
+        for tag_type, tag in pairs:
+            k = key(tag_type, tag)
+            if (k in self.removed) != removed:
+                (self.removed.add if removed else self.removed.discard)(k)
+                changed += 1
+        self.dirty = self.dirty or bool(changed)
+        return changed
+
+    def visible(self, tags) -> list:
+        """Tags ohne die aus dem Review genommenen (``Tag``-Objekte mit ``type``/``tag``)."""
+        return [t for t in tags if key(t.type, t.tag) not in self.removed] if self.removed else list(tags)
+
+
+def visible_tags(result) -> list:
+    """Tags einer PDF ohne die aus dem Review genommenen (gespeicherter Stand)."""
+    try:
+        return ReviewStore(result.path).visible(result.tags)
+    except OSError:
+        return list(result.tags)

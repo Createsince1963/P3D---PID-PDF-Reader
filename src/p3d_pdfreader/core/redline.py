@@ -60,6 +60,8 @@ def write_redline(result: PdfResult, out_path: str | Path, tags: list[Tag] | Non
             store = ReviewStore(result.path)
         except OSError:
             store = None
+    if callable(getattr(store, "visible", None)):
+        tags = store.visible(tags)                   # aus dem Review genommene Tags nicht markieren (1.0.43)
     ok, bad, dirty = _rgb(LIGHT.ok), _rgb(LIGHT.err), _rgb(DIRTY)
     faulty = {(t.type, t.tag) for t in tags if is_faulty(t, store, checker)}
     items = positions(tags)

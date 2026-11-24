@@ -85,8 +85,8 @@ Ein PC oder Server startet den Web-Server, Kollegen öffnen die Adresse im Brows
 | **Hilfe** | Handbuch (interaktive HTML-Datei `assets\help\handbuch.html`), Info, **Sprache** (Deutsch / English / Français, wirkt sofort, wird gemerkt) |
 
 Jede Gruppe hat oben eine dunkelblaue Überschrift; ein Klick darauf klappt die Gruppe ein (Zustand wird gemerkt). Die direkten Funktionen sitzen zusätzlich als Tab-Buttons in Leisten über den Bereichen:
-- **Dateien:** Alle markieren, Review markierte …, Excel
-- **Tags:** Aus PDF-Scan übernehmen, Autofill OK, Bearbeiten, Speichern, Nur doppelte, Nur Abweichungen, Filter zurücksetzen, Abgleich (mit der Importliste), ◀ ▶ Fundstelle, Excel, Redline
+- **Dateien:** Alle markieren, Review markierte …, Excel, rechts **Einklappen/Aufklappen** (Dateiliste ein-/ausklappen, gemerkt)
+- **Tags:** Aus PDF-Scan übernehmen, Autofill OK, Bearbeiten, Speichern, Nur doppelte, Nur Abweichungen, Filter zurücksetzen, **Importspalten** (ein/aus), **Importliste** (Menü), Abgleich (mit der Importliste), ◀ ▶ Fundstelle, Excel, Redline
 - **PDF-Viewer:** Einpassen, Zoom ±, Drehen, ◀ ▶ Fundstelle, Redline, Öffnen (im Standardprogramm), 2. Monitor
 
 ## Blatt „PID-Tags“
@@ -109,7 +109,11 @@ Das Blatt „Alle Tags“ zeigt die Tags aller eingelesenen PDFs in einer Tabell
 
 ## Review-Einträge in der Tag-Tabelle
 - **Bearbeiten** (Umschalter): Review und Änderung als Auswahlliste, Neuer Wert, Bemerkung und WPO frei. Doppelklick oder Tippen in die Zelle; Datum und User setzt das Tool automatisch.
-- **Autofill OK:** bei allen Tags mit Review „OK“ (oder leerem Review und Projekt-Prüfung „OK“) Review = OK, Datum und User setzen; leeres WPO bekommt den Checked-Wert aus dem Schriftfeld.
+- **Autofill OK:** bei allen Tags mit Review „OK“ (oder leerem Review und Projekt-Prüfung „OK“) Review = OK, Datum und User setzen; leeres WPO bekommt den Checked-Wert aus dem Schriftfeld. Der Knopf bleibt blau, bis gespeichert ist.
+- **Rechtsklick auf Zellen:** neben Kopieren, Filtern und Spalten …:
+  - **Einfügen (Strg+V):** ein Wert in alle markierten Zeilen, ein Block aus Excel ab der aktuellen Zelle (nur Review-Spalten, auch ohne Bearbeiten-Modus)
+  - **„Wert“ in markierte Zeilen übernehmen**, **Zellen leeren**
+  - **Zeile(n) aus Review nehmen:** für Tags, die nicht in den Review gehören (z. B. Fehlerkennung). Sie fehlen danach in Tabelle, Viewer, Redline, Review-Excel, Export, Vorschau und Review Importliste. **Aus dem Review genommene zeigen** blendet sie grau ein, **Zeile(n) wiederherstellen** holt sie zurück. Wirksam nach dem Speichern; die PDF bleibt unverändert.
 - **Speichern** (Strg+S): jeder Stand wird als neue Datei mit Zeitstempel in `<Datenordner>\reviews` gespeichert. Die PDF selbst wird nie verändert.
 - „Korrektur erforderlich“ erscheint rot in der Tabelle, im Viewer und im Redline-PDF.
 
@@ -128,6 +132,8 @@ Verknüpft eine Excel-Liste (z. B. die Instrumenten-Gesamtliste aus P3D Instrume
    - **Importliste → PDF-Tags:** alle Zeilen der Liste zu dieser Zeichnung, getroffene mit ihrem PDF-Tag,
    - **Tags beider Listen:** alles zusammen.
    Fehlende Werte stehen als **„n.a.“** da. Zeilen ohne PDF-Tag lassen sich nicht bearbeiten.
+   - **Importspalten** (Leiste der Tag-Tabelle): Spalten der Importliste ein-/ausblenden. Die Ansicht mit und die ohne Importspalten haben je ein eigenes gemerktes Layout, das Layout der Review-Spalten bleibt beim Ausblenden oder neu Einlesen erhalten.
+   - **Importliste** (Menü in der Leiste): Link aufheben, Liste neu einlesen, Importtabelle bearbeiten oder entfernen.
 5. **Review Importliste** (Menüband „3 Prüfen“): eigenes Blatt mit einem Prüfergebnis je Zeile über alle PDFs: **OK**, **Nicht in Liste** (Tag im PDF, nicht in der Liste), **Fehlt im PDF** (Zeile der Liste zu einer gescannten Zeichnung), **Zeichnung nicht gescannt**. Rechts die exportierten Spalten der Importliste, Excel über das Symbol in der Tabellenecke.
 
 Die Importliste liegt in `<Datenordner>\config\data_link.json` (Originalliste, Anpassung und Ergebnis), die Datenlink-Felder in `config\state.json`.

@@ -106,6 +106,29 @@ def test_export_tags_without_xy(tmp_path):
     assert [c.value for c in ws[1]] == headers
 
 
+def test_removed_tags_left_out_everywhere(tmp_path, monkeypatch):
+    """1.0.43: aus dem Review genommene Tags werden gespeichert und fehlen in Export und Review-Excel; wiederherstellbar."""
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path))
+    from p3d_pdfreader.core import review
+    from p3d_pdfreader.core.extract import PdfResult, Tag
+    from p3d_pdfreader.core.review_store import ReviewStore, visible_tags
+    pdf = tmp_path / "a.pdf"
+    r = PdfResult(path=pdf, drawing_no="DWG-A", tags=[Tag(tag="XV-1", type="Instrument"), Tag(tag="XV-2", type="Instrument")])
+    for t in r.tags:
+        t.hits.append((0, (10.0, 10.0, 40.0, 20.0)))         # eine Fundstelle je Tag (Review-Excel: Zeile je Fundstelle)
+    store = ReviewStore(pdf)
+    assert store.set_removed([("Instrument", "XV-2")]) == 1 and store.dirty
+    assert store.set_removed([("Instrument", "XV-2")]) == 0
+    store.save()
+    again = ReviewStore(pdf)
+    assert again.is_removed("Instrument", "XV-2") and [t.tag for t in visible_tags(r)] == ["XV-1"]
+    assert [row[3] for row in export.tag_rows([r])] == ["XV-1"]
+    assert [row[5] for row in review.review_rows(r)] == ["XV-1"]
+    again.set_removed([("Instrument", "XV-2")], False)
+    again.save()
+    assert [t.tag for t in visible_tags(r)] == ["XV-1", "XV-2"]
+
+
 def test_path_settings(tmp_path, monkeypatch):
     monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path))
     s = PathSettings.load()

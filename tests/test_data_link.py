@@ -280,6 +280,48 @@ def test_tag_table_join_and_filter_reset(app, tmp_path, monkeypatch):
     w.close()
 
 
+def test_link_columns_toggle_menu_and_fold(app, tmp_path, monkeypatch):
+    """1.0.43: Importspalten ein/aus mit getrennten Layout-Schluesseln, Menue Importliste (Link aufheben),
+    Dateiliste ein-/ausklappen (gemerkt)."""
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path))
+    from p3d_pdfreader import paths
+    from p3d_pdfreader.core.extract import PdfResult, Tag
+    from p3d_pdfreader.gui import last_paths, main_window
+    _table(tmp_path).save(paths.config_dir())
+    w = main_window.MainWindow(app, "test")
+    a = PdfResult(path=tmp_path / "a.pdf", drawing_no="SGOPS-P-DL1-PID-00-EQPM-124",
+                  tags=[Tag(tag="XV-332", type="Instrument")])
+    w.results = [a]
+    w._refresh()
+    page, view = w.page, w.page.tags.table
+    page.files.table.setCurrentIndex(page.files.proxy.index(0, 0))
+    assert not page.link_cols_button.isEnabled() and view.layout_key == "tags"
+    w.links.set_field("files", "Zeichnungsnr.")
+    w.links.set_field("tags", "Tag")
+    assert page.link_cols_button.isEnabled() and page.link_cols_button.isChecked()
+    assert len(page.tags.headers) > len(main_window.TAG_COLS) and view.layout_key == "tags_link"
+    assert view._shared_layout_store[1] == "auto|tags_link"
+    page.link_cols_button.setChecked(False)                   # Importspalten aus -> eigenes Layout, nur Tool-Spalten
+    assert page.tags.headers == main_window.TAG_COLS and view.layout_key == "tags"
+    assert view._shared_layout_store[1] == "auto|tags" and not page.join_button.isEnabled()
+    assert last_paths.get_value("data_link_tags_shown") is False and w.links.fields.get("tags") == "Tag"
+    page.link_cols_button.setChecked(True)
+    assert view.layout_key == "tags_link"
+    page._fill_link_menu()
+    texts = [a.text() for a in page.link_menu.actions() if a.text()]
+    assert any(t.startswith("Link aufheben") for t in texts) and "Liste neu einlesen …" in texts
+    next(a for a in page.link_menu.actions() if a.text().startswith("Link aufheben")).trigger()
+    assert "tags" not in w.links.fields and page.tags.headers == main_window.TAG_COLS
+    assert not page.link_cols_button.isEnabled()
+    # Dateiliste einklappen / aufklappen
+    page.fold_button.setChecked(True)
+    assert page.files.table.isHidden() and page.fold_button.text() == "Aufklappen"
+    assert last_paths.get_value("files_collapsed") is True
+    page.fold_button.setChecked(False)
+    assert not page.files.table.isHidden() and page.fold_button.text() == "Einklappen"
+    w.close()
+
+
 def test_match_count_and_samples(tmp_path):
     link = DataLink(_table(tmp_path), {"files": "Zeichnungsnr.", "tags": "Tag"})
     assert link.match_count(1, ["SGOPS-P-DL1-PID-00-EQPM-124", "GIBT-ES-NICHT", "", None]) == (1, 2)

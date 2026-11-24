@@ -114,7 +114,7 @@ ol.pins li b{display:block}
 </head>
 <body>
 <header>
-  <h1>P3D PDF Reader – Handbuch</h1><span class="ver">Stand Version 1.0.42</span>
+  <h1>P3D PDF Reader – Handbuch</h1><span class="ver">Stand Version 1.0.43</span>
   <input id="q" type="search" placeholder="Im Handbuch suchen … (z. B. Redline, F3, Filter)" aria-label="Suchen">
 </header>
 <div class="wrap">
@@ -193,8 +193,8 @@ ol.pins li b{display:block}
 <div class="detail" id="det"><div class="note">Knopf im Menüband anklicken …</div></div>
 <h3>Leisten über den Bereichen</h3>
 <ul>
-  <li><b>Dateien:</b> Alle markieren, Review markierte …, Excel</li>
-  <li><b>Tags:</b> Aus PDF-Scan übernehmen (Schriftfeld-Spalten Ersteller, Checked, Rev, Rev-Datum, Rev-Text hinten anfügen), Autofill OK (OK-Werte: Review, User, Datum ohne Uhrzeit, WPO = Checked), Bearbeiten, Speichern, Nur doppelte, Nur Abweichungen, Filter zurücksetzen, <b>Abgleich</b> (Richtung des Abgleichs mit der Importliste, siehe Kapitel „Datenlink“), ◀ ▶ Fundstelle, Excel, Redline</li>
+  <li><b>Dateien:</b> Alle markieren, Review markierte …, Excel, rechts <b>Einklappen / Aufklappen</b> (Dateiliste ein-/ausklappen; die Tag-Tabelle bekommt den Platz, wird gemerkt)</li>
+  <li><b>Tags:</b> Aus PDF-Scan übernehmen (Schriftfeld-Spalten Ersteller, Checked, Rev, Rev-Datum, Rev-Text hinten anfügen), Autofill OK (OK-Werte: Review, User, Datum ohne Uhrzeit, WPO = Checked; bleibt blau bis gespeichert), Bearbeiten, Speichern, Nur doppelte, Nur Abweichungen, Filter zurücksetzen, <b>Importspalten</b> (Spalten der Importliste ein/aus), <b>Importliste</b> (Link aufheben, neu einlesen, bearbeiten, entfernen), <b>Abgleich</b> (Richtung des Abgleichs mit der Importliste, siehe Kapitel „Datenlink“), ◀ ▶ Fundstelle, Excel, Redline</li>
   <li><b>PDF-Viewer:</b> Einpassen, Zoom ±, Drehen, Seite ◀ ▶, ◀ ▶ Fundstelle, Redline, Öffnen (Standardprogramm), 2. Monitor</li>
 </ul>
 </section>
@@ -281,6 +281,11 @@ ol.pins li b{display:block}
   <li><b>Tags beider Listen:</b> alle PDF-Tags und dahinter die Listenzeilen ohne PDF-Tag.</li>
 </ul>
 <p>Fehlende Werte stehen als <b>„n.a.“</b> da. Zeilen ohne PDF-Tag lassen sich nicht bearbeiten (kein Review-Eintrag).</p>
+<h3>Importspalten und Menü „Importliste“</h3>
+<ul>
+  <li><b>Importspalten</b> (Leiste der Tag-Tabelle): Spalten der Importliste ein- oder ausblenden. Die Ansicht mit und die Ansicht ohne Importspalten haben je ein <b>eigenes gemerktes Layout</b> – das Layout der Review-Spalten bleibt beim Ausblenden, Link aufheben oder neu Einlesen erhalten.</li>
+  <li><b>Importliste</b> (Menü): <i>Link aufheben</i> (Datenlink-Feld der Tag-Tabelle entfernen), <i>Liste neu einlesen …</i>, <i>Importtabelle bearbeiten …</i>, <i>Importtabelle entfernen …</i>, <i>Datenlinks anzeigen</i>.</li>
+</ul>
 <h3>Review Importliste</h3>
 <p>„3 Prüfen › Review Importliste“ öffnet ein eigenes Blatt mit einem <b>Prüfergebnis</b> je Zeile über alle PDFs: <b>OK</b> (Tag im PDF und in der Liste), <b>Nicht in Liste</b>, <b>Fehlt im PDF</b> (Zeile der Liste zu einer gescannten Zeichnung) und <b>Zeichnung nicht gescannt</b>. Rechts die exportierten Spalten der Liste, „Importzeilen“ nennt die Zeilennummern. Zählung je Ergebnis im Blattkopf, Excel über das Symbol in der Tabellenecke.</p>
 </section>
@@ -300,6 +305,12 @@ ol.pins li b{display:block}
 <p>Markierte oder alle PDFs; Ausgaben ankreuzen (Redline je PDF, Review-Excel je PDF, Review-Excel gesamt); Zielordner, optional Unterordner <code>Review_&lt;Zeitstempel&gt;</code>.</p>
 <h3>Tabelle bearbeiten</h3>
 <p>„Tabelle bearbeiten“ schaltet die Review-Spalten der Tag-Tabelle zum Bearbeiten frei; „Review speichern“ (<kbd>Strg</kbd>+<kbd>S</kbd>) sichert sie.</p>
+<h3>Rechtsklick in der Review-Tabelle</h3>
+<ul>
+  <li><b>Einfügen</b> (<kbd>Strg</kbd>+<kbd>V</kbd>): ein Wert geht in alle markierten Zeilen; ein Block aus Excel wird ab der aktuellen Zelle eingefügt (Tab = nächste Spalte, Zeilenumbruch = nächste Zeile). Beschrieben werden nur die Review-Spalten (Review, Änderung, Neuer Wert, Bemerkung, WPO), Datum und User setzt das Tool – auch ohne Bearbeiten-Modus.</li>
+  <li><b>„Wert“ in markierte Zeilen übernehmen</b> und <b>Zellen leeren</b>.</li>
+  <li><b>Zeile(n) aus Review nehmen:</b> für Tags, die nicht in den Review gehören (z. B. Fehlerkennung). Sie fehlen danach in Tabelle, Viewer-Rahmen, Redline, Review-Excel, Export, Alle Tags, Tabellen-Vorschau und Review Importliste. <b>Aus dem Review genommene zeigen</b> blendet sie grau ein, <b>Zeile(n) wiederherstellen</b> holt sie zurück. Wirksam nach „Speichern“; die PDF bleibt unverändert.</li>
+</ul>
 </section>
 
 <section id="project" data-title="Projektmodus">
@@ -328,6 +339,7 @@ ol.pins li b{display:block}
 <tr><td><kbd>F5</kbd></td><td>Quellordner scannen</td></tr>
 <tr><td><kbd>F3</kbd> / <kbd>Umschalt</kbd>+<kbd>F3</kbd></td><td>Fundstelle weiter / zurück</td></tr>
 <tr><td><kbd>Strg</kbd>+<kbd>S</kbd></td><td>Review speichern</td></tr>
+<tr><td><kbd>Strg</kbd>+<kbd>V</kbd> (in der Tag-Tabelle)</td><td>Werte aus der Zwischenablage in die Review-Spalten einfügen</td></tr>
 <tr><td><kbd>Strg</kbd>+<kbd>C</kbd> (Rechtsklick › Kopieren)</td><td>markierte Zellen als Text kopieren (in Excel einfügbar)</td></tr>
 <tr><td>Doppelklick Filterfeld</td><td>Wertauswahl der Spalte</td></tr>
 </tbody></table>

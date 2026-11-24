@@ -1,4 +1,4 @@
-# HANDOFF – P3D PDF Reader (Stand 1.0.42, 2026-11-23)
+# HANDOFF – P3D PDF Reader (Stand 1.0.43, 2026-11-23)
 
 Einstieg für neue Entwickler. Funktionen aus Nutzersicht: `README.md`. Historie mit Begründungen: `CHANGELOG.md`
 (oben = neu). Projektregeln: `CLAUDE.md` (liegt nur lokal, steht in `.gitignore`; die Regeln sind unten zusammengefasst).
@@ -50,7 +50,8 @@ Excel-Liste ab (Datenlink) und erzeugt Redline-PDFs und Review-Excel. Ein Kern, 
 - **Scan:** `MainWindow.scan` → `worker.ScanWorker` (Thread) → `core.extract.read_pdf` je PDF → `_refresh` füllt Dateiliste/Alle Tags.
 - **PDF-Wechsel:** `TagsSheet._file_changed` → ungespeicherte Review-Einträge abfragen (`confirm_unsaved`) → Filter der Tag-Tabelle auf Standard (`_default_tag_filters`) → `_load_with_progress` (ReviewStore laden, Tag-Tabelle, Viewer).
 - **Tag-Tabelle:** `TagsSheet.tag_rows_for(result, store)` baut die Zeilen (Spalten `TAG_COLS` + Datenlink-Spalten); `_only_duplicates` füllt die Tabelle neu (Filter „Nur doppelte“/„Nur Abweichungen“). Dieselben Zeilen nutzt die Tabellen-Vorschau (`MainWindow.preview_table`).
-- **Review-Einträge:** `core.review_store.ReviewStore` je PDF, jede Speicherung ist ein neuer Stand mit Zeitstempel in `data\reviews\<PDF>_<hash>\`. Bearbeitet in `ReviewModel` (Bearbeiten-Modus).
+- **Review-Einträge:** `core.review_store.ReviewStore` je PDF, jede Speicherung ist ein neuer Stand mit Zeitstempel in `data\reviews\<PDF>_<hash>\`. Bearbeitet in `ReviewModel` (Bearbeiten-Modus, oder per Rechtsklick über `ReviewModel.set_cell`). **Aus dem Review genommene Tags** stehen in `ReviewStore.removed`; jede Ausgabe holt die Tags über `store.visible(...)` bzw. `review_store.visible_tags(result)` – wer eine neue Ausgabe baut, muss das ebenfalls tun.
+- **Tag-Tabelle, Layouts:** `TagsSheet._bind_tag_layout` hängt die gemerkte Ansicht je nach Importspalten an `auto|tags` oder `auto|tags_link` (Kit-Funktion `bind_layout_persistence`).
 - **Datenlink:** `core.data_link.ImportTable` (gespeichert in `data\config\data_link.json`) + `DataLink` (Index, Abgleich). Datenlink 1 = Zeichnung (Dateiliste ↔ z. B. „P&ID No.“), Datenlink 2 = Tag (Tag-Tabelle ↔ z. B. „Tag -PID“). Mit beiden zählen nur Importzeilen derselben Zeichnung. Abgleich: exakt, sonst Endung ab Bindestrich; Zeichnung zusätzlich ohne „.pdf“ und „ (2)“ (`file_variants`). Richtung der Tag-Tabelle: `DataLink.tag_join` (PDF → Liste / Liste → PDF / beide), fehlend = „n.a.“. Im Hauptfenster: `gui\data_link_ui.LinkController`.
 - **Review Importliste:** `core.data_link.review_rows` (Prüfergebnis je Zeile) → Blatt `LinkReviewSheet`.
 - **Projektmodus:** `core.project_defs.Checker`; Projekt-DB speichert auch alle Tool-Einstellungen (`core.project_settings`).
@@ -66,8 +67,10 @@ Excel-Liste ab (Datenlink) und erzeugt Redline-PDFs und Review-Excel. Ein Kern, 
 - Nach GUI-Änderungen: Handbuch-Bilder mit `tools\make_help_images.py` bzw. `tools\make_help_workflow.py` neu erzeugen (Workflow-Bilder mit `QT_QPA_PLATFORM=windows`, sonst fehlt die QML-Schrift).
 
 ## Aktueller Stand / offene Punkte
-- Stand **1.0.42**, Tests 76/76 grün (ganze Suite ca. 8 Minuten). Ungetrackt und bewusst nicht committet: `Anpassung_Importliste_*.json`, `Tabellenprofil_*.json` (vom Nutzer gespeicherte Dateien), `build_exe\`, `config\`.
+- Stand **1.0.43**, committet, Tests 79/79 grün (ganze Suite ca. 8 Minuten). Ungetrackt und bewusst nicht committet: `Anpassung_Importliste_*.json`, `Tabellenprofil_*.json` (vom Nutzer gespeicherte Dateien), `build_exe\`, `config\`.
 - Erledigt in 1.0.42: Handbuch auf Stand 1.0.42, Launcher „Open data/logs“ zeigt auf den Datenordner der App, Export Excel/CSV ohne X/Y.
+- 1.0.43: Importspalten ein/aus mit getrennten Layouts, Menü Importliste, Dateiliste einklappbar, Rechtsklick der Review-Tabelle (Einfügen, Wert übernehmen, leeren, Zeilen aus Review nehmen), Autofill-Knopf blau. Beim ersten Einblenden der Importspalten ist deren Layout leer (früher lag es unter `auto|tags`).
+- **Web-Version:** zeigt aus dem Review genommene Tags in der Tag-Liste noch an (Redline/Review-Excel/CSV lassen sie weg).
 - **Handbuch-Workflow-Bilder** (`tools\make_help_workflow.py`, `img\wf_*.png`) zeigen noch den Stand vor 1.0.38 (z. B. ohne Knopf „Abgleich“). Neu erzeugen, wenn die Oberfläche fertig abgenommen ist (mit `QT_QPA_PLATFORM=windows`).
 - **i18n:** Texte der neuen Tabellen-Vorschau und des Kachel-Editor-Zeilenzählers sind nur deutsch; `i18n.untranslated()` listet fehlende Texte zur Laufzeit.
 - **Web-Version** kennt Datenlink, Abgleich, Tabellen-Vorschau und Projektmodus nicht (siehe README, „Noch nicht in der Web-Version“).

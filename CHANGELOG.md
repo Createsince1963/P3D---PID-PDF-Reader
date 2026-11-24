@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.43 – 2026-11-23
+- **Tag-Tabelle (Review-Tabelle), Leiste „Tags“ – Importliste:**
+  - **Importspalten** (Schalter ⇄): Spalten der verlinkten Importliste ein- oder ausblenden, gemerkt. Beide Ansichten haben ein **eigenes gemerktes Layout** (`auto|tags` ohne, `auto|tags_link` mit Importspalten) – Ausblenden, Link aufheben oder neu Einlesen ändert das Layout der Review-Spalten nicht.
+  - **Importliste** (Menü ⇧): Link aufheben (Datenlink-Feld der Tag-Tabelle entfernen), Liste neu einlesen …, Importtabelle bearbeiten (Kachel-Editor) …, Importtabelle entfernen …, Datenlinks anzeigen.
+  - „Abgleich“ hat jetzt ein eigenes Symbol (⇅); Importspalten/Abgleich sind ohne aktiven Datenlink 2 ausgegraut.
+- **Dateiliste ein-/ausklappen** (Knopf rechts in der Leiste „Dateien“, ⏶/⏷): eingeklappt bleiben Blattfilter, Zeilenzahl und Leiste sichtbar, die Tag-Tabelle bekommt den Platz; Zustand gemerkt (`files_collapsed`).
+- **Review-Tabelle, Rechtsklick auf Zellen** (zusätzlich zu Kopieren, Filtern, Spalten …):
+  - **Einfügen (Strg+V):** ein Wert geht in alle markierten Zeilen, ein Block aus Excel wird ab der aktuellen Zelle eingefügt (Tab = Spalte, Zeilenumbruch = Zeile). Nur Review-Spalten werden beschrieben, Datum und User automatisch; auch ohne Bearbeiten-Modus.
+  - **„Wert“ in markierte Zeilen übernehmen**, **Zellen leeren**.
+  - **Zeile(n) aus Review nehmen** (Nutzerwunsch „Zeilen löschen“): der Tag wird im Review-Speicher der PDF vermerkt und fehlt dann in Tag-Tabelle, Viewer-Rahmen, Redline, Review-Excel, Export, Alle Tags, Tabellen-Vorschau und Review Importliste. **Aus dem Review genommene zeigen** blendet sie grau ein, **Zeile(n) wiederherstellen** holt sie zurück. Wirksam nach „Speichern“; die PDF bleibt unverändert. Kern: `ReviewStore.set_removed`, `is_removed`, `visible`, `review_store.visible_tags`; die Review-Datei hat dafür den Eintrag `removed`.
+- **Autofill OK** bleibt blau hervorgehoben, solange die Autofill-Werte noch nicht gespeichert sind (wie „Bearbeiten“); nach Speichern, Verwerfen oder PDF-Wechsel wieder normal.
+- Web-Version: Redline und Review-Excel lassen aus dem Review genommene Tags ebenfalls weg (gemeinsamer Kern); die Tag-Liste im Browser zeigt sie noch.
+
 ## 1.0.42 – 2026-11-23
 - **Export Excel/CSV ohne X/Y:** Das Blatt „Tags“ (Export Excel), die Tag-CSV und der CSV-Export der Web-Version enthalten keine X/Y-Koordinaten mehr – wie Review-Excel und Tabellen-Vorschau (`core.export.TAG_HEADERS`).
 - **Launcher, Karte „Folders“:** „Open data“ öffnet jetzt den Datenordner der App (`%P3D_PDFREADER_HOME%`, sonst `<Tool>\data`) statt `<Tool>\config`, den die App nicht nutzt; „Open logs“ entsprechend `<Datenordner>\logs`. Der INSTALL-Text der portablen Kopie beschreibt den Datenordner richtig (Hinweise auf Lizenz/„security.sqlite“ aus der XCHANGE-Vorlage entfernt).

@@ -65,7 +65,7 @@ def review_rows(result: PdfResult, tags: list[Tag] | None = None, checker=None) 
     Ohne gespeicherten Review-Wert bekommen doppelte Tags "Offen". ``checker``: Projekt-Pruefung (Projektmodus)."""
     store = ReviewStore(result.path)
     rows = []
-    for p in positions(result.tags if tags is None else tags):
+    for p in positions(store.visible(result.tags if tags is None else tags)):   # ohne aus dem Review genommene
         values = store.values(p.tag.type, p.tag.tag)
         if not values[0] and p.total > 1:
             values[0] = "Offen"

@@ -20,7 +20,7 @@ FILTER_KEYS = ("column_filters", "value_filters")
 # Tabellen, deren gemerkte Ansicht keine Filter enthaelt (1.0.39, Nutzervorgabe: beim Programmstart und nach dem
 # Einlesen bzw. PDF-Wechsel keine Filter aktiv). Das Kit wendet die gemerkte Ansicht bei jedem neuen Modell erneut an -
 # mit Filtern kaemen sie nach jedem Scan und PDF-Wechsel zurueck.
-NO_FILTER_TABLES = ("files", "tags")
+NO_FILTER_TABLES = ("files", "tags", "tags_link")      # tags_link = Tag-Tabelle mit Importspalten (1.0.43)
 
 
 class LayoutStore(ViewSettingsStore):

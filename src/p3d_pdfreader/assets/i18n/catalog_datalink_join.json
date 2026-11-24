@@ -12,6 +12,31 @@
   "Abgleich der Tag-Tabelle mit der Importliste (Datenlink 2, mit Datenlink 1 je Zeichnung):\n• PDF-Tags → Importliste: alle Tags der PDF mit den passenden Listenwerten\n• Importliste → PDF-Tags: alle Zeilen der Liste zu dieser Zeichnung, getroffene mit ihrem PDF-Tag\n• Tags beider Listen: alles zusammen\nFehlende Werte stehen als „n.a.“ da.": {
    "en": "Match the tag table with the import list (data link 2, per drawing with data link 1):\n• PDF tags → import list: all tags of the PDF with the matching list values\n• Import list → PDF tags: all list rows of this drawing, matched ones with their PDF tag\n• Tags of both lists: everything together\nMissing values are shown as “n.a.”.",
    "fr": "Rapprocher le tableau des tags avec la liste d'import (lien de données 2, par plan avec le lien 1) :\n• Tags PDF → liste d'import : tous les tags du PDF avec les valeurs de la liste\n• Liste d'import → tags PDF : toutes les lignes de la liste pour ce plan, celles trouvées avec leur tag PDF\n• Tags des deux listes : tout ensemble\nLes valeurs manquantes sont affichées « n.a. »."
+  },
+  "Importspalten": {"en": "Import columns", "fr": "Colonnes d'import"},
+  "Importliste": {"en": "Import list", "fr": "Liste d'import"},
+  "Einklappen": {"en": "Collapse", "fr": "Réduire"},
+  "Aufklappen": {"en": "Expand", "fr": "Développer"},
+  "Liste neu einlesen …": {"en": "Re-import list …", "fr": "Relire la liste …"},
+  "Importtabelle entfernen …": {"en": "Remove import table …", "fr": "Supprimer la table d'import …"},
+  "Importspalten ein/aus: Spalten der verlinkten Importliste (Datenlink 2) in der Tag-Tabelle zeigen oder ausblenden. Beide Ansichten haben ein eigenes gemerktes Layout – Ausblenden ändert das Layout der Review-Spalten nicht.": {
+   "en": "Import columns on/off: show or hide the columns of the linked import list (data link 2) in the tag table. Both views keep their own layout – hiding does not change the layout of the review columns.",
+   "fr": "Colonnes d'import oui/non : afficher ou masquer les colonnes de la liste liée (lien 2) dans le tableau des tags. Chaque vue garde sa propre disposition."
+  },
+  "Importliste: Link der Tag-Tabelle aufheben, Liste neu einlesen, Importtabelle bearbeiten oder entfernen.": {
+   "en": "Import list: remove the link of the tag table, re-import the list, edit or remove the import table.",
+   "fr": "Liste d'import : supprimer le lien du tableau des tags, relire la liste, modifier ou supprimer la table d'import."
+  },
+  "Einfügen (Strg+V)": {"en": "Paste (Ctrl+V)", "fr": "Coller (Ctrl+V)"},
+  "Zellen leeren": {"en": "Clear cells", "fr": "Vider les cellules"},
+  "Wert in markierte Zeilen übernehmen": {"en": "Apply value to selected rows", "fr": "Appliquer la valeur aux lignes sélectionnées"},
+  "Aus dem Review genommen – Rechtsklick › Zeile wiederherstellen": {
+   "en": "Removed from the review – right-click › restore row",
+   "fr": "Retiré de la revue – clic droit › restaurer la ligne"
+  },
+  "Dateiliste einklappen bzw. wieder aufklappen – die Tag-Tabelle bekommt den Platz": {
+   "en": "Collapse or expand the file list – the tag table gets the space",
+   "fr": "Réduire ou développer la liste des fichiers – le tableau des tags prend la place"
   }
  }
 }

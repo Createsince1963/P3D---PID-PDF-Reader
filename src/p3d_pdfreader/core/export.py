@@ -25,10 +25,10 @@ def tag_rows(results: list[PdfResult], review: bool = False, checker=None) -> li
     ``checker`` (Projektmodus, ``project_defs.Checker``) am Ende die Spalten ``CHECK_HEADERS``."""
     rows = []
     for r in results:
-        store = ReviewStore(r.path) if review else None
-        for t in r.tags:
+        store = ReviewStore(r.path)
+        for t in store.visible(r.tags):                # ohne aus dem Review genommene Tags (1.0.43)
             row = [r.name, r.drawing_no, t.type, t.tag, t.count, t.pages_text]
-            if store:
+            if review:
                 row += store.values(t.type, t.tag)
             if checker is not None:
                 row += checker.columns(t.type, t.tag, t.count)

@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (QApplication, QComboBox, QHBoxLayout, QLabel, QLi
 from main_gui_kit.branding import HeaderBanner
 from main_gui_kit.buttons import ButtonKind, action_button
 from main_gui_kit.tables import (MultiColumnFilterProxy, TableAdminBar, TableDataModel, apply_table_layout,
-                                 configure_table_view, table_zoom_slider)
+                                 bind_layout_persistence, configure_table_view, table_zoom_slider)
 from main_gui_kit.theme import LIGHT, ThemeManager
 
 from .. import i18n, paths
@@ -27,9 +27,10 @@ from ..constants import APP_NAME
 from ..core import data_link, export, project_settings, redline, review
 from ..core.extract import PdfResult
 from ..core.project_defs import CHECK_HEADERS, ProjectDB, is_fault_status
-from ..core.review_store import CHANGE_VALUES, EDIT_FIELDS, FIELDS, REVIEW_VALUES, ReviewStore, status_hits
+from ..core.review_store import (CHANGE_VALUES, EDIT_FIELDS, FIELDS, REVIEW_VALUES, ReviewStore, status_hits,
+                                 visible_tags)
 from . import appearance, icons, last_paths, table_views
-from .design import NOTE_QSS
+from .design import DISABLED, NOTE_QSS
 from .paths_dialog import PathsDialog, open_in_explorer
 from . import msgbox, project_dialog, table_profiles, web_control
 from .controls import indicator_qss
@@ -82,6 +83,12 @@ JOIN_TIP = ("Abgleich der Tag-Tabelle mit der Importliste (Datenlink 2, mit Date
             "• Importliste → PDF-Tags: alle Zeilen der Liste zu dieser Zeichnung, getroffene mit ihrem PDF-Tag\n"
             "• Tags beider Listen: alles zusammen\n"
             "Fehlende Werte stehen als „n.a.“ da.")
+LINK_COLS_TIP = ("Importspalten ein/aus: Spalten der verlinkten Importliste (Datenlink 2) in der Tag-Tabelle zeigen "
+                 "oder ausblenden. Beide Ansichten haben ein eigenes gemerktes Layout – Ausblenden ändert das Layout "
+                 "der Review-Spalten nicht.")
+LINK_MENU_TIP = ("Importliste: Link der Tag-Tabelle aufheben, Liste neu einlesen, Importtabelle bearbeiten oder "
+                 "entfernen.")
+FILES_FOLD_KEY = "files_collapsed"   # config/state.json: Dateiliste eingeklappt (1.0.43)
 PROJECT_MODE_KEY, PROJECT_DB_KEY = "project_mode", "project_db"     # config/state.json
 PROJECT_TIP = ("Projektmodus: Tags werden gegen die Projektdefinitionen geprüft (Codelisten und Tag-Strukturen wie in "
                "P3D Tag Compliance). Aus = Standardmodus ohne Projektdefinitionen.")
@@ -147,17 +154,42 @@ class ReviewModel(DuplicateModel):
         self.store, self.edit_mode, self.first_field = store, edit_mode, first_field
         self._edit_cols = {first_field + i for i in range(len(EDIT_FIELDS))}
         self._edit_brush = QBrush(QColor(appearance.selection_color()))
+        self._removed_brush = QBrush(QColor(DISABLED))
 
     def flags(self, index):
         flags = super().flags(index)
-        if (self.edit_mode and self.store is not None and index.column() in self._edit_cols
-                and not is_na_row(self.rows[index.row()])):    # Importzeile ohne PDF-Tag: kein Review-Eintrag
+        if self.edit_mode and self.can_set(index.row(), index.column()):
             flags |= Qt.ItemIsEditable
         return flags
+
+    def can_set(self, row: int, column: int) -> bool:
+        """Review-Spalte einer echten PDF-Zeile (keine Importzeile „n.a.“, kein aus dem Review genommener Tag)."""
+        if self.store is None or column not in self._edit_cols or not 0 <= row < len(self.rows):
+            return False
+        r = self.rows[row]
+        return not is_na_row(r) and not self.store.is_removed(r[0], r[1])
+
+    def is_removed(self, row: int) -> bool:
+        r = self.rows[row]
+        return self.store is not None and not is_na_row(r) and self.store.is_removed(r[0], r[1])
+
+    def set_cell(self, row: int, column: int, value) -> bool:
+        """Review-Wert setzen ohne Bearbeiten-Modus (Rechtsklick: Einfuegen, Wert uebernehmen, leeren; 1.0.43)."""
+        if not self.can_set(row, column):
+            return False
+        r = self.rows[row]
+        values = self.store.set(r[0], r[1], EDIT_FIELDS[column - self.first_field], str(value or "").strip())
+        r[self.first_field:self.first_field + len(FIELDS)] = values
+        self.dataChanged.emit(self.index(row, 0), self.index(row, self.columnCount() - 1))
+        return True
 
     def data(self, index, role=Qt.DisplayRole):
         if role == Qt.EditRole and index.isValid():
             return self.rows[index.row()][index.column()]
+        if role == Qt.ForegroundRole and index.isValid() and self.is_removed(index.row()):
+            return self._removed_brush                   # aus dem Review genommen (nur mit „Gelöschte zeigen“)
+        if role == Qt.ToolTipRole and index.isValid() and self.is_removed(index.row()):
+            return "Aus dem Review genommen – Rechtsklick › Zeile wiederherstellen"
         if (role == Qt.BackgroundRole and self.edit_mode and index.isValid() and index.column() in self._edit_cols
                 and not self._is_duplicate(index.row())):
             return self._edit_brush                      # editierbare Zellen im Bearbeiten-Modus hervorheben
@@ -338,8 +370,13 @@ class TagsSheet(Sheet):
         strip.add("excel_files", "Excel", "excel", lambda: export_table_view(self.files.table, "PID_Dateien"),
                   "Dateiliste als Excel sichern", icon=excel_icon(16))
         strip.stretch()
+        # 1.0.43: Dateiliste ein-/ausklappen (mehr Platz fuer die Tag-Tabelle), Zustand gemerkt
+        self.fold_button = strip.add("fold_files", "Einklappen", "fold", self.set_files_collapsed,
+                                     "Dateiliste einklappen bzw. wieder aufklappen – die Tag-Tabelle bekommt den Platz",
+                                     checkable=True)
         self.files.layout().insertWidget(1, strip)
         vsplit.addWidget(self.files)
+        self._vsplit = vsplit
         hsplit = QSplitter(Qt.Horizontal)
         self.store: ReviewStore | None = None          # Review-Eintraege der gewaehlten PDF
         self._store_result: PdfResult | None = None
@@ -354,6 +391,11 @@ class TagsSheet(Sheet):
                                      SCAN_TIP, checkable=True)
         self.scan_button.setChecked(bool(last_paths.get_value(SCAN_KEY, False)))
         self.autofill_button = strip.add("autofill", "Autofill OK", "syscheck", self.autofill_ok, AUTOFILL_TIP)
+        self.autofill_button.setCheckable(True)          # blau, solange Autofill-Werte ungespeichert sind (1.0.43)
+        self._autofilled = False
+        self.show_removed = False                        # aus dem Review genommene Tags zeigen (Rechtsklick)
+        self.tags.table._cell_menu_hook = self._cell_menu
+        QShortcut(QKeySequence.Paste, self.tags.table, activated=self.paste_cells, context=Qt.WidgetShortcut)
         self.edit_button = strip.add("edit", "Bearbeiten", "rename", self.set_edit_mode,
                                      "Bearbeiten-Modus: Review, Änderung, Neuer Wert, Bemerkung, WPO eintragen "
                                      "(Datum und User werden automatisch gesetzt)", checkable=True)
@@ -369,7 +411,15 @@ class TagsSheet(Sheet):
         strip.add("filter_reset", "Filter zurücksetzen", "filter_reset", self.reset_tag_filters,
                   "Filter der Tag-Tabelle zurücksetzen (geschieht auch bei jedem PDF-Wechsel)")
         # Abgleich mit der Importliste (Datenlink 2, 1.0.38): Richtung waehlen, fehlende Werte = „n.a.“
-        self.join_button = strip.add("join", "Abgleich", "import", lambda: None, JOIN_TIP)
+        # Importliste (1.0.43): Importspalten ein/aus, Menue Link aufheben / entfernen / neu einlesen
+        self.link_cols_button = strip.add("link_cols", "Importspalten", "link_cols", self.toggle_link_columns,
+                                          LINK_COLS_TIP, checkable=True)
+        self.link_menu_button = strip.add("link_menu", "Importliste", "import", lambda: None, LINK_MENU_TIP)
+        self.link_menu_button.setPopupMode(QToolButton.InstantPopup)
+        self.link_menu = QMenu(self.link_menu_button)
+        self.link_menu.aboutToShow.connect(self._fill_link_menu)
+        self.link_menu_button.setMenu(self.link_menu)
+        self.join_button = strip.add("join", "Abgleich", "match", lambda: None, JOIN_TIP)
         self.join_button.setPopupMode(QToolButton.InstantPopup)
         join_menu = QMenu(self.join_button)
         self._join_actions = []
@@ -421,6 +471,8 @@ class TagsSheet(Sheet):
         # Programmstart: keine Filter in Dateiliste und Tag-Tabelle (auch nicht aus einem benannten Layout, 1.0.39)
         self.files.clear_filters()
         self.tags.clear_filters()
+        self._files_sizes: list[int] | None = None
+        self.fold_button.setChecked(bool(last_paths.get_value(FILES_FOLD_KEY, False)))
         self.files.table.export_name = lambda: "PID_Dateien"
         self.tags.table.export_name = self._tags_export_name
         self.files.table.selectionModel().currentRowChanged.connect(self._file_changed)
@@ -436,6 +488,26 @@ class TagsSheet(Sheet):
         self.viewer.detached_changed.connect(self._viewer_detached)
         self.viewer.install(self._viewer_host_layout)
 
+    def set_files_collapsed(self, collapsed: bool) -> None:
+        """Dateiliste ein-/ausklappen (1.0.43): eingeklappt bleiben Kopfzeile (Blattfilter, Zeilenzahl) und Leiste
+        sichtbar, Tabelle und Layout-Leiste verschwinden; die Tag-Tabelle bekommt den Platz. Aufklappen stellt die
+        vorherige Aufteilung wieder her. Die gewaehlte PDF bleibt gewaehlt."""
+        files = self.files
+        if collapsed and files.table.isVisible():
+            self._files_sizes = self._vsplit.sizes()
+        files.table.setVisible(not collapsed)
+        bottom = files.layout().itemAt(files.layout().count() - 1).layout()
+        for i in range(bottom.count()):
+            widget = bottom.itemAt(i).widget()
+            if widget is not None:
+                widget.setVisible(not collapsed)
+        files.setMaximumHeight(files.minimumSizeHint().height() if collapsed else 16777215)
+        if not collapsed and self._files_sizes:
+            self._vsplit.setSizes(self._files_sizes)
+        self.fold_button.setText(i18n.tr("Aufklappen" if collapsed else "Einklappen"))
+        self.fold_button.setIcon(icons.ribbon_icon("unfold" if collapsed else "fold", 16))
+        last_paths.set_value(FILES_FOLD_KEY, bool(collapsed))
+
     def _viewer_detached(self, detached: bool) -> None:
         """2. Monitor: Tag-Tabelle ueber die ganze Breite, Zurueckholen-Knopf ueber der Tabelle. Zurueck: Bereich wieder
         im Standardverhaeltnis (``VIEWER_SPLIT``) teilen."""
@@ -448,24 +520,26 @@ class TagsSheet(Sheet):
 
     # --- Tag-Tabelle ---------------------------------------------------------------------------------------------
     def _tag_rows(self) -> list[list]:
-        return self.tag_rows_for(self._store_result, self.store)
+        return self.tag_rows_for(self._store_result, self.store, include_removed=self.show_removed)
 
-    def tag_rows_for(self, result: PdfResult | None, store: ReviewStore | None) -> list[list]:
+    def tag_rows_for(self, result: PdfResult | None, store: ReviewStore | None,
+                     include_removed: bool = False) -> list[list]:
         """Zeilen der Tag-Tabelle (Spalten ``self.tags.headers``) fuer eine PDF - auch fuer die Tabellen-Vorschau aller
-        PDFs (1.0.40)."""
+        PDFs (1.0.40). Aus dem Review genommene Tags nur mit ``include_removed`` (1.0.43)."""
         if result is None:
             return []
         checker = self.win.checker
         scan = scan_values(result) if self.scan_button.isChecked() else [""] * len(SCAN_COLS)
+        tags = result.tags if include_removed or store is None else store.visible(result.tags)
         rows = [[t.type, t.tag, t.count, t.pages_text,
                  *(checker.columns(t.type, t.tag, t.count) if checker else ["", ""]),
                  *(store.values(t.type, t.tag) if store else [""] * len(FIELDS)), *scan]
-                for t in result.tags]
+                for t in tags]
         # Datenlink 2: Zusatzspalten aus der Importtabelle (Feld per Rechtsklick auf den Spaltenkopf). Abgleich (1.0.38):
         # PDF-Tags -> Liste, Liste -> PDF-Tags oder beide; was in einer Liste fehlt, steht als „n.a.“ da.
         links = self.win.links
-        field = links.fields.get("tags", "")
-        if links.active(2) and field in TAG_COLS:
+        if links.tags_linked(TAG_COLS):                # 1.0.43: Importspalten ein/aus (Leiste der Tag-Tabelle)
+            field = links.fields.get("tags", "")
             c, file_value = TAG_COLS.index(field), self.win.file_link_value(result)
             out = []
             for i, hits in links.tag_join([r[c] for r in rows], file_value):
@@ -502,12 +576,14 @@ class TagsSheet(Sheet):
         """Alle OK-Werte der gewaehlten PDF: Review OK, User, Datum (ohne Uhrzeit), WPO = Checked (falls leer)."""
         result, store = self._store_result, self.store
         if result is None or store is None:
+            self.autofill_button.setChecked(False)
             self.win.statusBar().showMessage("Autofill OK: zuerst eine PDF wählen.", 6000)
             return
         checker = self.win.checker
         changed = sum(store.autofill_ok(t.type, t.tag, result.checked,
                                         checker.columns(t.type, t.tag, t.count)[0] if checker else "")
-                      for t in result.tags)
+                      for t in store.visible(result.tags))
+        self._autofilled = self._autofilled or bool(changed)
         self._only_duplicates()
         self._store_changed()
         self.win.statusBar().showMessage(f"Autofill OK: {changed} Tag(s) ausgefüllt – zum Übernehmen Speichern."
@@ -518,17 +594,66 @@ class TagsSheet(Sheet):
         on = self.dup_button.isChecked() if on is None else on
         faults = self.fault_button.isChecked() and self.win.checker is not None
         rows = [r for r in self._tag_rows() if (not on or r[2] > 1) and (not faults or is_fault_status(r[CHECK_COL]))]
-        field = self.win.links.fields.get("tags", "")
-        self.tags.headers = TAG_COLS + (self.win.links.tag_extra(TAG_COLS) if field in TAG_COLS else [])
+        linked = self.win.links.tags_linked(TAG_COLS)
+        self.tags.headers = TAG_COLS + (self.win.links.tag_extra(TAG_COLS) if linked else [])
+        self._bind_tag_layout(linked)
         self.tags.set_rows(rows)
+        self._mark_link_buttons()
         self.tags.proxy.sourceModel().dataChanged.connect(self._store_changed)   # neues Modell -> neu verbinden
         self.win.apply_project_columns()
         self._hit = None
 
+    def _bind_tag_layout(self, linked: bool) -> None:
+        """Getrennt gemerkte Ansichten der Tag-Tabelle (1.0.43, Nutzervorgabe): ohne Importspalten ``tags``, mit
+        Importspalten ``tags_link``. Ausblenden, neu Einlesen oder Link aufheben laesst so das Layout der Review-Tabelle
+        unveraendert; das Layout mit Importspalten kommt beim Einblenden zurueck."""
+        key = "tags_link" if linked else "tags"
+        view = self.tags.table
+        if getattr(view, "layout_key", "") == key:
+            return
+        view.layout_key = key
+        if getattr(view, "_shared_layout_store", None) is not None:      # schon an einen Speicher gebunden: umhaengen
+            bind_layout_persistence(view, table_views.layout_store(), "auto|" + key)
+
+    # --- Importliste in der Tag-Tabelle (1.0.43) ------------------------------------------------------------------
+    def toggle_link_columns(self, on: bool) -> None:
+        """Importspalten der Tag-Tabelle ein/aus (gemerkt)."""
+        links = self.win.links
+        links.set_tags_shown(on)
+        self._only_duplicates()
+        if on and not links.active(2):
+            self.win.statusBar().showMessage("Importspalten: erst eine Liste importieren und in der Tag-Tabelle per "
+                                             "Rechtsklick auf den Spaltenkopf das Datenlink-Feld setzen.", 8000)
+
+    def _mark_link_buttons(self) -> None:
+        links = self.win.links
+        active = links.active(2) and links.fields.get("tags", "") in TAG_COLS
+        self.link_cols_button.blockSignals(True)
+        self.link_cols_button.setChecked(active and links.tags_shown)   # ohne Link nicht blau (sonst wirkt es „an“)
+        self.link_cols_button.blockSignals(False)
+        self.link_cols_button.setEnabled(active)
+        self.join_button.setEnabled(active and links.tags_shown)
+
+    def _fill_link_menu(self) -> None:
+        """Menue „Importliste“ der Tag-Tabelle: Link aufheben, Importtabelle entfernen, neu einlesen, bearbeiten."""
+        m, win, links = self.link_menu, self.win, self.win.links
+        m.clear()
+        has_table, field = links.table is not None, links.fields.get("tags", "")
+        unlink = m.addAction(f"Link aufheben (Datenlink-Feld „{field}“ der Tag-Tabelle)" if field
+                             else "Link aufheben (kein Datenlink-Feld gesetzt)", lambda: links.set_field("tags", ""))
+        unlink.setEnabled(bool(field))
+        m.addSeparator()
+        m.addAction("Liste neu einlesen …", lambda: win.edit_data_link(new=True))
+        m.addAction("Importtabelle bearbeiten (Kachel-Editor) …", win.edit_data_link).setEnabled(has_table)
+        m.addAction("Importtabelle entfernen …", win._remove_data_link).setEnabled(has_table)
+        m.addSeparator()
+        m.addAction("Datenlinks anzeigen", lambda: QMessageBox.information(win, "Datenlink", links.summary()))
+
     def show_status(self) -> None:
         """Rahmen im Viewer: gruen korrekt, rot Review "Korrektur erforderlich" oder (Projektmodus) Abweichung."""
         result = self._store_result
-        self.preview.show_status(*status_hits(result.tags if result else [], self.store, self.win.checker))
+        tags = (self.store.visible(result.tags) if self.store else result.tags) if result else []
+        self.preview.show_status(*status_hits(tags, self.store, self.win.checker))
 
     # --- Bearbeiten-Modus / Speichern -----------------------------------------------------------------------------
     def set_edit_mode(self, on: bool) -> None:
@@ -550,7 +675,99 @@ class TagsSheet(Sheet):
         dirty = bool(self.store and self.store.dirty)
         self.save_button.setEnabled(dirty)
         self.save_button.setText(i18n.tr("Speichern *" if dirty else "Speichern"))
+        if not dirty:                                    # gespeichert, verworfen oder andere PDF
+            self._autofilled = False
+        self.autofill_button.setChecked(self._autofilled)   # blau = Autofill-Werte noch nicht gespeichert (1.0.43)
         self.show_status()
+
+    # --- Rechtsklick in der Tag-Tabelle (1.0.43): Einfuegen, Wert uebernehmen, leeren, Zeilen aus Review nehmen ----
+    def _selected_rows(self) -> list[int]:
+        """Markierte Zeilen der Tag-Tabelle (Quellzeilen, sortiert)."""
+        sel = self.tags.table.selectionModel()
+        rows = {self.tags.source_row(i) for i in (sel.selectedIndexes() if sel else [])}
+        current = self.tags.source_row(self.tags.table.currentIndex())
+        return sorted(r for r in (rows or {current}) if r >= 0)
+
+    def _cell_menu(self, menu: QMenu, index: QModelIndex) -> None:
+        model = self.tags.proxy.sourceModel()
+        if not isinstance(model, ReviewModel) or self.store is None:
+            return
+        col = self.tags.proxy.mapToSource(index).column() if index.isValid() else -1
+        review_col = col in model._edit_cols
+        rows = self._selected_rows()
+        menu.addSeparator()
+        menu.addAction("Einfügen (Strg+V)", self.paste_cells).setEnabled(review_col)
+        value = str(index.data() or "") if index.isValid() else ""
+        short = value if len(value) <= 30 else value[:29] + "…"
+        menu.addAction(f"„{short}“ in markierte Zeilen übernehmen" if value else "Wert in markierte Zeilen übernehmen",
+                       lambda: self.fill_cells(col, value)).setEnabled(review_col and len(rows) > 1)
+        menu.addAction("Zellen leeren", lambda: self.fill_cells(col, "")).setEnabled(review_col)
+        menu.addSeparator()
+        removed = [r for r in rows if model.is_removed(r)]
+        menu.addAction(f"Zeile(n) aus Review nehmen ({len(rows) - len(removed)})",
+                       lambda: self.remove_rows(True)).setEnabled(len(rows) > len(removed))
+        menu.addAction(f"Zeile(n) wiederherstellen ({len(removed)})",
+                       lambda: self.remove_rows(False)).setEnabled(bool(removed))
+        show = menu.addAction(f"Aus dem Review genommene zeigen ({len(self.store.removed)})", self.toggle_show_removed)
+        show.setCheckable(True)
+        show.setChecked(self.show_removed)
+
+    def _apply_cells(self, changes: list[tuple[int, int, str]]) -> int:
+        model = self.tags.proxy.sourceModel()
+        done = sum(1 for row, col, value in changes if model.set_cell(row, col, value))
+        if done:
+            self._store_changed()
+            self.win.statusBar().showMessage(f"{done} Zelle(n) geändert – zum Übernehmen Speichern.", 6000)
+        return done
+
+    def fill_cells(self, column: int, value: str) -> int:
+        """Wert in die Spalte ``column`` aller markierten Zeilen schreiben (nur Review-Spalten)."""
+        return self._apply_cells([(r, column, value) for r in self._selected_rows()])
+
+    def paste_cells(self) -> int:
+        """Zwischenablage ab der aktuellen Zelle einfuegen (wie Excel: Tab = Spalte, Zeilenumbruch = Zeile). Nur
+        Review-Spalten echter PDF-Zeilen werden beschrieben; ein einzelner Wert geht in alle markierten Zeilen."""
+        text = QApplication.clipboard().text()
+        if not text:
+            return 0
+        lines = [line.split("\t") for line in text.rstrip("\r\n").replace("\r\n", "\n").split("\n")]
+        proxy, view = self.tags.proxy, self.tags.table
+        current = view.currentIndex()
+        if not current.isValid():
+            return 0
+        if len(lines) == 1 and len(lines[0]) == 1:
+            return self.fill_cells(proxy.mapToSource(current).column(), lines[0][0])
+        header = view.horizontalHeader()
+        visual = [c for c in (header.logicalIndex(v) for v in range(header.count())) if not view.isColumnHidden(c)]
+        start_v = visual.index(current.column()) if current.column() in visual else 0
+        changes = []
+        for dr, cells in enumerate(lines):
+            prow = current.row() + dr
+            if prow >= proxy.rowCount():
+                break
+            for dc, value in enumerate(cells):
+                if start_v + dc >= len(visual):
+                    break
+                src = proxy.mapToSource(proxy.index(prow, visual[start_v + dc]))
+                changes.append((src.row(), src.column(), value))
+        return self._apply_cells(changes)
+
+    def remove_rows(self, removed: bool = True) -> int:
+        """Markierte Tags aus dem Review nehmen bzw. wiederherstellen (Nutzervorgabe 1.0.43; gilt nach Speichern)."""
+        model = self.tags.proxy.sourceModel()
+        pairs = [(model.rows[r][0], model.rows[r][1]) for r in self._selected_rows() if not is_na_row(model.rows[r])]
+        changed = self.store.set_removed(pairs, removed) if self.store is not None else 0
+        if changed:
+            self._only_duplicates()
+            self._store_changed()
+            self.win.statusBar().showMessage(
+                f"{changed} Tag(s) {'aus dem Review genommen' if removed else 'wiederhergestellt'} – zum Übernehmen "
+                "Speichern. Rechtsklick › „Aus dem Review genommene zeigen“ zeigt sie wieder an.", 8000)
+        return changed
+
+    def toggle_show_removed(self) -> None:
+        self.show_removed = not self.show_removed
+        self._only_duplicates()
 
     def save_review(self) -> bool:
         if not (self.store and self.store.dirty):
@@ -647,7 +864,7 @@ class TagsSheet(Sheet):
             dlg.update_progress(60, f"PDF öffnen und anzeigen: {result.name} ({result.pages} Seite(n))", first + 1)
             self.preview.show_pdf(result.path)
             self.show_status()
-            self.preview.show_duplicates([t.hits for t in result.tags if t.duplicate])
+            self.preview.show_duplicates([t.hits for t in self.store.visible(result.tags) if t.duplicate])
             dlg.update_progress(100)
 
     # --- Tag-Navigation ------------------------------------------------------------------------------------------
@@ -922,8 +1139,11 @@ class MainWindow(QMainWindow):
     def _review_input(self) -> list[tuple]:
         """Je PDF: Name, Wert des Datenlink-Felds der Dateiliste, Tags mit dem Wert des Tag-Felds („Tag“/„Typ“)."""
         attr = {"Typ": "type"}.get(self.links.fields.get("tags", ""), "tag")
+        page = self.page
         return [(r.name, self.file_link_value(r),
-                 [(t.type, t.tag, t.count, t.pages_text, getattr(t, attr)) for t in r.tags]) for r in self.results]
+                 [(t.type, t.tag, t.count, t.pages_text, getattr(t, attr))
+                  for t in (page.store.visible(r.tags) if r is page._store_result and page.store else visible_tags(r))])
+                for r in self.results]
 
     def show_all_tags(self) -> None:
         if self.tabs.indexOf(self.all_page) < 0:

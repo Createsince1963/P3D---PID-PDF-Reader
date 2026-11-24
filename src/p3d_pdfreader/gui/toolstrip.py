@@ -19,6 +19,8 @@ icons.GLYPHS.update({
     "pdf_open": "⎘", "redline": "✎", "duplicates": "⚑", "filter_reset": "⊘", "review": "➤", "folder": "▤",
     "files": "⇧", "scan": "⟳", "excel_out": "⇩", "csv_out": "⇩", "info": "ⓘ", "help": "?", "pipe": "═", "mono": "◐",
     "project_mode": "◉", "defs": "☷", "deviations": "✗",
+    # 1.0.43: Importspalten ein/aus, Abgleich, Dateiliste ein-/ausklappen
+    "link_cols": "⇄", "match": "⇅", "fold": "⏶", "unfold": "⏷",
 })
 
 

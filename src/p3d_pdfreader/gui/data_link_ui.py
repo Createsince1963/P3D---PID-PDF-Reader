@@ -25,6 +25,7 @@ LINK_COLOR = appearance.ACCENT_CHOICES[1]      # dunkelgruen (#1B6B5A), passend 
 FIELDS_KEY = "data_link_fields"                # config/state.json: {"files": Spaltenname, "tags": Spaltenname}
 IMPORT_DIR = "last_data_link_dir"              # config/state.json: zuletzt gewaehlter Ordner der Importliste
 JOIN_KEY = "data_link_join"                    # config/state.json: Abgleich der Tag-Tabelle (pdf / list / both)
+SHOWN_KEY = "data_link_tags_shown"             # config/state.json: Importspalten in der Tag-Tabelle ein/aus (1.0.43)
 HITS = "Datenlink-Treffer"
 TABLE_NAMES = {1: "Tabelle 1 – Dateien", 2: "Tabelle 2 – Tags"}
 PREFERRED_SHEET = "Gesamtliste"                # Gesamtliste aus P3D InstrumentationList
@@ -217,6 +218,18 @@ class LinkController:
             return []
         rows = self.link.tag_rows(value, file_value if self.active(1) else None)
         return [len(rows), *self.link.values_or_na(rows)]
+
+    # --- Importspalten der Tag-Tabelle ein/aus (1.0.43) ----------------------------------------------------------
+    @property
+    def tags_shown(self) -> bool:
+        return bool(last_paths.get_value(SHOWN_KEY, True))
+
+    def set_tags_shown(self, on: bool) -> None:
+        last_paths.set_value(SHOWN_KEY, bool(on))
+
+    def tags_linked(self, base: list[str]) -> bool:
+        """Tag-Tabelle zeigt Importspalten: Datenlink 2 aktiv, Feld eine Grundspalte und nicht ausgeblendet."""
+        return self.active(2) and self.fields.get("tags", "") in base and self.tags_shown
 
     # --- Abgleich Tag-Tabelle <-> Importliste (1.0.38) -----------------------------------------------------------
     @property
