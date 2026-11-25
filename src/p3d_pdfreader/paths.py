@@ -30,13 +30,20 @@ def default_home() -> Path:
 
 
 def _ensure(path: Path) -> Path:
-    path.mkdir(parents=True, exist_ok=True)
+    if not path.is_dir():                    # stat statt mkdir: wird oft aufgerufen (je PDF, je Tabelle)
+        path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+_HOME: dict[str, Path] = {}                  # aufgeloester Datenordner je Wert von %P3D_PDFREADER_HOME%
 
 
 def home_dir() -> Path:
     env = os.environ.get(ENV_HOME, "").strip()
-    return _ensure((Path(env) if env else default_home()).resolve())
+    path = _HOME.get(env)
+    if path is None:                         # resolve() ist auf Windows teuer; einmal je Einstellung genuegt
+        path = _HOME[env] = (Path(env) if env else default_home()).resolve()
+    return _ensure(path)
 
 
 def config_dir() -> Path:

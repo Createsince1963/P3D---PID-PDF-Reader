@@ -147,7 +147,7 @@ Alle Tabellen folgen dem Standard aus `main_gui_kit`:
 - Sortierung, Spalten verschieben oder ausblenden, Zoom
 - dunkelblauer Tabellenkopf
 
-Die Ansicht jeder Tabelle (Spaltenreihenfolge, Breiten, Ausblenden, Sortierung, Zoom) wird automatisch gemerkt. **Ausnahme Filter:** Dateiliste und Tag-Tabelle starten immer ohne Filter, Filter werden dort nicht gemerkt. Benannte Ansichten verwaltest du über *Save / Load / Reset Layout*, die Ansicht aller Tabellen auf einmal über **Tabellenprofil** (Menüband „2 Ansicht“). Das **Excel-Symbol** oben links in der Tabelle sichert die sichtbare Ansicht als Excel oder CSV. Der Dateiname ist vorbelegt mit PDF- oder Tabellenname und Zeitstempel, z. B. `SGOPS-…-EQPM-001_Tags_2026-11-20_14-29.xlsx`.
+Die Ansicht jeder Tabelle (Spaltenreihenfolge, Breiten, Ausblenden, Sortierung, Zoom) wird automatisch gemerkt. **Ausnahme Filter:** Dateiliste und Tag-Tabelle starten immer ohne Filter, Filter werden dort nicht gemerkt. Benannte Ansichten verwaltest du über *Save / Load / Reset Layout*, die Ansicht aller Tabellen auf einmal über **Tabellenprofil** (Menüband „2 Ansicht“). Das **Excel-Symbol** oben links in der Tabelle sichert die Tabelle wie angezeigt: sichtbare und hinzugefügte Spalten (ausgeblendete nicht) in deiner Reihenfolge, Filter und Sortierung, in Excel zusätzlich mit Kopffarbe, Zellfarben, Ausrichtung und Spaltenbreiten (CSV: nur die Werte). Der Dateiname ist vorbelegt mit PDF- oder Tabellenname und Zeitstempel, z. B. `SGOPS-…-EQPM-001_Tags_2026-11-20_14-29.xlsx`.
 
 **Rechtsklick (wie P3D XCHANGE):**
 - **Zelle:** Kopieren, Zeile kopieren (mit/ohne Überschriften), nur diesen Wert zeigen, Filter der Spalte / alle Filter zurücksetzen, Spalten …, Nach Excel …

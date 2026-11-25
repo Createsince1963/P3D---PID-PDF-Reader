@@ -337,3 +337,31 @@ def test_viewer_second_monitor_full_width_and_back(app, tmp_path, monkeypatch):
     assert right > 0
     assert abs(left / (left + right) - expected) < 0.05 or left <= page.tags.minimumSizeHint().width() + 2
     w.close()
+
+
+def test_excel_export_looks_like_view(tmp_path):
+    """Excel-Export wie angezeigt: hinzugefuegte Spalten dabei, ausgeblendete nicht, Reihenfolge, Sortierung, gelbe
+    Zellen, Kopffarbe, Breiten; gleich benannte Spalten bleiben eine gueltige Excel-Tabelle."""
+    from openpyxl import load_workbook
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QApplication
+    from p3d_pdfreader.gui import appearance
+    from p3d_pdfreader.gui.main_window import DataTable
+    from p3d_pdfreader.gui.table_export import view_style, visible_table, write_view
+    QApplication.instance() or QApplication([])
+    t = DataTable("export_probe", "Probe", ["Tag", "Anzahl", "Geheim", "Tag"], count_col=1)
+    t.set_rows([["B-1", 2, "x", "imp-b"], ["A-1", 1, "y", "imp-a"]])
+    t.table.setColumnHidden(2, True)
+    header = t.table.horizontalHeader()
+    header.moveSection(header.visualIndex(3), 0)
+    t.table.setColumnWidth(0, 210)
+    t.table.sortByColumn(0, Qt.AscendingOrder)
+    headers, rows = visible_table(t.table)
+    out = tmp_path / "view.xlsx"
+    write_view(str(out), "Probe", headers, rows, view_style(t.table))
+    ws = load_workbook(out).active
+    values = [[c.value for c in r] for r in ws.iter_rows()]
+    assert values == [["Tag", "Tag (2)", "Anzahl"], ["imp-a", "A-1", "1"], ["imp-b", "B-1", "2"]]
+    assert ws["A1"].fill.fgColor.rgb.endswith(appearance.header_color()[1:])
+    assert ws["A3"].fill.fgColor.rgb.endswith(appearance.DEFAULT_DIRTY[1:]) and ws["A2"].fill.fill_type is None
+    assert ws.column_dimensions["B"].width == 30.0

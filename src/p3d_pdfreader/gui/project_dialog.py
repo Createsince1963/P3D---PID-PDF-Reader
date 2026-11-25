@@ -22,7 +22,7 @@ from .design import ERROR_QSS, NOTE_QSS, SECTION_QSS
 from .paths_dialog import open_in_explorer
 from .project_tiles import ColumnTiles, GridEditing, TileList, load_json_meta
 from .sheet import table_header_qss
-from .table_export import export_table_view
+from .table_export import export_table_view, install_excel_corner
 from .controls import tip_button
 
 TILES_ON = "defs_tile_editor_on"          # config/state.json: Kachel-Editor zuletzt ein/aus
@@ -230,6 +230,8 @@ class ProjectDefinitionsDialog(GridEditing, QDialog):
         self.grid.setToolTip("Rechtsklick: Zeilen, Zellen und Spalten bearbeiten (auch auf Zeilennummern und "
                              "Spaltenköpfe); Strg+Z/Strg+Y rückgängig/wiederholen, Strg+C/Strg+V wie Excel")
         self.install_grid_functions()
+        self.grid.export_name = lambda: self.title_label.text()         # Dateiname = Name der gezeigten Tabelle
+        install_excel_corner(self.grid, "Projektdefinitionen")
         self.column_tiles = ColumnTiles(self)
         self.column_tiles.hide()
         right_lay.addWidget(self.column_tiles)

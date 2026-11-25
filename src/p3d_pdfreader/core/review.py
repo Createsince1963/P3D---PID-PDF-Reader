@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from . import tag_edit
 from .extract import PdfResult, Tag
 
 from .project_defs import CHECK_HEADERS, is_fault_status
@@ -69,7 +70,7 @@ def review_rows(result: PdfResult, tags: list[Tag] | None = None, checker=None) 
         values = store.values(p.tag.type, p.tag.tag)
         if not values[0] and p.total > 1:
             values[0] = "Offen"
-        rows.append([p.pos, result.name, result.drawing_no, result.revision, p.tag.type, p.tag.tag, p.page + 1,
+        rows.append([p.pos, result.name, result.drawing_no, result.revision, p.tag.type, tag_edit.apply(p.tag.tag), p.page + 1,
                      f"{p.occurrence}/{p.total}", p.total, "Ja" if p.total > 1 else "",
                      *(checker.columns(p.tag.type, p.tag.tag, p.tag.count) if checker is not None else []),
                      p.comment, *values])

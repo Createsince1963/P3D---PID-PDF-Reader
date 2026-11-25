@@ -14,7 +14,7 @@ import copy
 from typing import Callable
 
 from PySide6.QtCore import QEvent, QObject, Qt
-from PySide6.QtGui import QColor, QPainter
+from PySide6.QtGui import QColor, QFontMetrics, QPainter
 from PySide6.QtWidgets import QApplication, QInputDialog, QMenu, QMessageBox
 
 from ..core.data_link import JOIN_MODES, JOIN_PDF, DataLink, ImportTable, read_sheet, sheet_names
@@ -62,17 +62,18 @@ class LinkHeaderPainter(QObject):
     dunkelgruener Schrift und dem Hinweis „Import“ rechts im Kopf."""
 
     def __init__(self, header, columns: Callable[[], set[int]], bottom: Callable[[], int] = lambda: 0,
-                 imports: Callable[[], set[int]] = set):
+                 imports: Callable[[], set[int]] = set, notes: Callable[[], dict[int, str]] = dict):
         super().__init__(header)
         self.header, self.columns, self.bottom, self.imports = header, columns, bottom, imports
+        self.notes = notes            # {Spalte: Hinweis}, kleine kursive Schrift rechts im Kopf (z. B. "edit")
         self._busy = False
         header.viewport().installEventFilter(self)
 
     def eventFilter(self, obj, event):  # noqa: N802
         if event.type() != QEvent.Paint or self._busy:
             return False
-        cols, imports = self.columns(), self.imports()
-        if not cols and not imports:
+        cols, imports, notes = self.columns(), self.imports(), self.notes()
+        if not cols and not imports and not notes:
             return False
         self._busy = True
         try:
@@ -81,10 +82,10 @@ class LinkHeaderPainter(QObject):
         finally:
             obj.installEventFilter(self)
             self._busy = False
-        self._paint(obj, cols, imports - cols)
+        self._paint(obj, cols, imports - cols, notes)
         return True
 
-    def _paint(self, viewport, cols: set[int], imports: set[int] = frozenset()) -> None:
+    def _paint(self, viewport, cols: set[int], imports: set[int] = frozenset(), notes: dict | None = None) -> None:
         h = self.header
         model = h.model()
         if model is None:
@@ -120,6 +121,22 @@ class LinkHeaderPainter(QObject):
                 painter.setPen(QColor(IMPORT_ACCENT) if is_import else QColor("white"))
                 painter.drawText(rect.adjusted(6, 0, -4, 0), Qt.AlignLeft | Qt.AlignVCenter | Qt.TextSingleLine,
                                  painter.fontMetrics().elidedText(text, Qt.ElideRight, room))
+            for c, note in (notes or {}).items():                  # Hinweis rechts im Kopf, wenn genug Platz ist
+                if c < 0 or c >= h.count() or h.isSectionHidden(c):
+                    continue
+                x, w = h.sectionViewportPosition(c), h.sectionSize(c)
+                rect = viewport.rect().adjusted(0, 0, 0, -bottom)
+                rect.setLeft(x)
+                rect.setWidth(w - 1)
+                title_w = QFontMetrics(h.font()).horizontalAdvance(str(model.headerData(c, Qt.Horizontal) or "")) + 12
+                small = h.font()
+                small.setItalic(True)
+                small.setPointSizeF(max(6.0, small.pointSizeF() * 0.8))
+                painter.setFont(small)
+                painter.setPen(QColor("white"))
+                if title_w + painter.fontMetrics().horizontalAdvance(note) + 12 < w:
+                    painter.drawText(rect.adjusted(0, 0, -5, 0), Qt.AlignRight | Qt.AlignVCenter | Qt.TextSingleLine,
+                                     note)
         finally:
             painter.end()
 
@@ -252,7 +269,7 @@ class LinkController:
         return [len(rows), *self.link.values_or_na(rows)]
 
     # --- Rechtsklick auf den Spaltenkopf --------------------------------------------------------------------------
-    def install(self, key: str, data_table, base: list[str]) -> None:
+    def install(self, key: str, data_table, base: list[str], extra=None, notes=None) -> None:
         """Rechtsklick-Eintrag „Als Datenlink-Feld setzen“ (nur Grundspalten ``base``) und gruener Kopf."""
         from .sheet import _filter_height
         view = data_table.table
@@ -273,10 +290,13 @@ class LinkController:
                                      lambda: self.set_field(key, name))
                 act.setEnabled(name in base)
             menu.addAction("Datenlink: Importtabelle …", self.on_open)
+            if extra is not None:
+                extra(menu, name)
 
         view._shared_header_menu_hook = hook
         LinkHeaderPainter(view.horizontalHeader(), lambda: self._field_columns(key, data_table), _filter_height,
-                          lambda: set(range(len(base), len(data_table.headers))))
+                          lambda: set(range(len(base), len(data_table.headers))),
+                          (lambda: notes(data_table.headers)) if notes else dict)
 
     def _field_columns(self, key: str, data_table) -> set[int]:
         name = self.fields.get(key, "")

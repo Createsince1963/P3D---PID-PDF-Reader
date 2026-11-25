@@ -206,7 +206,7 @@ Rectangle {
             else if (m.modifiers & Qt.ControlModifier) card.ctrlClicked()
             else if (typeof columnEditorController !== "undefined" && columnEditorController.inSelection(card.slotIndex))
                 mouseArea.pendingSingle = true          // press inside a multi selection: keep it, so the whole group can be dragged
-            else card.clicked()
+            else mouseArea.pendingSingle = true         // plain click: acts on release, never while the tile is picked up / dragged
         }
         onReleased: function (m) {                      // plain click (no drag) inside a multi selection = select only this tile
             if (pendingSingle && !drag.active && m.button === Qt.LeftButton) card.clicked()

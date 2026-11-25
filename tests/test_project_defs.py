@@ -12,7 +12,7 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from p3d_pdfreader.core.project_defs import (CODE_MISSING, DUPLICATE, FAULT, INCOMPLETE, OK, RULES,  # noqa: E402
-                                             SEGMENTS, ProjectDB)
+                                             SEGMENTS, STRUCTURES, ProjectDB)
 
 
 def _tc_db(path: Path) -> Path:
@@ -363,19 +363,113 @@ def test_project_settings_roundtrip(tmp_path):
     db.close()
 
 
-def test_instrument_tag_without_dash(tmp_path):
-    """Projektregel: Instrument-Tag ohne Bindestrich (VX130 korrekt, VX-130 falsch); alte Standard-Struktur wird migriert."""
+def test_instrument_tag_with_dash(tmp_path):
+    """Projektregel: Instrument = Kuerzel-Nummer (TIT-130); der Stand ohne Trennzeichen (1.0.46) wird zurueckgestellt."""
     db = ProjectDB.create(tmp_path / "P.db", "P")
     chk = db.checker()
-    assert chk.check("Instrument", "VX130").status == OK
-    assert chk.check("Instrument", "VX-130").status == FAULT
-    assert chk.check("Instrument", "PDIT410").status == OK
-    db.con.execute(f"update {SEGMENTS} set source='free', suffix='-' where tag_type='PDF_INSTRUMENT' and pos=1")
+    assert chk.check("Instrument", "TIT-130").status == OK
+    assert chk.check("Instrument", "TIT130").status == FAULT
+    db.con.execute(f"update {SEGMENTS} set source='alnum', suffix='' where tag_type='PDF_INSTRUMENT' and pos=1")
+    db.con.execute(f"update {STRUCTURES} set example='TIT130', structure='FunctionNumber', note=? "
+                   "where tag_type='PDF_INSTRUMENT'",
+                   ("Instrument (Blase), z. B. TIT130 (Kuerzel + Nummer ohne Trennzeichen; TIT-130 ist falsch)",))
     db.con.commit()
     db.close()
-    db = ProjectDB(tmp_path / "P.db")                 # Oeffnen migriert den alten Standard
+    db = ProjectDB(tmp_path / "P.db")                 # Oeffnen stellt zurueck
     try:
-        assert db.checker().check("Instrument", "VX130").status == OK
-        assert db.checker().check("Instrument", "VX-130").status == FAULT
+        assert db.checker().check("Instrument", "TIT-130").status == OK
+        assert db.checker().check("Instrument", "TIT130").status == FAULT
+        row = db.con.execute(f"select example,structure from {STRUCTURES} where tag_type='PDF_INSTRUMENT'").fetchone()
+        assert tuple(row) == ("TIT-130", "Function-Number")
     finally:
         db.close()
+
+
+def test_tile_click_acts_on_release_not_on_press():
+    """Kachel-Editor: Anfassen/Ziehen loest keine Kachel-Funktion aus; ein Klick wirkt erst beim Loslassen ohne Ziehen."""
+    from p3d_pdfreader.column_editor import qml_resources  # noqa: F401  (registriert die QML-Ressourcen)
+    from PySide6.QtCore import QFile
+    f = QFile(":/column_editor/ColumnCard.qml")
+    assert f.open(QFile.ReadOnly)
+    text = bytes(f.readAll()).decode("utf-8")
+    press = text.split("onPressed:")[1].split("onReleased:")[0]
+    assert "card.clicked()" not in press
+    assert "pendingSingle = true" in press
+    assert "!drag.active" in text.split("onReleased:")[1].split("onCanceled")[0]
+
+
+def test_tag_edit_replace_char(tmp_path):
+    """Zeichen ersetzen: XV_130 -> XV-130 wirkt auf Pruefung und Ansicht; ungueltige Regeln werden abgelehnt."""
+    from p3d_pdfreader.core import tag_edit
+    from p3d_pdfreader.core.export import tag_rows
+    from p3d_pdfreader.core.extract import PdfResult, Tag
+    db = ProjectDB.create(tmp_path / "P.db", "P")
+    chk = db.checker()
+    try:
+        assert chk.check("Instrument", "XV_130").status == FAULT
+        tag_edit.RULE.set("_", "-")
+        assert tag_edit.apply("XV_130") == "XV-130" and tag_edit.RULE.active
+        assert chk.check("Instrument", "XV_130").status == OK            # Cache beruecksichtigt die Regel
+        r = PdfResult(path=tmp_path / "a.pdf", drawing_no="D", tags=[Tag(tag="XV_130", type="Instrument")])
+        assert tag_rows([r])[0][3] == "XV-130"
+        with pytest.raises(ValueError):
+            tag_edit.RULE.set("-", "--")
+        tag_edit.RULE.clear()
+        assert chk.check("Instrument", "XV_130").status == FAULT and tag_edit.apply("XV_130") == "XV_130"
+    finally:
+        tag_edit.RULE.clear()
+        db.close()
+
+
+def test_review_model_marks_rule_fault_and_shows_replacement():
+    """Tag-Tabelle: Tag-Wert eines Regelverstosses hellgelb; mit Ersetzungsregel zeigt die Zelle den ersetzten Tag."""
+    from PySide6.QtCore import Qt
+    from p3d_pdfreader.core import tag_edit
+    from p3d_pdfreader.gui.main_window import CHECK_COL, TAG_COLS, ReviewModel
+    bad, ok = [""] * len(TAG_COLS), [""] * len(TAG_COLS)
+    bad[:3], bad[CHECK_COL] = ["Instrument", "XV-130", 1], FAULT
+    ok[:3], ok[CHECK_COL] = ["Instrument", "XV130", 1], OK
+    m = ReviewModel(TAG_COLS, [bad, ok], 2)
+    try:
+        assert m.data(m.index(0, 1), Qt.BackgroundRole) is not None
+        assert m.data(m.index(1, 1), Qt.BackgroundRole) is None
+        assert m.data(m.index(0, 0), Qt.BackgroundRole) is None
+        tag_edit.RULE.set("-", "")
+        assert m.data(m.index(0, 1), Qt.DisplayRole) == "XV130" and m.rows[0][1] == "XV-130"
+    finally:
+        tag_edit.RULE.clear()
+
+
+def test_fast_sort_proxy_matches_kit_order():
+    """Performance: FastSortProxy sortiert wie der Kit-Proxy (auf-/absteigend, Zahlen vor Text), ueberspringt eine schon
+    aufsteigende Quelle und sortiert das naechste, unsortierte Modell wieder nach dem gemerkten Wunsch."""
+    import random
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QApplication
+    from main_gui_kit.tables import MultiColumnFilterProxy, TableDataModel
+    from p3d_pdfreader.gui.fast_proxy import FastSortProxy
+    QApplication.instance() or QApplication([])
+    rnd = random.Random(3)
+    rows = [[rnd.choice(["b", "A", "10", "9", "", "c-1"]), str(i)] for i in range(300)]
+
+    def order(proxy_cls, data, col, direction, presorted_first=False):
+        proxy = proxy_cls()
+        if presorted_first:
+            proxy.sort(col, direction)
+            proxy.setSourceModel(TableDataModel(["a", "b"], sorted(data, key=lambda r: TableDataModel._sort_key(r[0]))))
+        else:
+            proxy.sort(col, direction)
+        proxy.setSourceModel(TableDataModel(["a", "b"], [list(r) for r in data]))
+        return [proxy.index(i, 1).data() for i in range(proxy.rowCount())], proxy
+
+    for col, direction in ((0, Qt.AscendingOrder), (0, Qt.DescendingOrder), (1, Qt.AscendingOrder)):
+        kit, _ = order(MultiColumnFilterProxy, rows, col, direction)
+        fast, _ = order(FastSortProxy, rows, col, direction)
+        assert fast == kit
+    already = sorted(rows, key=lambda r: TableDataModel._sort_key(r[0]))
+    kit, _ = order(MultiColumnFilterProxy, already, 0, Qt.AscendingOrder)
+    fast, proxy = order(FastSortProxy, already, 0, Qt.AscendingOrder)
+    assert fast == kit
+    kit, _ = order(MultiColumnFilterProxy, rows, 0, Qt.AscendingOrder)
+    fast, _ = order(FastSortProxy, rows, 0, Qt.AscendingOrder, presorted_first=True)
+    assert fast == kit                                   # nach uebersprungener Sortierung wieder sortiert

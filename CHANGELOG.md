@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.0.51 – 2026-11-25
+
+- **Excel-Export wie angezeigt** (Excel-Symbol in der Tabellenecke): sichtbare und hinzugefügte Spalten in deiner Reihenfolge, ausgeblendete nicht, Filter und Sortierung wie gehabt; neu mit Kopffarbe, Zellfarben (doppelte Tags, Regelverstöße), Ausrichtung und den Spaltenbreiten der Ansicht. CSV enthält wie bisher nur die Werte.
+- Das Excel-Symbol gibt es jetzt auch im Raster der **Projektdefinitionen**.
+- Fehler behoben: gleich benannte Spalten (z. B. hinzugefügte Importspalte „Tag“) ergaben eine ungültige Excel-Tabelle; die zweite heißt jetzt „Tag (2)“.
+
+## 1.0.50 – 2026-11-25
+
+- **Projektregel Instrument wieder mit Bindestrich** (ersetzt 1.0.46): `PDF_INSTRUMENT` ist wieder Kürzel + `-` + Nummer (`TIT-130`, „Function-Number“); die Schreibweise ohne Trennzeichen ist ein Regelfehler. Projekt-Datenbanken mit dem Standard aus 1.0.46 bis 1.0.49 werden beim Öffnen zurückgestellt; selbst geänderte Strukturen bleiben unberührt. Die Segment-Quelle `alnum` bleibt verfügbar.
+
+## 1.0.49 – 2026-11-24
+- **Performance bei großen Datenmengen** (Messung mit 663 PDFs, 28 509 Tags, 30 000 Importzeilen, Benchmark offscreen; Zeiten inkl. Last durch parallelen Testlauf): Tabellen neu füllen (`_refresh`) 6,0 s → 1,4 s, Blatt „Alle Tags“ 5,6 s → 0,9 s, Tabellen-Vorschau 1,6 s → 0,9 s.
+  - **Sortierung** (`gui/fast_proxy.py`, `FastSortProxy` statt Kit-Proxy; Kit unverändert): Sortierschlüssel je Spalte einmal berechnen statt bei jedem der ~200 000 Vergleiche; ist die Quelle schon aufsteigend sortiert (Standard: Spalte 0), entfällt die Sortierung ganz; wiederholte `sort()`-Aufrufe ohne geänderte Daten tun nichts mehr (der Kit ruft sie nach dem Füllen mehrfach auf). Reihenfolge und Ergebnis bleiben gleich.
+  - **Review-Speicher** (`ReviewStore`): `resolve()`/Hash je Instanz nur einmal, neuester Stand je PDF-Ordner über den Ordner-Zeitstempel statt `glob`, Review-Dateien werden bei unverändertem Zeitstempel/Größe nicht erneut gelesen und geparst.
+  - **Pfade** (`paths.home_dir`/`_ensure`): aufgelöster Datenordner gemerkt, `mkdir` nur wenn der Ordner fehlt (wurde je PDF und Tabelle mehrfach aufgerufen).
+  - **Datenlink** (`DataLink.tag_rows`): Importzeilen einer Zeichnung je Zeichnung einmal bilden statt je Tag.
+
+## 1.0.48 – 2026-11-24
+- **Tag-Tabelle: Regelverstoß sichtbar.** Der Tag-Wert einer Zeile mit Befund in „Projekt-Prüfung“ (Regelfehler, Code fehlt/unvollständig, mehrfach vorhanden) ist hellgelb hinterlegt (Farbe wie doppelte Tags, `appearance.DEFAULT_DIRTY`).
+- **Zeichen im Tag ersetzen** (Rechtsklick auf den Spaltenkopf „Tag“ › „Zeichen ersetzen …“ / „Ersetzung zurücknehmen“): der Nutzer ersetzt ein Zeichen durch ein Zeichen seiner Wahl, auch durch nichts (`-` → leer: XV-130 → XV130). Der Spaltenkopf zeigt dann den Hinweis „edit“. Die Regel wird gemerkt (`config/state.json`, Schlüssel `tag_edit`), das Original in PDF und Review-Speicher bleibt unverändert. Sie wirkt auf Anzeige und Export (Tag-Tabelle, Alle Tags, Excel/CSV, Review-Excel), die Projekt-Prüfung (`Checker.check`) und den Abgleich mit der Importliste. Das Ersatzzeichen darf das gesuchte Zeichen nicht enthalten. Kern: `core/tag_edit.py`, Oberfläche: `gui/tag_edit_ui.py`.
+
+## 1.0.47 – 2026-11-24
+- **Kachel-Editor: Kachel anfassen oder ziehen löst nichts aus.** Bisher wirkte schon das Drücken der Maustaste (Kachel auswählen, Inspektor „Aktive Kachel“ füllen, Spaltenwahl für den Excel-Export). Jetzt wirkt ein einfacher Klick erst beim Loslassen ohne Ziehen; wird die Kachel in „Nicht exportiert“ oder „Ausgeblendet“ gezogen, beginnt die Aktion erst beim Ablegen. Umgesetzt als Verhaltens-Ersetzung in `tools\translate_column_editor.py` (Abschnitt `PY`, `qml/ColumnCard.qml`), damit sie nach einem neuen Kopieren aus Tag Compliance erhalten bleibt; `qml_resources.py` neu gebaut.
+
 ## 1.0.46 – 2026-11-24
 - **Projektregel Instrument: Tag ohne Bindestrich.** `PDF_INSTRUMENT` ist jetzt Kürzel + Nummer ohne Trennzeichen (`VX130` korrekt, `VX-130` = Regelfehler Projektdefinition). Dafür gibt es die neue Segment-Quelle `alnum` (nur Buchstaben/Ziffern, sonst hätte „freier Text“ `VX-` als Kürzel akzeptiert). Projekt-Datenbanken mit der alten Standard-Struktur (Kürzel + `-` + Nummer) werden beim Öffnen automatisch umgestellt; selbst geänderte Strukturen bleiben unberührt.
 

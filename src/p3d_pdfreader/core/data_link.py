@@ -243,6 +243,7 @@ class DataLink:
                 self._idx[n] = _KeyIndex([r[c] if c < len(r) else "" for r in table.rows])
         self.columns = table.transfer_columns()
         self._pos = [cols.index(h) for h in self.columns]
+        self._same: dict[str, frozenset] = {}      # Zeichnung (Datenlink-1-Wert) -> Importzeilen; je Tag nicht neu bilden
 
     def active(self, n: int) -> bool:
         """Datenlink n aktiv: Spalte in der Importtabelle gesetzt und Feld in der Tool-Tabelle gesetzt."""
@@ -266,7 +267,9 @@ class DataLink:
             return []
         hits = self._idx[2].find(value)
         if hits and self.active(1) and file_value is not None:
-            same = set(self.file_rows(file_value))
+            same = self._same.get(file_value)
+            if same is None:
+                same = self._same[file_value] = frozenset(self.file_rows(file_value))
             hits = [i for i in hits if i in same]
         return hits
 

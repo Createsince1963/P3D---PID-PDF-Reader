@@ -39,11 +39,26 @@ def table_name(text: str, used: set[str]) -> str:
     return name
 
 
+def unique_headers(headers: list[str]) -> list[str]:
+    """Spaltennamen einer Excel-Datentabelle muessen gefuellt und eindeutig sein (ohne Gross-/Kleinschreibung), sonst
+    meldet Excel die Datei als beschaedigt - z. B. wenn eine hinzugefuegte Importspalte wie eine PDF-Spalte heisst."""
+    out, used = [], set()
+    for i, header in enumerate(headers, start=1):
+        base = str(header) or f"Spalte {i}"
+        name, n = base, 2
+        while name.casefold() in used:
+            name, n = f"{base} ({n})", n + 1
+        used.add(name.casefold())
+        out.append(name)
+    return out
+
+
 def write_table(ws, headers: list[str], rows: list[list], name: str, used: set[str] | None = None) -> None:
     """Kopf + Zeilen schreiben und als Excel-Datentabelle formatieren (bei 0 Zeilen nur Kopf, keine Tabelle)."""
     from openpyxl.utils import get_column_letter
     from openpyxl.worksheet.table import Table, TableStyleInfo
-    ws.append([str(h) for h in headers])
+    headers = unique_headers(headers)
+    ws.append(headers)
     for row in rows:
         ws.append(list(row))
     ws.freeze_panes = "A2"

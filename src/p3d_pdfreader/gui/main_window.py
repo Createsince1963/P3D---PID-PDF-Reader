@@ -26,10 +26,12 @@ from .. import i18n, paths
 from ..constants import APP_NAME
 from ..core import data_link, export, project_settings, redline, review
 from ..core.extract import PdfResult
+from ..core import tag_edit
 from ..core.project_defs import CHECK_HEADERS, ProjectDB, is_fault_status
 from ..core.review_store import (CHANGE_VALUES, EDIT_FIELDS, FIELDS, REVIEW_VALUES, ReviewStore, status_hits,
                                  visible_tags)
-from . import appearance, icons, last_paths, table_views
+from . import appearance, icons, last_paths, table_views, tag_edit_ui
+from .fast_proxy import FastSortProxy
 from .design import DISABLED, NOTE_QSS
 from .paths_dialog import PathsDialog, open_in_explorer
 from . import msgbox, project_dialog, table_profiles, web_control
@@ -155,6 +157,7 @@ class ReviewModel(DuplicateModel):
         self._edit_cols = {first_field + i for i in range(len(EDIT_FIELDS))}
         self._edit_brush = QBrush(QColor(appearance.selection_color()))
         self._removed_brush = QBrush(QColor(DISABLED))
+        self._fault_brush = QBrush(QColor(appearance.DEFAULT_DIRTY))
 
     def flags(self, index):
         flags = super().flags(index)
@@ -168,6 +171,11 @@ class ReviewModel(DuplicateModel):
             return False
         r = self.rows[row]
         return not is_na_row(r) and not self.store.is_removed(r[0], r[1])
+
+    def is_rule_fault(self, row: int) -> bool:
+        """Projekt-Pruefung der Zeile meldet einen Befund (Regelfehler, Code fehlt/unvollstaendig, mehrfach)."""
+        r = self.rows[row]
+        return not is_na_row(r) and len(r) > CHECK_COL and is_fault_status(str(r[CHECK_COL]))
 
     def is_removed(self, row: int) -> bool:
         r = self.rows[row]
@@ -186,8 +194,14 @@ class ReviewModel(DuplicateModel):
     def data(self, index, role=Qt.DisplayRole):
         if role == Qt.EditRole and index.isValid():
             return self.rows[index.row()][index.column()]
+        if (role == Qt.DisplayRole and index.isValid() and index.column() == 1 and tag_edit.RULE.active
+                and not is_na_row(self.rows[index.row()])):
+            return tag_edit.apply(str(self.rows[index.row()][1]))      # Ansicht: Original bleibt in den Zeilen
         if role == Qt.ForegroundRole and index.isValid() and self.is_removed(index.row()):
             return self._removed_brush                   # aus dem Review genommen (nur mit „Gelöschte zeigen“)
+        if (role == Qt.BackgroundRole and index.isValid() and index.column() == 1 and self.is_rule_fault(index.row())
+                and not self.is_removed(index.row())):
+            return self._fault_brush                     # Regelverstoss (Projekt-Pruefung): Tag-Wert hellgelb
         if role == Qt.ToolTipRole and index.isValid() and self.is_removed(index.row()):
             return "Aus dem Review genommen – Rechtsklick › Zeile wiederherstellen"
         if (role == Qt.BackgroundRole and self.edit_mode and index.isValid() and index.column() in self._edit_cols
@@ -277,7 +291,7 @@ class DataTable(QWidget):
         self.count.setStyleSheet(NOTE_QSS)
         top.addWidget(self.count)
         lay.addLayout(top)
-        self.proxy = MultiColumnFilterProxy(self)
+        self.proxy = FastSortProxy(self)                     # Sortierschluessel je Spalte zwischengespeichert
         self.proxy.setSourceModel(self.model_factory(headers, [], count_col, self))
         self.table = QTableView()
         self.table.layout_key = key
@@ -542,7 +556,8 @@ class TagsSheet(Sheet):
             field = links.fields.get("tags", "")
             c, file_value = TAG_COLS.index(field), self.win.file_link_value(result)
             out = []
-            for i, hits in links.tag_join([r[c] for r in rows], file_value):
+            for i, hits in links.tag_join([tag_edit.apply(r[c]) if field == "Tag" else r[c] for r in rows],
+                                          file_value):
                 row = rows[i] if i is not None else na_tag_row()
                 out.append(row + links.join_values(hits))
             rows = out
@@ -984,7 +999,10 @@ class MainWindow(QMainWindow):
         self.setStatusBar(QStatusBar())
         self.page = TagsSheet(self)                 # vor dem Menueband: es ruft Funktionen der Blaetter auf
         self.links.install("files", self.page.files, FILE_COLS)
-        self.links.install("tags", self.page.tags, TAG_COLS)
+        tag_edit_ui.load()
+        self.links.install("tags", self.page.tags, TAG_COLS,
+                           extra=lambda menu, name: tag_edit_ui.header_menu(menu, name, self, self._tag_edit_changed),
+                           notes=tag_edit_ui.notes)
         self.all_page = AllTagsSheet()
         self.review_page = LinkReviewSheet()
         self.preview_page = PreviewSheet()
@@ -1140,8 +1158,9 @@ class MainWindow(QMainWindow):
         """Je PDF: Name, Wert des Datenlink-Felds der Dateiliste, Tags mit dem Wert des Tag-Felds („Tag“/„Typ“)."""
         attr = {"Typ": "type"}.get(self.links.fields.get("tags", ""), "tag")
         page = self.page
+        shown = tag_edit.apply if attr == "tag" else (lambda v: v)       # Zeichen-Ersetzung gilt fuer das Tag-Feld
         return [(r.name, self.file_link_value(r),
-                 [(t.type, t.tag, t.count, t.pages_text, getattr(t, attr))
+                 [(t.type, tag_edit.apply(t.tag), t.count, t.pages_text, shown(getattr(t, attr)))
                   for t in (page.store.visible(r.tags) if r is page._store_result and page.store else visible_tags(r))])
                 for r in self.results]
 
@@ -1689,6 +1708,14 @@ class MainWindow(QMainWindow):
             missing = f" – Tag-Strukturen fehlen: {', '.join(self.checker.missing)}" if on and self.checker.missing else ""
             self.statusBar().showMessage(f"Projektmodus an: {self.project.name}{missing}" if on else
                                          "Projektmodus aus: Standard ohne Projektdefinitionen", 10000)
+
+    def _tag_edit_changed(self) -> None:
+        """Zeichen-Ersetzung im Tag geaendert: Tabellen, Pruefung und Viewer-Rahmen neu aufbauen, Kopf neu zeichnen."""
+        self._refresh_tags()
+        if self.page._store_result is not None:
+            self.page._only_duplicates()
+        self.page.show_status()
+        self.page.tags.table.horizontalHeader().viewport().update()
 
     def apply_project_columns(self) -> None:
         """Pruefspalten nur im Projektmodus zeigen; im Standardmodus ausgeblendet (Tabellen wie bisher). Zusaetzlich

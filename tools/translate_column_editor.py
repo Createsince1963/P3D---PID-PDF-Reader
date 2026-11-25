@@ -341,6 +341,13 @@ QML = {
 # Python: (alt, neu) als Textausschnitt je Datei (mit Anfuehrungszeichen bzw. genug Umfeld, damit nur Anzeigetext passt)
 # ---------------------------------------------------------------------------------------------------------------------
 PY: dict[str, list[tuple[str, str]]] = {
+    # Verhalten (seit 1.0.47, Nutzervorgabe): Eine Kachel loest beim blossen Anfassen/Ziehen nichts aus (keine Auswahl,
+    # kein Inspektor, kein Spalten-Pick). Ein einfacher Klick wirkt erst beim Loslassen ohne Ziehen; beim Ziehen beginnt
+    # die Aktion erst beim Ablegen (finishDrag).
+    "qml/ColumnCard.qml": [
+        ("            else card.clicked()\n        }\n        onReleased:",
+         "            else mouseArea.pendingSingle = true         // plain click: acts on release, never while the tile is picked up / dragged\n        }\n        onReleased:"),
+    ],
     "qml/ColumnGrid.qml": [
         ('"these columns are written by \\"Export view to Excel\\""', '"diese Spalten werden übergeben und mit „Als Excel speichern“ geschrieben"'),
     ],

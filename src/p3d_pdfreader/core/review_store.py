@@ -59,9 +59,14 @@ def key(tag_type: str, tag: str) -> str:
     return f"{tag_type}|{tag}"
 
 
+_LATEST: dict[Path, tuple] = {}      # Ordner -> (Zeitstempel des Ordners, neuester Stand): spart glob je PDF
+_PARSED: dict[Path, tuple] = {}      # Datei -> (mtime_ns, Groesse, Inhalt): spart Lesen und Parsen je Aktualisierung
+
+
 class ReviewStore:
     def __init__(self, pdf_path: str | Path):
         self.pdf_path = Path(pdf_path)
+        self._base_name: str | None = None
         self.entries: dict[str, dict[str, str]] = {}
         self.removed: set[str] = set()                # aus dem Review genommene Tags (Schluessel, 1.0.43)
         self.dirty = False
@@ -75,8 +80,10 @@ class ReviewStore:
 
     @property
     def _base(self) -> str:
-        digest = hashlib.sha1(str(self.pdf_path.resolve()).casefold().encode("utf-8")).hexdigest()[:8]
-        return f"{self.pdf_path.stem}_{digest}"
+        if self._base_name is None:                  # resolve() + sha1 nur einmal je Instanz
+            digest = hashlib.sha1(str(self.pdf_path.resolve()).casefold().encode("utf-8")).hexdigest()[:8]
+            self._base_name = f"{self.pdf_path.stem}_{digest}"
+        return self._base_name
 
     @property
     def history_dir(self) -> Path:
@@ -90,22 +97,47 @@ class ReviewStore:
     @property
     def file(self) -> Path | None:
         """Neuester gespeicherter Stand (Altbestand ohne Zeitstempel als Rueckfall)."""
-        versions = self.versions()
-        if versions:
-            return versions[-1]
+        folder = self.history_dir
+        try:
+            stamp = folder.stat().st_mtime_ns            # aendert sich, sobald eine neue Version dazukommt
+        except OSError:
+            stamp = None
+        hit = _LATEST.get(folder)
+        if hit is not None and hit[0] == stamp:
+            latest = hit[1]
+        else:
+            versions = self.versions()
+            latest = versions[-1] if versions else None
+            _LATEST[folder] = (stamp, latest)
+        if latest is not None:
+            return latest
         legacy = self.folder() / f"{self._base}.json"
         return legacy if legacy.is_file() else None
 
     def load(self) -> None:
-        try:
-            data = json.loads(self.file.read_text(encoding="utf-8")) if self.file else {}
-        except (OSError, ValueError):
-            data = {}
+        data = self._read(self.file)
         entries = data.get("entries", {}) if isinstance(data, dict) else {}
         self.entries = {k: {f: str(v.get(f, "") or "") for f in FIELDS} for k, v in entries.items() if isinstance(v, dict)}
         removed = data.get("removed", []) if isinstance(data, dict) else []
         self.removed = {str(k) for k in removed} if isinstance(removed, list) else set()
         self.dirty = False
+
+    @staticmethod
+    def _read(path: Path | None) -> dict:
+        """Inhalt einer Review-Datei; unveraenderte Dateien (Zeit, Groesse) kommen aus dem Zwischenspeicher. Der Inhalt
+        wird nur gelesen (``load`` baut daraus neue Eintraege), nie veraendert."""
+        if path is None:
+            return {}
+        try:
+            st = path.stat()
+            hit = _PARSED.get(path)
+            if hit is not None and hit[:2] == (st.st_mtime_ns, st.st_size):
+                return hit[2]
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+        _PARSED[path] = (st.st_mtime_ns, st.st_size, data)
+        return data
 
     def save(self) -> Path:
         payload = {"pdf": str(self.pdf_path.resolve()), "saved": timestamp(), "user": current_user(),

@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
+from . import tag_edit
 from .extract import PdfResult
 from .project_defs import CHECK_HEADERS
 from .review_store import FIELDS, ReviewStore
@@ -27,7 +28,7 @@ def tag_rows(results: list[PdfResult], review: bool = False, checker=None) -> li
     for r in results:
         store = ReviewStore(r.path)
         for t in store.visible(r.tags):                # ohne aus dem Review genommene Tags (1.0.43)
-            row = [r.name, r.drawing_no, t.type, t.tag, t.count, t.pages_text]
+            row = [r.name, r.drawing_no, t.type, tag_edit.apply(t.tag), t.count, t.pages_text]
             if review:
                 row += store.values(t.type, t.tag)
             if checker is not None:

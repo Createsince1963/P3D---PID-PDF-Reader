@@ -25,6 +25,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from . import tag_edit
+
 PROJECT_SUFFIX = ".db"
 LIST_PREFIX = "list:"
 RULES = "pdf_tag_rules"
@@ -118,10 +120,12 @@ DEFAULT_DESIGNS = {
         ("System", "def_system_codes", "17", "", "_", True),
         ("Unit", "seq:3", "111", "", "_", True),
         ("Tag", "free", "TZIT-011", "", "", True)]),
-    "PDF_INSTRUMENT": ("Instrument (Blase), z. B. TIT130 (Kuerzel + Nummer ohne Trennzeichen; TIT-130 ist falsch)", [
-        ("Function", "alnum", "TIT", "", "", True),
+    "PDF_INSTRUMENT": ("Instrument (Blase), z. B. TIT-130 (Kuerzel + Nummer, vom PDF Reader mit - verbunden)", [
+        ("Function", "free", "TIT", "", "-", True),
         ("Number", "seq:3", "130", "", "", True)]),
 }
+#: Beschreibung des Standards aus 1.0.46 bis 1.0.49 (ohne Trennzeichen); daran erkennt die Migration diesen Stand.
+_NOTE_NO_DASH = "Instrument (Blase), z. B. TIT130 (Kuerzel + Nummer ohne Trennzeichen; TIT-130 ist falsch)"
 DEFAULT_RULES = [("Equipment", "PDF_EQUIPMENT"), ("Armatur", "PDF_VALVE"), ("Rohrleitung", "PDF_PIPE_LINE"),
                  ("Rohrleitung", "PDF_HOSE"), ("Volltag", "PDF_FULL_TAG"), ("Instrument", "PDF_INSTRUMENT")]
 
@@ -216,14 +220,16 @@ class ProjectDB:
         self.con.commit()
 
     def _migrate_instrument(self) -> None:
-        """Alte Standard-Struktur PDF_INSTRUMENT (Kuerzel, Trennzeichen "-", Nummer) auf die Schreibweise ohne
-        Trennzeichen (VX130) umstellen. Nur wenn sie noch dem alten Standard entspricht; eigene Aenderungen bleiben."""
+        """Standard PDF_INSTRUMENT aus 1.0.46-1.0.49 (ohne Trennzeichen) auf Kuerzel, "-", Nummer (TIT-130) zurueckstellen.
+        Nur wenn Beschreibung und Segmente noch genau diesem Stand entsprechen; eigene Aenderungen bleiben."""
         rows = self.con.execute(f"select pos,source,prefix,suffix from {SEGMENTS} where tag_type='PDF_INSTRUMENT' "
                                 "order by pos").fetchall()
-        if [tuple(r) for r in rows] != [(1, "free", "", "-"), (2, "seq:3", "", "")]:
+        head = self.con.execute(f"select note from {STRUCTURES} where tag_type='PDF_INSTRUMENT'").fetchone()
+        if ([tuple(r) for r in rows] != [(1, "alnum", "", ""), (2, "seq:3", "", "")]
+                or head is None or head[0] != _NOTE_NO_DASH):
             return
         note, segs = DEFAULT_DESIGNS["PDF_INSTRUMENT"]
-        self.con.execute(f"update {SEGMENTS} set source='alnum', suffix='' where tag_type='PDF_INSTRUMENT' and pos=1")
+        self.con.execute(f"update {SEGMENTS} set source='free', suffix='-' where tag_type='PDF_INSTRUMENT' and pos=1")
         example = "".join(f"{pre}{sample}{suf}" for _n, _s, sample, pre, suf, _r in segs)
         structure = "".join(f"{pre}{name}{suf}" for name, _s, _x, pre, suf, _r in segs)
         self.con.execute(f"update {STRUCTURES} set example=?, structure=?, note=? where tag_type='PDF_INSTRUMENT'",
@@ -748,6 +754,7 @@ class Checker:
         return pdf_type in self.rules
 
     def check(self, pdf_type: str, tag: str, count: int = 1) -> CheckResult:
+        tag = tag_edit.apply(tag)                        # Zeichen-Ersetzung des Nutzers (core.tag_edit)
         key = (pdf_type, tag)
         if key not in self._cache:
             self._cache[key] = self._check(pdf_type, tag)
