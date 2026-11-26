@@ -1,7 +1,9 @@
 """Review-Eintraege je PDF (Bearbeiten-Modus der Tag-Tabelle): Review, Aenderung, Neuer Wert, Bemerkung, WPO sowie
 automatisch Datum und User der letzten Aenderung.
 
-Die PDF selbst wird nie veraendert (nur gelesen). Ablage je PDF in ``<Datenordner>/reviews/<PDF-Name>_<Hash>/``; jedes
+Die PDF selbst wird nie veraendert (nur gelesen). Mit gewaehltem Projekt liegen die Staende in dessen Datenbank
+(``project_store``, mit Verlauf); vorhandene JSON-Staende werden beim ersten Laden uebernommen, die Dateien bleiben.
+Ohne Projekt: Ablage je PDF in ``<Datenordner>/reviews/<PDF-Name>_<Hash>/``; jedes
 Speichern legt eine **neue** Datei ``<PDF-Name>_Review_<Zeitstempel>.json`` an (nichts wird ueberschrieben, Verlauf
 bleibt erhalten); geladen wird die neueste. Der Hash des aufgeloesten Pfads trennt gleichnamige PDFs aus verschiedenen
 Ordnern. Schluessel je Eintrag: ``"<Typ>|<Tag>"``. Ohne Qt."""
@@ -15,11 +17,13 @@ from datetime import datetime
 from pathlib import Path
 
 from ..paths import file_timestamp, home_dir
+from . import project_store
 
 EDIT_FIELDS = ["Review", "Änderung", "Neuer Wert", "Bemerkung", "WPO"]
 AUTO_FIELDS = ["Datum", "User"]
 FIELDS = EDIT_FIELDS + AUTO_FIELDS
-REVIEW_VALUES = ["", "Offen", "OK", "Korrektur erforderlich", "Klärung", "Nicht relevant"]
+REVIEW_VALUES = ["", "Offen", "OK", "Korrektur erforderlich", "Klärung", "Nicht relevant", "No Tag"]
+REVIEW_UNMARKED = ("No Tag",)                       # kein Tag (Fehlerkennung): keine Markierung in PDF, Viewer, Redline
 REVIEW_FAULTY = ("Korrektur erforderlich",)        # Viewer: rot umrandet, alle anderen Tags gruen
 REVIEW_ACCEPTED = ("OK", "Nicht relevant")          # Projektmodus: Abweichung vom Reviewer angenommen -> gruen
 CHANGE_VALUES = ["", "Keine", "Tag ändern", "Tag ergänzen", "Tag löschen", "Position prüfen", "Doppelten Tag auflösen"]
@@ -29,11 +33,17 @@ def status_hits(tags, store=None, checker=None) -> tuple[list, list]:
     """Alle Fundstellen nach Review-Status: (korrekt, fehlerhaft), je Tag eine Liste [(Seite, Rechteck)].
     Fehlerhaft = Review "Korrektur erforderlich"; im Projektmodus (``checker``) zusaetzlich Tags, die nicht zur
     Projektdefinition passen - ausser der Review hat sie als "OK" oder "Nicht relevant" angenommen.
-    Alle anderen gefundenen Tags (auch ohne Review) gelten als korrekt."""
+    Alle anderen gefundenen Tags (auch ohne Review) gelten als korrekt; Review "No Tag" wird gar nicht umrandet."""
     ok, faulty = [], []
-    for t in tags:
+    for t in marked_tags(tags, store):
         (faulty if is_faulty(t, store, checker) else ok).append(list(t.hits))
     return ok, faulty
+
+
+def marked_tags(tags, store=None) -> list:
+    """Tags, die in der PDF gekennzeichnet werden: alle ausser Review "No Tag"."""
+    entries = store.entries if store is not None else {}
+    return [t for t in tags if entries.get(key(t.type, t.tag), {}).get("Review", "") not in REVIEW_UNMARKED]
 
 
 def is_faulty(tag, store=None, checker=None) -> bool:
@@ -66,6 +76,7 @@ _PARSED: dict[Path, tuple] = {}      # Datei -> (mtime_ns, Groesse, Inhalt): spa
 class ReviewStore:
     def __init__(self, pdf_path: str | Path):
         self.pdf_path = Path(pdf_path)
+        self.db = project_store.active()              # Projekt beim Laden: dorthin wird auch gespeichert
         self._base_name: str | None = None
         self.entries: dict[str, dict[str, str]] = {}
         self.removed: set[str] = set()                # aus dem Review genommene Tags (Schluessel, 1.0.43)
@@ -114,8 +125,19 @@ class ReviewStore:
         legacy = self.folder() / f"{self._base}.json"
         return legacy if legacy.is_file() else None
 
+    def _load_data(self) -> dict:
+        if self.db is None:
+            return self._read(self.file)
+        key_ = project_store.path_key(self.pdf_path)
+        data = project_store.load_review(self.db, key_)
+        if data is None:
+            data = self._read(self.file)              # Stand von vor der Datenbank ins Projekt uebernehmen
+            if data:
+                project_store.save_review(self.db, key_, data)
+        return data
+
     def load(self) -> None:
-        data = self._read(self.file)
+        data = self._load_data()
         entries = data.get("entries", {}) if isinstance(data, dict) else {}
         self.entries = {k: {f: str(v.get(f, "") or "") for f in FIELDS} for k, v in entries.items() if isinstance(v, dict)}
         removed = data.get("removed", []) if isinstance(data, dict) else []
@@ -143,6 +165,12 @@ class ReviewStore:
         payload = {"pdf": str(self.pdf_path.resolve()), "saved": timestamp(), "user": current_user(),
                    "entries": {k: v for k, v in self.entries.items() if any(v.get(f) for f in EDIT_FIELDS)},
                    "removed": sorted(self.removed)}
+        if self.db is not None:
+            if not self.db.is_file():
+                raise OSError(f"Projekt-Datenbank nicht gefunden: {self.db}")
+            project_store.save_review(self.db, project_store.path_key(self.pdf_path), payload)
+            self.dirty = False
+            return self.db
         folder = self.history_dir
         folder.mkdir(parents=True, exist_ok=True)
         target, n = folder / f"{self.pdf_path.stem}_Review_{file_timestamp()}.json", 2

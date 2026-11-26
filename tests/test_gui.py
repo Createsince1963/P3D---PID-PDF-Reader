@@ -193,9 +193,12 @@ def test_review_table_cell_menu_paste_remove_autofill(app, tmp_path, monkeypatch
             view.selectionModel().select(proxy.index(r, col), QItemSelectionModel.Select)
     select([0, 1, 2])
     menu = QMenu()
-    page._cell_menu(menu, proxy.index(0, FIRST_FIELD))
-    texts = [x.text() for x in menu.actions() if x.text()]
-    assert "Einfügen (Strg+V)" in texts and "Zellen leeren" in texts
+    from p3d_pdfreader.gui.table_menu import cell_menu
+    QApplication.clipboard().setText("x")
+    menu = cell_menu(view, proxy.index(0, FIRST_FIELD))
+    actions = {x.text(): x for x in menu.actions() if x.text()}
+    texts = list(actions)
+    assert actions["Einfügen"].isEnabled() and actions["Zellen leeren"].isEnabled() and "Kopieren" in texts
     assert "Zeile(n) aus Review nehmen (3)" in texts
     # Einfuegen: ein Wert -> alle markierten Zeilen; Block -> ab aktueller Zelle
     QApplication.clipboard().setText("Klärung")

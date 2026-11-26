@@ -339,8 +339,8 @@ class GridEditing:
         h.sectionMoved.connect(self._section_moved)
         self.grid.setSelectionBehavior(QAbstractItemView.SelectItems)
         self.grid.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.grid.viewport().setContextMenuPolicy(Qt.CustomContextMenu)
-        self.grid.viewport().customContextMenuRequested.connect(
+        self.grid.setContextMenuPolicy(Qt.CustomContextMenu)   # nicht am Viewport: dort kommt das Signal nie an
+        self.grid.customContextMenuRequested.connect(
             lambda p: self.cell_menu(self.grid.indexAt(p)).exec(self.grid.viewport().mapToGlobal(p)))
         vh.setContextMenuPolicy(Qt.CustomContextMenu)
         vh.customContextMenuRequested.connect(self._row_header_menu)

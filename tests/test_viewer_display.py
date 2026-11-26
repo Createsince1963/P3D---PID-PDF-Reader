@@ -84,3 +84,36 @@ def test_viewer_monochrome_and_status_frames(app, tmp_path, monkeypatch):
     assert not preview.monochrome
     page.store.dirty = False
     w.close()
+
+
+def test_no_tag_is_not_marked(tmp_path):
+    """Review "No Tag": kein Rahmen im Viewer und im Redline-PDF, Pos.-Nr. der uebrigen wie in der Review-Excel."""
+    import pymupdf
+    from p3d_pdfreader.core.extract import PdfResult, Tag
+    from p3d_pdfreader.core.redline import write_redline
+    from p3d_pdfreader.core.review import positions
+    from p3d_pdfreader.core.review_store import REVIEW_VALUES, key
+
+    assert "No Tag" in REVIEW_VALUES
+    pdf = tmp_path / "p.pdf"
+    with pymupdf.open() as doc:
+        doc.new_page(width=600, height=400)
+        doc.save(pdf)
+    no = Tag(tag="MARCH-2025", type="Instrument", hits=[(0, (50, 50, 100, 60)), (0, (50, 90, 100, 100))])
+    yes = Tag(tag="VH328", type="Armatur", hits=[(0, (200, 200, 240, 210))])
+
+    class Store:
+        entries = {key(no.type, no.tag): {"Review": "No Tag"}}
+
+    ok, faulty = status_hits([no, yes], Store())
+    assert ok == [yes.hits] and faulty == []
+    tags = [no, yes]
+    out = tmp_path / "r.pdf"
+    assert write_redline(PdfResult(path=pdf, tags=tags), out, store=Store(), layer=False) == 1
+    pos = next(p.pos for p in positions(tags) if p.tag is yes)
+    with pymupdf.open(out) as doc:
+        page = doc[0]                                             # Seite halten, sonst sind die Annotationen ungueltig
+        annots = list(page.annots())
+        assert len(annots) == 3                                   # Rahmen + Pos.-Nr. von VH328 + Uebersicht
+        assert [a.info["subject"] for a in annots if a.type[1] == "Square"] == [f"Pos. {pos} – VH328"]
+        assert any("nicht markiert): 1" in a.info["content"] for a in annots)

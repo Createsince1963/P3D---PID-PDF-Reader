@@ -294,7 +294,7 @@ ol.pins li b{display:block}
 <h2>Review / Redline</h2>
 <h3>Redline-PDF</h3>
 <ul>
-  <li>Kopie der PDF, das Original bleibt unverändert. An jeder Fundstelle Rahmen und <b>Pos.-Nr.</b>, Farben wie im Viewer: grün korrekt, rot fehlerhaft (Review „Korrektur erforderlich“ bzw. Projekt-Abweichung), doppelte Tags gelb hinterlegt.</li>
+  <li>Kopie der PDF, das Original bleibt unverändert. An jeder Fundstelle Rahmen und <b>Pos.-Nr.</b>, Farben wie im Viewer: grün korrekt, rot fehlerhaft (Review „Korrektur erforderlich“ bzw. Projekt-Abweichung), doppelte Tags gelb hinterlegt. Tags mit Review <b>„No Tag“</b> (kein Tag, z. B. Fehlerkennung) werden weder im Redline-PDF noch im Viewer gekennzeichnet; sie bleiben in Tabelle und Review-Excel, die Pos.-Nr. der übrigen ändern sich nicht.</li>
   <li>Mit <b>Einstellungen › Layer für Review im PDF</b> (Gruppe Projekt, Standard an) liegen alle Review-Kommentare auf der PDF-Ebene „Review_TT.MM.JJJJ“ und lassen sich im PDF-Programm unter „Ebenen“ ein- und ausblenden.</li>
   <li>Jede Fundstelle trägt einen PDF-Kommentar (Pos., Typ, Tag, „Fundstelle n / m“) – sichtbar in Acrobat, Bluebeam, PDF-XChange.</li>
   <li>Es gilt der Tabellenfilter: mit „Nur doppelte“ entsteht ein Redline nur mit den doppelten Tags.</li>
@@ -307,8 +307,9 @@ ol.pins li b{display:block}
 <p>„Tabelle bearbeiten“ schaltet die Review-Spalten der Tag-Tabelle zum Bearbeiten frei; „Review speichern“ (<kbd>Strg</kbd>+<kbd>S</kbd>) sichert sie.</p>
 <h3>Rechtsklick in der Review-Tabelle</h3>
 <ul>
-  <li><b>Einfügen</b> (<kbd>Strg</kbd>+<kbd>V</kbd>): ein Wert geht in alle markierten Zeilen; ein Block aus Excel wird ab der aktuellen Zelle eingefügt (Tab = nächste Spalte, Zeilenumbruch = nächste Zeile). Beschrieben werden nur die Review-Spalten (Review, Änderung, Neuer Wert, Bemerkung, WPO), Datum und User setzt das Tool – auch ohne Bearbeiten-Modus.</li>
-  <li><b>„Wert“ in markierte Zeilen übernehmen</b> und <b>Zellen leeren</b>.</li>
+  <li><b>Zellen markieren</b> wie in Excel (Maus ziehen, Strg/Umschalt), ganze Zeilen über die Zeilennummer. <b>Kopieren</b> (<kbd>Strg</kbd>+<kbd>C</kbd>) und <b>Alles markieren</b> (<kbd>Strg</kbd>+<kbd>A</kbd>) gibt es in jeder Tabelle.</li>
+  <li><b>Einfügen</b> (<kbd>Strg</kbd>+<kbd>V</kbd>): ein Wert geht in alle markierten Zellen; ein Block aus Excel wird ab der linken oberen markierten Zelle eingefügt (Tab = nächste Spalte, Zeilenumbruch = nächste Zeile). Sind ganze Zeilen markiert, gilt die Spalte der aktuellen Zelle. Beschrieben werden nur die Review-Spalten (Review, Änderung, Neuer Wert, Bemerkung, WPO), Datum und User setzt das Tool – auch ohne Bearbeiten-Modus.</li>
+  <li><b>„Wert“ in markierte Zeilen übernehmen</b> und <b>Zellen leeren</b> (<kbd>Entf</kbd>).</li>
   <li><b>Zeile(n) aus Review nehmen:</b> für Tags, die nicht in den Review gehören (z. B. Fehlerkennung). Sie fehlen danach in Tabelle, Viewer-Rahmen, Redline, Review-Excel, Export, Alle Tags, Tabellen-Vorschau und Review Importliste. <b>Aus dem Review genommene zeigen</b> blendet sie grau ein, <b>Zeile(n) wiederherstellen</b> holt sie zurück. Wirksam nach „Speichern“; die PDF bleibt unverändert.</li>
 </ul>
 </section>
@@ -358,7 +359,7 @@ ol.pins li b{display:block}
 <tr><td>Rohrleitung (optional)</td><td>Menüband › Projekt › Rohrleitungen; waagerecht und senkrecht</td></tr>
 </tbody></table></div></details>
 <details><summary>Wo liegen meine Daten?</summary><div>
-<p>Datenordner: <code>%P3D_PDFREADER_HOME%</code>, sonst <code>&lt;Tool&gt;\data</code>, als EXE <code>%LOCALAPPDATA%\P3D_PDFREADER</code>. Darin <code>config\paths.json</code> (Quell-/Exportordner), <code>config\state.json</code>, <code>config\table_views.json</code>, <code>config\tag_patterns.json</code>, <code>config\data_link.json</code> (Importliste), <code>reviews\</code> (Review-Einträge, jeder Stand eine Datei), <code>projects\</code>, <code>logs\</code>, <code>exports\</code>. Im Launcher öffnet „Open data“ diesen Ordner.</p>
+<p>Datenordner: <code>%P3D_PDFREADER_HOME%</code>, sonst <code>&lt;Tool&gt;\data</code>, als EXE <code>%LOCALAPPDATA%\P3D_PDFREADER</code>. Darin <code>config\paths.json</code> (Quell-/Exportordner), <code>config\state.json</code>, <code>config\table_views.json</code>, <code>config\tag_patterns.json</code>, <code>config\data_link.json</code> (Importliste), <code>reviews\</code> (Review-Einträge ohne Projekt, jeder Stand eine Datei), <code>projects\</code> (je Projekt eine Datenbank mit Definitionen, Review-Einträgen samt Verlauf, gelesenen PDF-Daten und allen Einstellungen; die Einstellungen werden automatisch gespeichert, die PDFs selbst nicht), <code>logs\</code>, <code>exports\</code>. Im Launcher öffnet „Open data“ diesen Ordner.</p>
 <p>Projekt › <b>Pfade</b>: Quellordner hinzufügen/entfernen, Exportordner wählen. Projekt › <b>Tag-Muster</b>: Regex und Ausschlussliste anpassen.</p></div></details>
 <details><summary>Warum erscheint Equipment doppelt?</summary><div>
 <p>Equipment steht oft zusätzlich in der Equipment-Tabelle am Blattfuß und zählt dann als doppelter Tag – das kann gewollt sein.</p></div></details>
@@ -557,6 +558,9 @@ function openMenu(td, x, y) {
   const v = td.textContent || "(leer)", col = heads[td.cellIndex];
   const items = [
     ["Kopieren", "Strg+C", "Kopiert die markierten Zellen als Text (Tabulator-getrennt) – direkt in Excel einfügbar."],
+    ["Einfügen", "Strg+V", "Nur in beschreibbaren Zellen (Review-Spalten): ein Wert in alle markierten Zellen, ein Block ab der linken oberen."],
+    ["Zellen leeren", "Entf", "Leert die markierten Review-Zellen (gilt nach dem Speichern)."],
+    ["Alles markieren", "Strg+A", "Markiert alle Zellen der Tabelle."],
     ["Zeile kopieren", "", "Kopiert alle sichtbaren Zellen der Zeile in der angezeigten Spaltenreihenfolge."],
     ["Zeile mit Überschriften kopieren", "", "Wie „Zeile kopieren“, mit einer Kopfzeile darüber."], null,
     [`Nur „${v}“ in „${col}“ zeigen`, "", `Setzt die Wertauswahl der Spalte „${col}“ auf genau „${v}“. Das Filterfeld zeigt dann „1 / n“.`],

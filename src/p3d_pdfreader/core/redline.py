@@ -5,6 +5,7 @@ Text) - in Acrobat/Bluebeam/PDF-XChange in der Kommentarliste. Die Pos.-Nr. ist 
 (``review.positions``). Farben und Rahmen wie im Viewer der App: korrekte Tags gruen, fehlerhafte (Review "Korrektur
 erforderlich" bzw. im Projektmodus Abweichung) rot, doppelte Tags (Anzahl > 1 auf der Seite) zusaetzlich gelb
 hinterlegt; neben jedem Rahmen steht die Pos.-Nr. in Rahmenfarbe. Oben links steht ein Uebersichtskommentar.
+Tags mit Review "No Tag" werden nicht gekennzeichnet; die Pos.-Nr. der uebrigen bleiben wie in der Review-Excel.
 
 Optional (Einstellung "Layer fuer Review im PDF", Standard an) liegen alle Kommentare auf einer eigenen PDF-Ebene
 (Optional Content Group) ``Review_TT.MM.JJJJ`` - in Acrobat/PDF-XChange/Bluebeam unter "Ebenen" ein- und ausblendbar."""
@@ -21,7 +22,7 @@ from main_gui_kit.theme import LIGHT
 from ..paths import config_dir
 from .extract import PdfResult, Tag
 from .review import positions
-from .review_store import ReviewStore, is_faulty
+from .review_store import ReviewStore, is_faulty, marked_tags
 
 AUTHOR = "P3D PDF Reader"
 DIRTY = "#FFF2CC"              # = gui.appearance.DEFAULT_DIRTY (doppelte Tags; appearance importiert Qt)
@@ -63,8 +64,13 @@ def write_redline(result: PdfResult, out_path: str | Path, tags: list[Tag] | Non
     if callable(getattr(store, "visible", None)):
         tags = store.visible(tags)                   # aus dem Review genommene Tags nicht markieren (1.0.43)
     ok, bad, dirty = _rgb(LIGHT.ok), _rgb(LIGHT.err), _rgb(DIRTY)
-    faulty = {(t.type, t.tag) for t in tags if is_faulty(t, store, checker)}
-    items = positions(tags)
+    marked = marked_tags(tags, store)                # Review "No Tag": nicht kennzeichnen
+    shown = {(t.type, t.tag) for t in marked}
+    faulty = {(t.type, t.tag) for t in marked if is_faulty(t, store, checker)}
+    # Pos.-Nr. ueber alle Tags vergeben (gleich wie in der Review-Excel), erst danach "No Tag" weglassen
+    items = [p for p in positions(tags) if (p.tag.type, p.tag.tag) in shown]
+    unmarked = len(tags) - len(marked)
+    tags = marked
     layer = review_layer_enabled() if layer is None else layer
     with pymupdf.open(result.path) as doc:
         ocg = doc.add_ocg(review_layer_name(), on=True) if layer else 0
@@ -107,6 +113,7 @@ def write_redline(result: PdfResult, out_path: str | Path, tags: list[Tag] | Non
                    f"Positionen: {len(items)} (Pos.-Nr. wie in der Review-Excel)\n"
                    f"Rahmen grün = korrekt, rot = fehlerhaft: {len(faulty)} Tag(s)\n"
                    f"Doppelte Tags (gelb hinterlegt): {dups}"
+                   + (f"\nReview „No Tag“ (nicht markiert): {unmarked}" if unmarked else "")
                    + (f"\nEbene: {review_layer_name()}" if ocg else ""))
         page = doc[0]
         note = page.add_text_annot(pymupdf.Point(20, 20) * page.derotation_matrix, summary, icon="Note")

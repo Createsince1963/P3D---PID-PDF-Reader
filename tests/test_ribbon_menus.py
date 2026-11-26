@@ -128,3 +128,63 @@ def test_fold_state_restored_on_start(app, tmp_path, monkeypatch):
         assert not w.ribbon_fold.stack_sep.isHidden()
     finally:
         w.close()
+
+
+def test_real_right_click_opens_cell_menu(window, app, monkeypatch):
+    """Ein echtes Rechtsklick-Ereignis auf den Zellen oeffnet das Menue (Dateien und Tags)."""
+    from PySide6.QtGui import QContextMenuEvent
+    from p3d_pdfreader.gui import table_menu
+    shown = []
+    monkeypatch.setattr(table_menu, "show_menu",
+                        lambda menu, _pos: shown.append([x.text() for x in menu.actions() if x.text()]))
+    window.show()
+    for table in (window.page.files, window.page.tags):
+        table.set_rows([["a", "b", 1] + [""] * (len(table.headers) - 3)])
+        app.processEvents()
+        view = table.table
+        pos = view.visualRect(view.model().index(0, 1)).center()
+        shown.clear()
+        app.sendEvent(view.viewport(), QContextMenuEvent(QContextMenuEvent.Mouse, pos, view.viewport().mapToGlobal(pos)))
+        assert len(shown) == 1 and {"Kopieren", "Einfügen", "Zellen leeren", "Alles markieren"} <= set(shown[0])
+
+
+def test_multi_cell_copy_paste_clear(window, app):
+    """Mehrere Zellen: kopieren als Tabulator-Text, ein Wert in alle markierten Zellen, Block ab links oben, leeren;
+    ganze Zeilen markiert -> nur die Spalte der aktuellen Zelle."""
+    from PySide6.QtCore import QItemSelection, QItemSelectionModel
+    from p3d_pdfreader.core.extract import PdfResult, Tag
+    from p3d_pdfreader.gui import table_menu
+    from p3d_pdfreader.gui.main_window import FIRST_FIELD
+    pdf = PdfResult(path=paths_home() / "a.pdf", drawing_no="D", tags=[Tag(tag=f"XV-{i}", type="Instrument")
+                                                                        for i in (1, 2, 3)])
+    window.results = [pdf]
+    window._refresh()
+    page = window.page
+    page.files.table.setCurrentIndex(page.files.proxy.index(0, 0))
+    view, proxy = page.tags.table, page.tags.proxy
+    comment, wpo = FIRST_FIELD + 3, FIRST_FIELD + 4
+    sel = view.selectionModel()
+
+    def block(r0, r1, c0, c1):
+        sel.setCurrentIndex(proxy.index(r1, c1), QItemSelectionModel.NoUpdate)      # wie nach dem Ziehen: Ende
+        sel.select(QItemSelection(proxy.index(r0, c0), proxy.index(r1, c1)), QItemSelectionModel.ClearAndSelect)
+
+    block(0, 1, comment, wpo)
+    QApplication.clipboard().setText("a")
+    assert page.paste_cells() == 4                                                    # ein Wert -> alle 4 Zellen
+    assert table_menu.selection_text(view).count("a") == 4
+    QApplication.clipboard().setText("1\t2\n3\t4")
+    assert page.paste_cells() == 4                                                    # Block ab links oben
+    assert table_menu.selection_text(view) == "1\t2\n3\t4"
+    assert page.clear_cells() == 4 and table_menu.selection_text(view) == "\t\n\t"
+    view.selectRow(2)                                                                 # ganze Zeile
+    sel.setCurrentIndex(proxy.index(2, comment), QItemSelectionModel.NoUpdate)
+    QApplication.clipboard().setText("z")
+    assert page.paste_cells() == 1
+    assert [proxy.index(2, c).data() for c in (comment, wpo)] == ["z", ""]
+    page.store.dirty = False
+
+
+def paths_home():
+    from p3d_pdfreader import paths
+    return paths.home_dir()

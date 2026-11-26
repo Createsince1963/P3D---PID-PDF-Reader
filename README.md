@@ -58,7 +58,7 @@ Ein PC oder Server startet den Web-Server, Kollegen öffnen die Adresse im Brows
 - **Sicherheit:** Der Browser kann keine Pfade angeben. Gelesen wird nur, was in einem Quellordner liegt oder hochgeladen wurde. Es gibt keine Anmeldung: Wer die Adresse im Netz erreicht, kann das Tool nutzen. Den Server deshalb nur im Firmennetz betreiben.
 - **Audit-Spalten** in der Tag-Tabelle: Review und Änderung als Auswahlliste, dazu Neuer Wert, Bemerkung und WPO. Datum und User werden automatisch gesetzt.
   - Bearbeiten per Doppelklick in die Zelle, speichern mit „Review speichern“ oder Strg+S. Beim Wechsel der PDF wird automatisch gespeichert.
-  - Gespeichert wird auf dem Server wie „Review speichern“ der Desktop-App (`data\reviews`, jeder Stand eine neue Datei). Redline, Review-Excel und Desktop-App sehen die Einträge.
+  - Gespeichert wird auf dem Server wie „Review speichern“ der Desktop-App (mit Projekt in dessen Datenbank, sonst `data\reviews`; jeder Stand bleibt erhalten). Redline, Review-Excel und Desktop-App sehen die Einträge.
   - „Korrektur erforderlich“ erscheint rot in der Tabelle und im Viewer.
   - Als User steht der Name, den jeder Browser beim ersten Eintrag einmal abfragt.
 - **Noch nicht in der Web-Version:** Tabellenansichten speichern, Viewer auf 2. Monitor, Einstellungen (Pfade, Tag-Muster) im Browser, Sprachwahl, Projektmodus, Datenlink (Importliste, Abgleich, Review Importliste) und Tabellen-Vorschau. Diese Funktionen gibt es nur im Desktop-Tool.
@@ -67,7 +67,7 @@ Ein PC oder Server startet den Web-Server, Kollegen öffnen die Adresse im Brows
 - **Aus (Standard):** das Tool arbeitet wie bisher mit den Tag-Mustern, ohne Projektregeln.
 - **An:** Jeder Tag wird gegen die Projektdefinitionen geprüft. Neue Spalten „Projekt-Prüfung“ (OK / Fehler) und „Projekt-Hinweis“, Filter „Nur Abweichungen“, Abweichungen im Viewer rot (außer Review „OK“ / „Nicht relevant“), Prüfspalten auch in Export und Review-Excel.
 - **Projekt wählen:** „Aus Tag Compliance übernehmen …“ liest die `pidtag_project.db` von P3D Tag Compliance (nur lesend) und legt ein Projekt in `<Datenordner>\projects` an. Alternativ Projekt öffnen oder neu anlegen.
-- **Projekt mit allen Einstellungen:** Die Projekt-Datenbank speichert auch die Einstellungen des Tools: Quell-/Exportordner, Tag-Muster, Importliste samt Kachel-Editor-Anpassung, Datenlink-Felder, Tabellenansichten, Umschalter und Review-Optionen. Menü „Projekt wählen“: Projekt speichern, Projekt speichern unter …, Einstellungen des Projekts laden. Beim Öffnen fragt das Tool, ob gespeicherte Einstellungen geladen werden; beim Programmstart öffnet es das zuletzt gewählte Projekt ohne Rückfrage.
+- **Alles je Projekt in der Projekt-Datenbank:** Review-Einträge (mit Verlauf), gelesene PDF-Daten (nur neue oder geänderte PDFs werden neu gelesen; die PDFs selbst werden nicht gespeichert) und die Einstellungen: Quell-/Exportordner, Tag-Muster, Importliste samt Kachel-Editor-Anpassung, Datenlink-Felder, Tabellenansichten, Umschalter, Review-Optionen und „Zeichen ersetzen“. Die Einstellungen werden automatisch gespeichert (alle 30 Sekunden bei Änderungen, beim Projektwechsel, beim Beenden); beim Wechsel lädt das Tool die des gewählten Projekts. Nicht für gleichzeitiges Arbeiten mehrerer Personen oder Programmfenster an einem Datenordner gedacht.
 - **Projektdefinitionen …:** Codelisten, Listen, Tag-Strukturen und -Segmente, Notizen, Trennzeichen-Regel und die **PDF-Prüfregeln** (PDF-Tag-Typ → Tag-Struktur) bearbeiten; Listen anlegen, Spalten, Liste aus Excel; Excel-Export/-Import im Blattformat von Tag Compliance; „Tag testen“.
 - **Segment-Quellen:** Tabelle (`def_function_codes`), Liste mit Spalte (`list:media|Medium Code (Fluid)`), `const:TEXT`, `seq:3` (laufende Nummer), `free`. Ein Tag ist OK, wenn er zu einer Struktur seines Typs passt; sonst nennt der Hinweis das erste nicht passende Segment oder die Trennzeichen-Regel.
 - **Befunde (Spalte „Projekt-Prüfung“, kombinierbar mit „ + “):** „Regelfehler Projektdefinition“ (Trennzeichen oder Aufbau), „Code fehlt in Projektdefinition“ (Code nicht in der Liste), „Code unvollständig“ (Platzhalter `?`, X statt Ziffern wie `XXX`, `SSXX`, `ST1X`), dazu „mehrfach vorhanden“, wenn der Tag auf einer Seite mehrfach steht. Platzhalter-Tags werden nur im Projektmodus eingelesen.
@@ -110,11 +110,12 @@ Das Blatt „Alle Tags“ zeigt die Tags aller eingelesenen PDFs in einer Tabell
 ## Review-Einträge in der Tag-Tabelle
 - **Bearbeiten** (Umschalter): Review und Änderung als Auswahlliste, Neuer Wert, Bemerkung und WPO frei. Doppelklick oder Tippen in die Zelle; Datum und User setzt das Tool automatisch.
 - **Autofill OK:** bei allen Tags mit Review „OK“ (oder leerem Review und Projekt-Prüfung „OK“) Review = OK, Datum und User setzen; leeres WPO bekommt den Checked-Wert aus dem Schriftfeld. Der Knopf bleibt blau, bis gespeichert ist.
-- **Rechtsklick auf Zellen:** neben Kopieren, Filtern und Spalten …:
-  - **Einfügen (Strg+V):** ein Wert in alle markierten Zeilen, ein Block aus Excel ab der aktuellen Zelle (nur Review-Spalten, auch ohne Bearbeiten-Modus)
-  - **„Wert“ in markierte Zeilen übernehmen**, **Zellen leeren**
+- **Zellen markieren** wie in Excel: Maus ziehen, Strg/Umschalt; ganze Zeilen über die Zeilennummer.
+- **Rechtsklick auf Zellen:** neben Kopieren (Strg+C), Alles markieren, Filtern und Spalten …:
+  - **Einfügen (Strg+V):** ein Wert in alle markierten Zellen, ein Block aus Excel ab der linken oberen markierten Zelle (nur Review-Spalten, auch ohne Bearbeiten-Modus). Sind ganze Zeilen markiert, gilt die Spalte der aktuellen Zelle.
+  - **Zellen leeren (Entf)**, **„Wert“ in markierte Zeilen übernehmen**
   - **Zeile(n) aus Review nehmen:** für Tags, die nicht in den Review gehören (z. B. Fehlerkennung). Sie fehlen danach in Tabelle, Viewer, Redline, Review-Excel, Export, Vorschau und Review Importliste. **Aus dem Review genommene zeigen** blendet sie grau ein, **Zeile(n) wiederherstellen** holt sie zurück. Wirksam nach dem Speichern; die PDF bleibt unverändert.
-- **Speichern** (Strg+S): jeder Stand wird als neue Datei mit Zeitstempel in `<Datenordner>\reviews` gespeichert. Die PDF selbst wird nie verändert.
+- **Speichern** (Strg+S): jeder Stand bleibt erhalten – mit gewähltem Projekt in dessen Datenbank, ohne Projekt als neue Datei mit Zeitstempel in `<Datenordner>\reviews`. Die PDF selbst wird nie verändert.
 - „Korrektur erforderlich“ erscheint rot in der Tabelle, im Viewer und im Redline-PDF.
 
 ## Datenlink: Excel-Liste importieren und abgleichen
@@ -150,7 +151,7 @@ Alle Tabellen folgen dem Standard aus `main_gui_kit`:
 Die Ansicht jeder Tabelle (Spaltenreihenfolge, Breiten, Ausblenden, Sortierung, Zoom) wird automatisch gemerkt. **Ausnahme Filter:** Dateiliste und Tag-Tabelle starten immer ohne Filter, Filter werden dort nicht gemerkt. Benannte Ansichten verwaltest du über *Save / Load / Reset Layout*, die Ansicht aller Tabellen auf einmal über **Tabellenprofil** (Menüband „2 Ansicht“). Das **Excel-Symbol** oben links in der Tabelle sichert die Tabelle wie angezeigt: sichtbare und hinzugefügte Spalten (ausgeblendete nicht) in deiner Reihenfolge, Filter und Sortierung, in Excel zusätzlich mit Kopffarbe, Zellfarben, Ausrichtung und Spaltenbreiten (CSV: nur die Werte). Der Dateiname ist vorbelegt mit PDF- oder Tabellenname und Zeitstempel, z. B. `SGOPS-…-EQPM-001_Tags_2026-11-20_14-29.xlsx`.
 
 **Rechtsklick (wie P3D XCHANGE):**
-- **Zelle:** Kopieren, Zeile kopieren (mit/ohne Überschriften), nur diesen Wert zeigen, Filter der Spalte / alle Filter zurücksetzen, Spalten …, Nach Excel …
+- **Zelle:** Kopieren, Einfügen, Zellen leeren (nur beschreibbare Zellen), Alles markieren, Zeile kopieren (mit/ohne Überschriften), nur diesen Wert zeigen, Filter der Spalte / alle Filter zurücksetzen, Spalten …, Nach Excel …
 - **Excel-Symbol:** Dialog „Spalten …“ (verschieben, ein-/ausblenden, Standard)
 - **Spaltenkopf:** ausblenden, verschieben, Ausrichtung, Ansicht zurücksetzen, Teilreiter
 
@@ -199,7 +200,7 @@ Hinweis: Equipment steht oft zusätzlich in der Equipment-Tabelle am Blattfuß. 
   - `config\table_views.json`: gemerkte Tabellenansichten
   - `config\tag_patterns.json`
   - `config\data_link.json`: Importliste mit Kachel-Editor-Anpassung
-  - `reviews\`: Review-Einträge je PDF (jeder Stand eine Datei)
+  - `reviews\`: Review-Einträge ohne Projekt je PDF (jeder Stand eine Datei); mit Projekt liegen sie in dessen Datenbank
   - `projects\`: Projekt-Datenbanken
   - `logs\`, `exports\`
 - **Pfade-Dialog** (**Projekt › Pfade**): Quellordner hinzufügen oder entfernen (✓/✗ = vorhanden), Exportordner wählen, Speicherorte öffnen.

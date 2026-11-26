@@ -2,7 +2,9 @@
 
 * Rechtsklick auf das Excel-Symbol in der Tabellenecke: Dialog „Spalten …“ (verschieben, ein-/ausblenden, Standard) -
   Muster: XCHANGE 0.5.0 ``gui/columns_dialog.py`` (ohne Read only / Write, der PDF Reader schreibt keine Plant-3D-Daten).
-* Rechtsklick in die Tabelle: Kopieren, nach dem Wert der Zelle filtern, Filter zuruecksetzen, Spalten …, nach Excel.
+* Rechtsklick in die Tabelle: Kopieren, Einfuegen, Zellen leeren, Alles markieren, nach dem Wert der Zelle filtern,
+  Filter zuruecksetzen, Spalten …, nach Excel. Strg+C kopiert alle markierten Zellen. Einfuegen und Leeren gibt es nur,
+  wo die Tabelle beschreibbar ist: ``table._paste_hook()``, ``table._clear_hook()``, ``table._can_write()``.
 * Rechtsklick auf den Spaltenkopf: unveraendert das Kit-Menue (Spalte ausblenden, verschieben, Ausrichtung, Teilreiter).
 
 Werkzeugeigene Eintraege: ``table._cell_menu_hook(menu, index)`` (Index des Proxy-Modells)."""
@@ -11,7 +13,7 @@ from __future__ import annotations
 from typing import Callable
 
 from PySide6.QtCore import QModelIndex, Qt
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QAbstractItemView, QDialog, QHBoxLayout, QHeaderView, QLabel, QMenu, QMessageBox,
                                QTableView, QTableWidget, QTableWidgetItem, QToolButton, QVBoxLayout)
 
@@ -249,6 +251,16 @@ def cell_menu(table: QTableView, index: QModelIndex, *, on_clear_all: Callable[[
     copy = menu.addAction("Kopieren", lambda: clip.setText(selection_text(table)))
     copy.setShortcut("Ctrl+C")
     copy.setEnabled(bool(table.selectionModel() and table.selectionModel().hasSelection()))
+    paste_hook, clear_hook = getattr(table, "_paste_hook", None), getattr(table, "_clear_hook", None)
+    can_write = getattr(table, "_can_write", None)
+    writable = bool(callable(can_write) and can_write())
+    paste = menu.addAction("Einfügen", lambda: paste_hook())
+    paste.setShortcut("Ctrl+V")
+    paste.setEnabled(writable and callable(paste_hook) and bool(clip.text()))
+    clear = menu.addAction("Zellen leeren", lambda: clear_hook())
+    clear.setShortcut("Del")
+    clear.setEnabled(writable and callable(clear_hook))
+    menu.addAction("Alles markieren", table.selectAll).setShortcut("Ctrl+A")
     menu.addAction("Zeile kopieren", lambda: clip.setText(row_text(table, index.row()))).setEnabled(valid)
     menu.addAction("Zeile mit Überschriften kopieren",
                    lambda: clip.setText(row_text(table, index.row(), with_header=True))).setEnabled(valid)
@@ -282,6 +294,11 @@ def cell_menu(table: QTableView, index: QModelIndex, *, on_clear_all: Callable[[
     return menu
 
 
+def show_menu(menu: QMenu, global_pos) -> None:
+    """Menue anzeigen (eigene Funktion: Tests ersetzen sie, damit kein Menue auf eine Eingabe wartet)."""
+    menu.exec(global_pos)
+
+
 def install_table_menus(table: QTableView, excel_button: QToolButton | None = None, *,
                         on_clear_all: Callable[[], None] | None = None, on_filter: Callable[[], None] | None = None,
                         on_export: Callable[[], None] | None = None) -> None:
@@ -290,17 +307,26 @@ def install_table_menus(table: QTableView, excel_button: QToolButton | None = No
     count = model.columnCount() if model is not None else 0
     table._default_hidden = {c for c in range(count) if table.isColumnHidden(c)}
     viewport = table.viewport()
-    viewport.setContextMenuPolicy(Qt.CustomContextMenu)
+    # Die Richtlinie gehoert auf die Tabelle: Qt reicht den Rechtsklick des Viewports an sie weiter; am Viewport
+    # selbst kaeme das Signal nie an. ``pos`` ist trotzdem in Viewport-Koordinaten.
+    table.setContextMenuPolicy(Qt.CustomContextMenu)
 
     def open_menu(pos) -> None:
         index = table.indexAt(pos)
         if index.isValid() and table.selectionModel() and not table.selectionModel().isSelected(index):
             table.setCurrentIndex(index)
-        cell_menu(table, index, on_clear_all=on_clear_all, on_filter=on_filter,
-                  on_export=on_export).exec(viewport.mapToGlobal(pos))
+        show_menu(cell_menu(table, index, on_clear_all=on_clear_all, on_filter=on_filter, on_export=on_export),
+                  viewport.mapToGlobal(pos))
 
-    viewport.customContextMenuRequested.connect(open_menu)
+    table.customContextMenuRequested.connect(open_menu)
     table._cell_menu_open = open_menu
+
+    def copy_selection() -> None:
+        text = selection_text(table)
+        if text:
+            QGuiApplication.clipboard().setText(text)
+
+    QShortcut(QKeySequence.Copy, table, activated=copy_selection, context=Qt.WidgetShortcut)   # alle markierten Zellen
     if excel_button is not None:
         excel_button.setToolTip(excel_button.toolTip() + "\nRechtsklick: Spalten …")
         excel_button.setContextMenuPolicy(Qt.CustomContextMenu)

@@ -20,7 +20,8 @@ META_KEY = "tool_settings"
 FORMAT_VERSION = 1
 FILES = ("paths.json", "tag_patterns.json", "data_link.json", "table_views.json")
 STATE_KEYS = ("data_link_fields", "read_pipe_lines", "tags_scan_fields", "redline_review_layer", "review_options",
-              "project_mode")
+              "project_mode", "tag_edit")
+BACKUP_DAYS = 5                       # je Tag der erste ueberschriebene Stand, die letzten Tage bleiben erhalten
 STATE_FILE = "state.json"
 
 
@@ -69,6 +70,25 @@ def save_to_project(db, config: Path, version: str = "") -> dict[str, Any]:
     bundle = collect(config, version)
     db.set_meta(META_KEY, json.dumps(bundle, ensure_ascii=False))
     return bundle
+
+
+def autosave(db, config: Path, version: str = "") -> bool:
+    """Einstellungen speichern, wenn sie sich geaendert haben. Der ueberschriebene Stand bleibt je Tag einmal in der
+    Tabelle ``settings_backups`` erhalten. Rueckgabe: True, wenn geschrieben wurde."""
+    bundle = collect(config, version)
+    stored = load_from_project(db)
+    if stored is not None:
+        if stored.get("files") == bundle["files"] and stored.get("state") == bundle["state"]:
+            return False
+        with db.con:
+            db.con.execute("create table if not exists settings_backups(day text primary key, saved text, bundle text)")
+            db.con.execute("insert or ignore into settings_backups(day, saved, bundle) values(?,?,?)",
+                           (bundle["saved"][:10], str(stored.get("saved", "")),
+                            json.dumps(stored, ensure_ascii=False)))
+            db.con.execute("delete from settings_backups where day not in "
+                           "(select day from settings_backups order by day desc limit ?)", (BACKUP_DAYS,))
+    db.set_meta(META_KEY, json.dumps(bundle, ensure_ascii=False))
+    return True
 
 
 def load_from_project(db) -> dict[str, Any] | None:

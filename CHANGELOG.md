@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.54 – 2026-11-26
+
+- **Fehler behoben: Rechtsklick in den Tabellen öffnete kein Menü** (Dateiliste, Tag-Tabelle, Alle Tags, Prüfblätter, Raster der Projektdefinitionen). Das Menü war vorhanden, hing aber an der falschen Stelle.
+- **Mehrere Zellen markieren** wie in Excel (Maus ziehen, Strg/Umschalt); ganze Zeilen über die Zeilennummer. Bisher markierte ein Klick immer die ganze Zeile.
+- Menü und Tasten: **Kopieren** (Strg+C, alle markierten Zellen), **Einfügen** (Strg+V), **Zellen leeren** (Entf), **Alles markieren** (Strg+A). Einfügen und Leeren wirken nur auf die Review-Spalten der Tag-Tabelle: ein Wert geht in alle markierten Zellen, ein Block ab der linken oberen; bei markierten ganzen Zeilen nur in die Spalte der aktuellen Zelle.
+
+## 1.0.53 – 2026-11-26
+
+- **Projektdaten in der Projekt-Datenbank:** Mit gewähltem Projekt liegen die **Review-Einträge** (mit Verlauf, inklusive aus dem Review genommener Tags) in dessen Datenbank, je Projekt getrennt. Vorhandene JSON-Reviews werden beim ersten Laden übernommen; die Dateien bleiben unverändert. Ohne Projekt bleibt es bei `data\reviews`.
+- **Gelesene PDF-Daten** (Tags, Schriftfeld, Fundstellen) werden im Projekt gespeichert. Beim nächsten Scan werden nur neue oder geänderte PDFs neu gelesen; nach einem Tool-Update oder geänderten Tag-Mustern alle. Die PDF-Dateien selbst werden nicht gespeichert.
+- **Einstellungen werden automatisch gespeichert** (Importliste mit Kachel-Editor-Anpassung und Datenlinks, Tabellenansichten, Pfade, Tag-Muster, Optionen, neu auch „Zeichen ersetzen“): alle 30 Sekunden bei Änderungen, beim Projektwechsel und beim Beenden. Der überschriebene Stand bleibt je Tag einmal erhalten (letzte 5 Tage, Tabelle `settings_backups`).
+- **Projektwechsel** lädt die Einstellungen des neuen Projekts ohne Rückfrage (Rückfrage nur, wenn vorher kein Projekt gewählt war). Ein neues Projekt startet mit den aktuellen Einstellungen. Der Menüpunkt „Einstellungen des Projekts laden“ entfällt.
+
+## 1.0.52 – 2026-11-26
+
+- **Neuer Review-Wert „No Tag“** für Einträge, die kein Tag sind (z. B. Fehlerkennung „MARCH-2025“ als Instrument): sie werden weder im Viewer noch im Redline-PDF gekennzeichnet (auch nicht gelb als doppelt), in der Desktop- und der Web-Version. Zeile und Review-Wert bleiben in Tag-Tabelle, Review-Excel und Export; die Pos.-Nr. der übrigen Tags ändern sich nicht (im Redline-PDF bleibt die Nummer frei).
+
 ## 1.0.51 – 2026-11-25
 
 - **Excel-Export wie angezeigt** (Excel-Symbol in der Tabellenecke): sichtbare und hinzugefügte Spalten in deiner Reihenfolge, ausgeblendete nicht, Filter und Sortierung wie gehabt; neu mit Kopffarbe, Zellfarben (doppelte Tags, Regelverstöße), Ausrichtung und den Spaltenbreiten der Ansicht. CSV enthält wie bisher nur die Werte.

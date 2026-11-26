@@ -12,7 +12,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QModelIndex, Qt, QThread, QTimer
 from PySide6.QtGui import QBrush, QColor, QKeySequence, QShortcut
-from PySide6.QtWidgets import (QApplication, QComboBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu,
+from PySide6.QtWidgets import (QAbstractItemView, QApplication, QComboBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu,
                                QMessageBox, QSplitter, QStatusBar, QStyledItemDelegate, QTabBar, QTableView,
                                QTabWidget, QToolButton, QVBoxLayout, QWidget)
 
@@ -24,11 +24,11 @@ from main_gui_kit.theme import LIGHT, ThemeManager
 
 from .. import i18n, paths
 from ..constants import APP_NAME
-from ..core import data_link, export, project_settings, redline, review
+from ..core import data_link, export, project_settings, project_store, redline, review
 from ..core.extract import PdfResult
 from ..core import tag_edit
 from ..core.project_defs import CHECK_HEADERS, ProjectDB, is_fault_status
-from ..core.review_store import (CHANGE_VALUES, EDIT_FIELDS, FIELDS, REVIEW_VALUES, ReviewStore, status_hits,
+from ..core.review_store import (CHANGE_VALUES, EDIT_FIELDS, FIELDS, REVIEW_VALUES, ReviewStore, marked_tags, status_hits,
                                  visible_tags)
 from . import appearance, icons, last_paths, table_views, tag_edit_ui
 from .fast_proxy import FastSortProxy
@@ -297,6 +297,8 @@ class DataTable(QWidget):
         self.table.layout_key = key
         self.table.setModel(self.proxy)
         configure_table_view(self.table)
+        # Zellen markieren wie in Excel (Maus ziehen, Strg/Umschalt); ganze Zeilen ueber die Zeilennummer
+        self.table.setSelectionBehavior(QAbstractItemView.SelectItems)
         self.table.horizontalHeader().setStyleSheet(table_header_qss())
         mark_active_filters(self.table.horizontalHeader())
         configure_subtabs(self.table)
@@ -409,7 +411,10 @@ class TagsSheet(Sheet):
         self._autofilled = False
         self.show_removed = False                        # aus dem Review genommene Tags zeigen (Rechtsklick)
         self.tags.table._cell_menu_hook = self._cell_menu
-        QShortcut(QKeySequence.Paste, self.tags.table, activated=self.paste_cells, context=Qt.WidgetShortcut)
+        self.tags.table._paste_hook, self.tags.table._clear_hook = self.paste_cells, self.clear_cells
+        self.tags.table._can_write = lambda: any(self._writable(r, c) for r, c in self._target_cells())
+        for seq, fn in ((QKeySequence.Paste, self.paste_cells), (QKeySequence.Delete, self.clear_cells)):
+            QShortcut(seq, self.tags.table, activated=fn, context=Qt.WidgetShortcut)      # nicht im Zelleditor
         self.edit_button = strip.add("edit", "Bearbeiten", "rename", self.set_edit_mode,
                                      "Bearbeiten-Modus: Review, Änderung, Neuer Wert, Bemerkung, WPO eintragen "
                                      "(Datum und User werden automatisch gesetzt)", checkable=True)
@@ -665,10 +670,12 @@ class TagsSheet(Sheet):
         m.addAction("Datenlinks anzeigen", lambda: QMessageBox.information(win, "Datenlink", links.summary()))
 
     def show_status(self) -> None:
-        """Rahmen im Viewer: gruen korrekt, rot Review "Korrektur erforderlich" oder (Projektmodus) Abweichung."""
+        """Markierungen im Viewer: gruen korrekt, rot Review "Korrektur erforderlich" oder (Projektmodus) Abweichung,
+        doppelte gelb; Review "No Tag" bleibt ohne Markierung."""
         result = self._store_result
         tags = (self.store.visible(result.tags) if self.store else result.tags) if result else []
         self.preview.show_status(*status_hits(tags, self.store, self.win.checker))
+        self.preview.show_duplicates([t.hits for t in marked_tags(tags, self.store) if t.duplicate])
 
     # --- Bearbeiten-Modus / Speichern -----------------------------------------------------------------------------
     def set_edit_mode(self, on: bool) -> None:
@@ -711,12 +718,10 @@ class TagsSheet(Sheet):
         review_col = col in model._edit_cols
         rows = self._selected_rows()
         menu.addSeparator()
-        menu.addAction("Einfügen (Strg+V)", self.paste_cells).setEnabled(review_col)
         value = str(index.data() or "") if index.isValid() else ""
         short = value if len(value) <= 30 else value[:29] + "…"
         menu.addAction(f"„{short}“ in markierte Zeilen übernehmen" if value else "Wert in markierte Zeilen übernehmen",
                        lambda: self.fill_cells(col, value)).setEnabled(review_col and len(rows) > 1)
-        menu.addAction("Zellen leeren", lambda: self.fill_cells(col, "")).setEnabled(review_col)
         menu.addSeparator()
         removed = [r for r in rows if model.is_removed(r)]
         menu.addAction(f"Zeile(n) aus Review nehmen ({len(rows) - len(removed)})",
@@ -739,25 +744,57 @@ class TagsSheet(Sheet):
         """Wert in die Spalte ``column`` aller markierten Zeilen schreiben (nur Review-Spalten)."""
         return self._apply_cells([(r, column, value) for r in self._selected_rows()])
 
+    def _target_cells(self) -> list[tuple[int, int]]:
+        """Zellen (Proxy-Zeile, Spalte), auf die Einfuegen und Leeren wirken: die markierten sichtbaren Zellen. Sind
+        ganze Zeilen markiert (Zeilennummer), gilt nur die Spalte der aktuellen Zelle - nie alle Review-Spalten."""
+        view = self.tags.table
+        sel, current = view.selectionModel(), view.currentIndex()
+        if sel is None:
+            return []
+        cells = {(i.row(), i.column()) for i in sel.selectedIndexes() if not view.isColumnHidden(i.column())}
+        if not cells and current.isValid():
+            return [(current.row(), current.column())]
+        if sel.selectedRows() and current.isValid():
+            return sorted({(r, current.column()) for r, _c in cells})
+        return sorted(cells)
+
+    def _writable(self, row: int, column: int) -> bool:
+        proxy = self.tags.proxy
+        model = proxy.sourceModel()
+        src = proxy.mapToSource(proxy.index(row, column))
+        return isinstance(model, ReviewModel) and src.isValid() and model.can_set(src.row(), src.column())
+
+    def _fill_targets(self, value: str) -> int:
+        proxy = self.tags.proxy
+        sources = [proxy.mapToSource(proxy.index(r, c)) for r, c in self._target_cells()]
+        return self._apply_cells([(i.row(), i.column(), value) for i in sources])
+
+    def clear_cells(self) -> int:
+        """Markierte Review-Zellen leeren (gilt wie jede Eingabe nach dem Speichern)."""
+        return self._fill_targets("")
+
     def paste_cells(self) -> int:
-        """Zwischenablage ab der aktuellen Zelle einfuegen (wie Excel: Tab = Spalte, Zeilenumbruch = Zeile). Nur
-        Review-Spalten echter PDF-Zeilen werden beschrieben; ein einzelner Wert geht in alle markierten Zeilen."""
+        """Zwischenablage einfuegen wie in Excel (Tab = Spalte, Zeilenumbruch = Zeile). Ein einzelner Wert geht in alle
+        markierten Zellen, ein Block ab der linken oberen markierten Zelle. Nur Review-Spalten echter PDF-Zeilen werden
+        beschrieben."""
         text = QApplication.clipboard().text()
         if not text:
             return 0
         lines = [line.split("\t") for line in text.rstrip("\r\n").replace("\r\n", "\n").split("\n")]
         proxy, view = self.tags.proxy, self.tags.table
         current = view.currentIndex()
-        if not current.isValid():
+        targets = self._target_cells()
+        if not current.isValid() or not targets:
             return 0
         if len(lines) == 1 and len(lines[0]) == 1:
-            return self.fill_cells(proxy.mapToSource(current).column(), lines[0][0])
+            return self._fill_targets(lines[0][0])
         header = view.horizontalHeader()
         visual = [c for c in (header.logicalIndex(v) for v in range(header.count())) if not view.isColumnHidden(c)]
-        start_v = visual.index(current.column()) if current.column() in visual else 0
+        top = min(r for r, _c in targets)
+        start_v = min((visual.index(c) for _r, c in targets if c in visual), default=0)
         changes = []
         for dr, cells in enumerate(lines):
-            prow = current.row() + dr
+            prow = top + dr
             if prow >= proxy.rowCount():
                 break
             for dc, value in enumerate(cells):
@@ -802,7 +839,8 @@ class TagsSheet(Sheet):
             return True
         box = QMessageBox(QMessageBox.Question, "Review-Einträge",
                           f"Ungespeicherte Review-Einträge für „{self.store.pdf_path.name}“ speichern?\n\n"
-                          "Gespeichert wird ein neuer Stand mit Zeitstempel im Review-Ordner des Tools. "
+                          "Gespeichert wird ein neuer Stand mit Zeitstempel "
+                          + ("in der Projekt-Datenbank. " if self.store.db else "im Review-Ordner des Tools. ") +
                           "Die PDF selbst wird nicht verändert (nur gelesen).", parent=self)
         save = box.addButton("Speichern", QMessageBox.AcceptRole)
         discard = box.addButton("Verwerfen", QMessageBox.DestructiveRole)
@@ -879,7 +917,6 @@ class TagsSheet(Sheet):
             dlg.update_progress(60, f"PDF öffnen und anzeigen: {result.name} ({result.pages} Seite(n))", first + 1)
             self.preview.show_pdf(result.path)
             self.show_status()
-            self.preview.show_duplicates([t.hits for t in self.store.visible(result.tags) if t.duplicate])
             dlg.update_progress(100)
 
     # --- Tag-Navigation ------------------------------------------------------------------------------------------
@@ -1022,6 +1059,9 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.page, "PID-Tags")
         for side in (QTabBar.RightSide, QTabBar.LeftSide):
             self.tabs.tabBar().setTabButton(0, side, None)
+        self._autosave_timer = QTimer(self)             # Einstellungen laufend ins Projekt uebernehmen
+        self._autosave_timer.timeout.connect(self.autosave_project)
+        self._autosave_timer.start(30_000)
         QShortcut(QKeySequence("F5"), self, activated=lambda: self.scan(None))
         QShortcut(QKeySequence.Save, self, activated=self.page.save_review)
         self._restore_project()
@@ -1362,7 +1402,8 @@ class MainWindow(QMainWindow):
         QApplication.setOverrideCursor(Qt.WaitCursor)
         self._thread = QThread(self)
         self._scan_placeholders = self.checker is not None
-        self._worker = ScanWorker([Path(s) for s in sources], self.pipes_enabled(), self._scan_placeholders)
+        self._worker = ScanWorker([Path(s) for s in sources], self.pipes_enabled(), self._scan_placeholders,
+                                  project_store.active(), self.version)
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
         self._worker.progress.connect(self._on_progress)
@@ -1382,6 +1423,7 @@ class MainWindow(QMainWindow):
     def _on_finished(self, cancelled: bool) -> None:
         self._thread.quit()
         self._thread.wait()
+        reused = self._worker.reused
         self._thread = self._worker = None
         QApplication.restoreOverrideCursor()
         if self._progress:
@@ -1401,7 +1443,8 @@ class MainWindow(QMainWindow):
             finally:
                 self._table_progress = None
         self.statusBar().showMessage(f"{'Abgebrochen: ' if cancelled else ''}{len(self.results)} PDF(s), {tags} Tags, "
-                                     f"{errors} Fehler")
+                                     f"{errors} Fehler"
+                                     + (f" – {reused} unverändert aus dem Projekt übernommen" if reused else ""))
 
     # --- Export / Vorschau / Pfade / Info ------------------------------------------------------------------------
     def export(self, kind: str) -> None:
@@ -1508,7 +1551,7 @@ class MainWindow(QMainWindow):
     def marked_results(self) -> list[PdfResult]:
         """In der Dateiliste markierte PDFs (Mehrfachauswahl), in Tabellenreihenfolge."""
         table = self.page.files
-        rows = sorted({i.row() for i in table.table.selectionModel().selectedRows()})
+        rows = sorted({i.row() for i in table.table.selectionModel().selectedIndexes()})   # jede markierte Zelle
         return [r for r in (self.result_at(table.source_row(table.proxy.index(row, 0))) for row in rows) if r]
 
     def review(self) -> None:
@@ -1638,6 +1681,7 @@ class MainWindow(QMainWindow):
                 self.project = ProjectDB(path)
             except Exception:  # noqa: BLE001 - defekte Datenbank: Standardmodus
                 self.project = None
+        project_store.activate(self.project.path if self.project else None)
         self._set_mode(bool(last_paths.get_value(PROJECT_MODE_KEY, False)) and self.project is not None, quiet=True)
 
     def toggle_project_mode(self) -> None:
@@ -1666,9 +1710,15 @@ class MainWindow(QMainWindow):
         path = action(self) if action else None
         return bool(path) and self.activate_project(path)
 
-    def activate_project(self, path, settings: bool = False) -> bool:
-        """Projekt-Datenbank oeffnen, merken und den Projektmodus einschalten. ``settings``: gespeicherte
-        Einstellungen des Projekts nach Rueckfrage laden (Projekt waehlen/oeffnen; nicht beim Programmstart)."""
+    def activate_project(self, path) -> bool:
+        """Projekt-Datenbank oeffnen, merken und den Projektmodus einschalten. Beim Wechsel werden die Einstellungen
+        im bisherigen Projekt gespeichert und die des neuen geladen; Reviews kommen aus dem neuen Projekt."""
+        previous = self.project
+        switched = previous is None or not paths.same_path(previous.path, path)
+        if switched and previous is not None:
+            if not self.page.confirm_unsaved():
+                return False
+            self.autosave_project()
         try:
             db = ProjectDB(path)
         except Exception as exc:  # noqa: BLE001
@@ -1678,10 +1728,32 @@ class MainWindow(QMainWindow):
             self.project.close()
         self.project = db
         last_paths.set_value(PROJECT_DB_KEY, str(db.path))
+        project_store.activate(db.path)
+        if switched and self.page._store_result is not None:
+            self.page.store = ReviewStore(self.page._store_result.path)
         self._set_mode(True)
-        if settings:
-            self.load_project_settings()
+        if switched:
+            # ohne bisheriges Projekt wuerden die aktuellen Einstellungen sonst ohne Rueckfrage verschwinden
+            self.load_project_settings(ask=previous is None)
+            self._settings_stamp = None
+            self.autosave_project()
         return True
+
+    def autosave_project(self) -> None:
+        """Einstellungen samt Importtabelle im aktuellen Projekt speichern, wenn sich eine Datei geaendert hat."""
+        if self.project is None:
+            return
+        config = paths.config_dir()
+        files = [config / n for n in (*project_settings.FILES, project_settings.STATE_FILE)]
+        stamp = (str(self.project.path), tuple(f.stat().st_mtime_ns if f.is_file() else 0 for f in files))
+        if stamp == getattr(self, "_settings_stamp", None):
+            return
+        try:
+            project_settings.autosave(self.project, config, self.version)
+        except Exception as exc:  # noqa: BLE001 - gesperrt oder schreibgeschuetzt: beim naechsten Mal erneut
+            self.statusBar().showMessage(f"Projekt konnte nicht automatisch gespeichert werden: {exc}", 10000)
+            return
+        self._settings_stamp = stamp
 
     def _set_mode(self, on: bool, quiet: bool = False) -> None:
         """Projektmodus setzen (an nur mit Projekt) und Tabellen, Viewer-Rahmen und Kopfband neu aufbauen."""
@@ -1740,13 +1812,11 @@ class MainWindow(QMainWindow):
         save.setEnabled(self.project is not None)
         save_as = m.addAction("Projekt speichern unter …", self.save_project_as)
         save_as.setEnabled(self.project is not None)
-        load = m.addAction("Einstellungen des Projekts laden", lambda: self.load_project_settings(ask=False))
-        load.setEnabled(self.project is not None and project_settings.load_from_project(self.project) is not None)
         m.addSeparator()
         current = self.project.path if self.project else None
         found = sorted(paths.projects_dir().glob("*.db"), key=lambda f: f.name.casefold())
         for f in found:
-            action = m.addAction(f.stem, lambda f=f: self.activate_project(f, settings=True))
+            action = m.addAction(f.stem, lambda f=f: self.activate_project(f))
             action.setCheckable(True)
             action.setChecked(current is not None and paths.same_path(f, current))
             action.setProperty("i18n_skip", True)
@@ -1758,20 +1828,15 @@ class MainWindow(QMainWindow):
     def _pick(self, action) -> None:
         path = action(self)
         if path:
-            self.activate_project(path, settings=True)
+            self.activate_project(path)
 
     # --- Projekt mit allen Einstellungen (1.0.37) --------------------------------------------------------------------
     def new_project(self) -> None:
-        """Neues Projekt; auf Wunsch mit den aktuellen Einstellungen (Quellordner, Importtabelle, Datenlinks,
-        Tabellenansichten …) als Startpunkt."""
+        """Neues Projekt; es startet mit den aktuellen Einstellungen (Quellordner, Importtabelle, Datenlinks,
+        Tabellenansichten …) und speichert sie automatisch."""
         path = project_dialog.new_project(self)
-        if not path or not self.activate_project(path):
-            return
-        answer = QMessageBox.question(self, "Neues Projekt", "Die aktuellen Einstellungen (Quellordner, Tag-Muster, "
-                                      "Importtabelle mit Datenlinks, Tabellenansichten, Optionen) in das neue "
-                                      "Projekt übernehmen?")
-        if answer == QMessageBox.Yes:
-            self.save_project()
+        if path:
+            self.activate_project(path)
 
     def save_project(self) -> bool:
         if self.project is None:
@@ -1811,7 +1876,7 @@ class MainWindow(QMainWindow):
         if ask and QMessageBox.question(
                 self, "Projekt laden", f"Das Projekt „{self.project.name}“ hat gespeicherte Einstellungen "
                 f"(Stand {bundle.get('saved', '–')}).\nEinstellungen laden? Die aktuellen Einstellungen werden "
-                "ersetzt.") != QMessageBox.Yes:
+                "ersetzt. Bei „Nein“ übernimmt das Projekt die aktuellen Einstellungen.") != QMessageBox.Yes:
             return False
         before = paths.PathSettings.load().existing_sources()
         project_settings.apply(paths.config_dir(), bundle)
@@ -1834,6 +1899,8 @@ class MainWindow(QMainWindow):
         self.layer_action.setChecked(redline.review_layer_enabled())
         self.page.scan_button.setChecked(bool(last_paths.get_value(SCAN_KEY, False)))
         self._relink()
+        tag_edit_ui.load()
+        self._tag_edit_changed()
         tables = table_profiles.stored_layouts(table_profiles.read_json(table_views.store().path))
         for key, view in table_profiles.live_views():
             if key in tables:
@@ -1974,7 +2041,10 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_web"):
             self._web.stop()                               # nur einen selbst gestarteten Server beenden
         if self.project is not None:
+            self._autosave_timer.stop()
+            self.autosave_project()
             self.project.close()
+            self.project = None
         if self._worker:
             self._worker.cancel()
         if self._thread:

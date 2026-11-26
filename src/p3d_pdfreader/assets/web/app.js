@@ -436,9 +436,10 @@ const auditCols = () => [
   { key: "a:Datum", label: "Datum", width: 120, get: r => (r.audit || {}).Datum || "" },
   { key: "a:User", label: "User", width: 90, get: r => (r.audit || {}).User || "" },
 ];
-state.reviewValues = ["", "Offen", "OK", "Korrektur erforderlich", "Klärung", "Nicht relevant"];
+state.reviewValues = ["", "Offen", "OK", "Korrektur erforderlich", "Klärung", "Nicht relevant", "No Tag"];
 state.changeValues = ["", "Keine", "Tag ändern", "Tag ergänzen", "Tag löschen", "Position prüfen", "Doppelten Tag auflösen"];
 state.reviewFaulty = ["Korrektur erforderlich"];
+const REVIEW_UNMARKED = ["No Tag"];    // kein Tag: keine Markierung im Viewer (wie core/review_store.py)
 state.pending = {};             // fileId -> {"Typ|Tag": {type, tag, fields: {Feld: Wert}}} (noch nicht gespeichert)
 const tagCols = [
   { key: "type", label: "Typ", width: 120 },
@@ -457,6 +458,7 @@ const allCols = [
   { key: "pdf", label: "PDF", width: 280 },
 ];
 const isFaulty = r => state.reviewFaulty.includes((r.audit || {}).Review || "");
+const isMarked = r => !REVIEW_UNMARKED.includes((r.audit || {}).Review || "");
 
 const tblFiles = new Table($("#tblFiles"), {
   columns: fileCols, multi: true, key: r => r.id, empty: "Noch keine PDFs eingelesen – „Quellordner scannen“ oder „PDFs hochladen“.",
@@ -512,16 +514,17 @@ async function openFile(file) {
   state.tags = await getJson(`files/${file.id}/tags`);
   if (state.file !== file) return;
   tblTags.setRows(state.tags, false);
-  viewer.dups = state.tags.filter(t => t.duplicate).map(t => t.hits);
   markReviewInViewer();
   await viewer.open(file);
   viewer.draw();
 }
 
 // ---- Audit / Review-Spalten bearbeiten und speichern ----------------------------------------------------------
-function markReviewInViewer() {       // wie Desktop: "Korrektur erforderlich" rot umrandet, alle anderen gruen
-  viewer.found = state.tags.filter(t => !isFaulty(t)).map(t => t.hits);
-  viewer.faulty = state.tags.filter(isFaulty).map(t => t.hits);
+function markReviewInViewer() {       // wie Desktop: "Korrektur erforderlich" rot, "No Tag" ohne, alle anderen gruen
+  const marked = state.tags.filter(isMarked);
+  viewer.dups = marked.filter(t => t.duplicate).map(t => t.hits);
+  viewer.found = marked.filter(t => !isFaulty(t)).map(t => t.hits);
+  viewer.faulty = marked.filter(isFaulty).map(t => t.hits);
   viewer.draw();
 }
 function auditUser() {
