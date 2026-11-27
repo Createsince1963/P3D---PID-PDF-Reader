@@ -68,11 +68,21 @@ class ViewerPanel(QWidget):
         s.add("next", "Fundstelle", "next", sheet.next_occurrence, "Nächste Fundstelle (F3, oder erneut auf den Tag klicken)")
         s.separator()
         s.add("redline", "Redline", "redline", sheet.win.redline_current, "Redline-PDF der gewählten PDF (sichtbare Tags)")
+        # eigene zweite Zeile: die erste Leiste ist voll, sonst wuerde das Fenster noch breiter
+        self.notes_strip = ToolStrip("Multi Tag")
+        self.notes_button = self.notes_strip.add("notes", "Kommentare bearbeiten", "notes", sheet.toggle_notes,
+                                  "Rote Multi-Tag-Einträge zeigen und mit der Maus verschieben. Die Positionen gelten für "
+                                  "„Multi-Tag-PDF“; die PDF selbst bleibt unverändert.", checkable=True)
+        self.preview.page_changed.connect(lambda *_a: sheet.refresh_notes())
+        self.preview.note_moved.connect(sheet.note_moved)
+        self.preview.note_reset.connect(sheet.note_reset)
         s.add("pdf_open", "Öffnen", "pdf_open", self.open_external, "PDF im Standardprogramm öffnen")
         s.stretch()
         self.monitor_button = s.add("monitor", "2. Monitor", "monitor", self.set_detached,
                                     "PDF-Viewer in eigenem Fenster auf dem zweiten Monitor zeigen", checkable=True)
         lay.addWidget(self.strip)
+        self.notes_strip.stretch()
+        lay.addWidget(self.notes_strip)
         lay.addWidget(self.preview, 1)
 
         # Platzhalter im Hauptfenster, solange der Viewer ausgelagert ist

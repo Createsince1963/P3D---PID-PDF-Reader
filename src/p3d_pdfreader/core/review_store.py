@@ -16,6 +16,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+from . import type_filter
 from ..paths import file_timestamp, home_dir
 from . import project_store
 
@@ -232,8 +233,9 @@ class ReviewStore:
         return changed
 
     def visible(self, tags) -> list:
-        """Tags ohne die aus dem Review genommenen (``Tag``-Objekte mit ``type``/``tag``)."""
-        return [t for t in tags if key(t.type, t.tag) not in self.removed] if self.removed else list(tags)
+        """Tags ohne die aus dem Review genommenen und ohne abgewaehlte Prueftypen (``Tag``-Objekte)."""
+        tags = type_filter.apply(tags)
+        return [t for t in tags if key(t.type, t.tag) not in self.removed] if self.removed else tags
 
 
 def visible_tags(result) -> list:
@@ -241,4 +243,4 @@ def visible_tags(result) -> list:
     try:
         return ReviewStore(result.path).visible(result.tags)
     except OSError:
-        return list(result.tags)
+        return type_filter.apply(result.tags)

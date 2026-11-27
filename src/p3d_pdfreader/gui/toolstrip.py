@@ -21,6 +21,8 @@ icons.GLYPHS.update({
     "project_mode": "◉", "defs": "☷", "deviations": "✗",
     # 1.0.43: Importspalten ein/aus, Abgleich, Dateiliste ein-/ausklappen
     "link_cols": "⇄", "match": "⇅", "fold": "⏶", "unfold": "⏷",
+    # 1.0.55: „?“-Tags aus Plant 3D mit verknuepfen
+    "two_tag": "②", "multitag": "❢", "review_table": "▦", "notes": "✥",
 })
 
 

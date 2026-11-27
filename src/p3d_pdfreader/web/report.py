@@ -15,6 +15,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+from ..core import type_filter
 from ..constants import APP_NAME
 from .server import STATIC, file_json, review_lists, review_store, tag_json, version
 
@@ -63,8 +64,8 @@ def report_data(results: list, max_px: int = DEFAULT_MAX_PX, quality: int = DEFA
         fid = i
         files.append(file_json(fid, r, "bericht"))
         store = review_store(r)                        # gespeicherte Audit-Eintraege mit in den Bericht
-        tags[fid] = [tag_json(t, store) for t in r.tags]
-        all_tags.extend({"file": fid, "pdf": r.name, "drawing_no": r.drawing_no, **tag_json(t, store)} for t in r.tags)
+        tags[fid] = [tag_json(t, store) for t in type_filter.apply(r.tags)]
+        all_tags.extend({"file": fid, "pdf": r.name, "drawing_no": r.drawing_no, **tag_json(t, store)} for t in type_filter.apply(r.tags))
         if r.error:
             pages[fid], images[fid] = [], []
             continue

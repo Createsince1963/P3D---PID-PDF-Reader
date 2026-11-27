@@ -95,6 +95,194 @@ def united(widgets, root):
     return r
 
 
+def shown(dialog, app, width: int = 0, height: int = 0):
+    """Dialog zum Fotografieren oeffnen, ohne ihn auf dem Bildschirm zu zeigen."""
+    from PySide6.QtCore import Qt
+    dialog.setAttribute(Qt.WA_DontShowOnScreen)
+    if width:
+        dialog.resize(width, height)
+    dialog.show()
+    wait(app, 0.4)
+    return dialog
+
+
+def top_of(widget, root, height: int, pad: int = 4):
+    r = united([widget], root).adjusted(-pad, -pad, pad, pad)
+    r.setHeight(min(r.height(), height))
+    return r
+
+
+def topic_steps(app, w, out: Path, group_fig) -> list[dict]:
+    """Ansichten zu den Themen ab 1.0.38: Listenabgleich, Prueftypen, 2TAG, Multi-Tag, Vorschau, Tabellen, Pfade."""
+    from PySide6.QtCore import QPoint, QRect
+    from p3d_pdfreader.gui.paths_dialog import PathsDialog
+    from p3d_pdfreader.gui.table_export import PreviewDialog
+    from p3d_pdfreader.gui.type_dialog import TypeDialog
+    page, rb, steps = w.page, w.ribbon.buttons, []
+    strip = page.tags.layout().itemAt(1).widget()
+    multi = page.tags.layout().itemAt(2).widget()
+    left = united([page.tags], w).adjusted(-4, -4, 4, 4)
+
+    def step(ident: str, title: str, intro: str, figs: list) -> None:
+        steps.append({"id": ident, "title": title, "intro": intro, "figs": figs})
+
+    # --- Pfade ---
+    dlg = shown(PathsDialog(w), app)
+    f = Figure("paths", dlg, caption="Projekt › Pfade")
+    f.mark(dlg, "Quell- und Exportordner", "Quellordner hinzufügen oder entfernen und den Exportordner wählen. "
+                                           "„Quellordner scannen“ (F5) liest die Quellordner ein.",
+           QRect(0, 0, dlg.width(), dlg.height() // 2))
+    step("paths", "Pfade festlegen", "Einmal einstellen: wo die PDFs liegen und wohin die Ausgaben gehen.",
+         [f.save(out)])
+    dlg.close()
+
+    # --- Abgleich mit der Liste ---
+    page.reset_tag_filters()
+    wait(app, 0.3)
+    f = Figure("listcheck", w, top_of(page.tags, w, 520), "Leisten der Tag-Tabelle: Abgleich mit der Importliste")
+    f.mark(strip.buttons["link_cols"], "Importspalten", "Spalten der Liste ein- oder ausblenden.")
+    f.mark(strip.buttons["link_menu"], "Importliste", "Link aufheben, Liste neu einlesen, bearbeiten, entfernen.")
+    f.mark(strip.buttons["join"], "Abgleich", "Richtung wählen: PDF → Liste, Liste → PDF oder beide. Fehlendes = „n.a.“.")
+    th = page.tags.table.horizontalHeader()
+    hits = page.tags.headers.index("Datenlink-Treffer")
+    f.mark(th, "Datenlink-Treffer", "0 = Tag fehlt in der Liste. Der Bindestrich zwischen Kürzel und Nummer zählt "
+                                    "nicht (FV-501 passt zu FV501).", section_rect(th, hits))
+    figs = [f.save(out)]
+    f = group_fig("listcheck_ribbon", "link_review", "Menüband, Gruppe „3 Prüfen“")
+    f.mark(rb["link_review"], "Review Importliste", "Blatt mit dem Prüfergebnis über alle PDFs.")
+    figs.append(f.save(out))
+    w.show_link_review()
+    wait(app, 0.8)
+    sheet = w.review_page
+    r = top_of(sheet, w, 520)
+    r.setWidth(min(r.width(), 1300))
+    f = Figure("listcheck_sheet", w, r, "Blatt „Review Importliste“")
+    f.mark(sheet.header, "Zählung", "Anzahl je Prüfergebnis.")
+    f.mark(sheet.tags.table.viewport(), "Prüfergebnis je Zeile", "OK, Nicht in Liste, Fehlt im PDF, Zeichnung nicht "
+                                                                "gescannt.", QRect(0, 0, 260, 120))
+    figs.append(f.save(out))
+    w._close_widget(sheet)                  # sonst oeffnet jedes Neu-Verknuepfen das Pruefblatt wieder
+    w.tabs.setCurrentWidget(page)
+    wait(app, 0.3)
+    step("listcheck", "PDF-Tags mit der Liste abgleichen",
+         "Nach dem Setzen der Datenlink-Felder: Treffer ansehen, Richtung wählen und das Prüfblatt öffnen.", figs)
+
+    # --- Prueftypen ---
+    f = group_fig("types_ribbon", "check_types", "Menüband, Gruppe „3 Prüfen“")
+    f.mark(rb["check_types"], "Prüftypen", "Öffnet die Optionstabelle.")
+    figs = [f.save(out)]
+    dlg = TypeDialog(w.results, [], w)
+    dlg.only("Instrument")
+    shown(dlg, app, 640, 460)
+    f = Figure("types_dialog", dlg, caption="Optionstabelle „Prüftypen“ (Beispiel: nur Instrument)")
+    t = dlg.table
+    f.mark(t.viewport(), "Haken je Typ", "Nur angehakte Typen werden geprüft und ausgegeben.",
+           QRect(0, 0, 60, t.rowHeight(0) * t.rowCount()))
+    f.mark(t.viewport(), "Doppelklick auf eine Zeile", "Prüft nur diesen Typ.",
+           QRect(t.columnViewportPosition(1), 0, t.columnWidth(1), t.rowHeight(0)))
+    f.mark(t.horizontalHeader(), "Anzahl Tags und PDFs", "Wie oft der Typ in den gescannten PDFs vorkommt.",
+           section_rect(t.horizontalHeader(), 2))
+    from PySide6.QtWidgets import QDialogButtonBox
+    f.mark(dlg.findChild(QDialogButtonBox), "OK", "Übernimmt die Auswahl; die Kopfzeile nennt die geprüften Typen.")
+    figs.append(f.save(out))
+    dlg.close()
+    step("types", "Prüftypen wählen (Vorfilter)",
+         "Vor der Prüfung festlegen, ob alles oder nur z. B. Equipment oder Instrument geprüft wird. Der Filter gilt "
+         "auch für Redline, Review-Excel, Bulk und Export.", figs)
+
+    # --- 2TAG ---
+    page.two_tag_button.setChecked(True)
+    wait(app, 0.8)
+    th = page.tags.table.horizontalHeader()
+    view = page.tags.table
+    model = view.model()
+    tag_col = page.tags.headers.index("Tag")
+    marked = next((model.index(r, tag_col) for r in range(model.rowCount())
+                   if "Multi Tag" in str(model.index(r, tag_col).data(3) or "")), None)
+    if marked is not None:
+        view.scrollTo(marked, view.ScrollHint.PositionAtTop)
+        wait(app, 0.3)
+    f = Figure("twotag", w, top_of(page.tags, w, 520), "2TAG eingeschaltet")
+    f.mark(page.two_tag_button, "2TAG einschalten", "Plant 3D schreibt doppelt angelegte Tags mit „?“ am Ende in die "
+                                                    "Datenbank. Mit 2TAG werden auch diese Zeilen verknüpft.")
+    if marked is not None:
+        f.mark(view.viewport(), "Hellgelbe Tag-Zelle", "„Multi Tag Eintrag in Projekt“: der Tooltip nennt die andere "
+                                                      "PID. Zählt unter „Nur Abweichungen“.", view.visualRect(marked))
+    f.mark(th, "Treffer", "Zeigt beide Listenzeilen (mit und ohne „?“).",
+           section_rect(th, page.tags.headers.index("Datenlink-Treffer")))
+    step("twotag", "Doppelt angelegte Tags (2TAG)",
+         "Wenn ein Tag in Plant 3D zweimal existiert, passt der Wert der Datenbank (PI-100?) nicht zur PDF (PI-100). "
+         "2TAG schließt diese Lücke und weist darauf hin.", [f.save(out)])
+
+    # --- Multi-Tag-PDF ---
+    viewer = page.viewer
+    viewer.notes_button.setChecked(True)
+    wait(app, 0.8)
+    preview = page.preview
+    f = Figure("multitag_bar", w, top_of(page.tags, w, 150), "Leiste „Multi Tag“ über der Tag-Tabelle")
+    f.mark(multi.buttons["multitag"], "Multi-Tag-PDF", "Kopie der PDF (gewählte oder alle) mit rotem Eintrag je "
+                                                       "doppeltem Tag.")
+    f.mark(page.review_table_button, "Reviewtabelle", "Hängt Seiten mit allen Reviewpunkten an (Spalten wie in der "
+                                                      "Tag-Tabelle).")
+    figs = [f.save(out)]
+    if preview._notes:
+        note = preview._notes[0]
+        s = preview._scale
+        preview.resetTransform()
+        preview.scale(1.6, 1.6)
+        preview.centerOn((note.rect[0] + note.rect[2]) / 2 * s, note.box[3] * s)
+        preview._render_detail()
+        wait(app, 0.5)
+    f = Figure("multitag_viewer", w, united([page.viewer], w).adjusted(-4, -4, 4, 4),
+               "PDF-Viewer mit „Kommentare bearbeiten“")
+    f.mark(viewer.notes_button, "Kommentare bearbeiten", "Zeigt die roten Einträge über der PDF.")
+    if preview._notes:
+        item = next(i for i in preview._note_items if type(i).__name__ == "NoteItem")
+        rect = preview.mapFromScene(item.sceneBoundingRect()).boundingRect()
+        f.mark(preview.viewport(), "Eintrag ziehen", "Mit der Maus verschieben; Rechtsklick setzt die Position zurück. "
+                                                     "Gilt für die Multi-Tag-PDF.", rect)
+    f.mark(viewer.mono_button, "Monochrom", "Eingeschaltet wird auch die ausgegebene PDF schwarz-weiß; "
+                                            "Review-Elemente bleiben farbig.")
+    figs.append(f.save(out))
+    viewer.notes_button.setChecked(False)
+    preview.fit()
+    step("multitag", "Doppelte Tags in der PDF kommentieren",
+         "Einträge ansehen, bei Bedarf verschieben und die kommentierte Kopie erzeugen. Das Original bleibt "
+         "unverändert.", figs)
+    page.two_tag_button.setChecked(False)
+    wait(app, 0.5)
+
+    # --- Excel-Vorschau ---
+    f = Figure("preview_bar", w, top_of(page.tags, w, 150), "Leiste der Tag-Tabelle")
+    f.mark(strip.buttons["preview_tags"], "Vorschau", "Zeigt den Excel-Export vorher an.")
+    f.mark(strip.buttons["excel_tags"], "Excel", "Direkt sichern, ohne Vorschau.")
+    figs = [f.save(out)]
+    dlg = shown(PreviewDialog(page.tags.table, "Tags"), app, 1100, 520)
+    f = Figure("preview_dialog", dlg, caption="Vorschau des Excel-Exports")
+    f.mark(dlg.view, "Tabelle wie in der Datei", "Spalten, Reihenfolge, Breiten und Farben der Ansicht.")
+    box = dlg.findChild(QDialogButtonBox)
+    f.mark(box, "Als Excel sichern …", "Speichert die ganze Tabelle (die Vorschau zeigt höchstens 500 Zeilen).")
+    figs.append(f.save(out))
+    dlg.close()
+    step("preview", "Excel-Export vorher ansehen",
+         "Bei allen anderen Tabellen: Rechtsklick auf das Excel-Symbol in der Ecke › „Vorschau ansehen“.", figs)
+
+    # --- Tabellenbedienung ---
+    view = page.tags.table
+    header = view.horizontalHeader()
+    f = Figure("tables", w, united([page.tags], w).adjusted(-4, -4, 4, 4), "Standardfunktionen jeder Tabelle")
+    corner = next((c for c in view.children() if type(c).__name__ == "QToolButton"), None)
+    if corner is not None:
+        f.mark(corner, "Excel-Symbol", "Klick: sichern. Rechtsklick: Vorschau ansehen.")
+    f.mark(header, "Spaltenkopf", "Klick sortiert, Feld darunter filtert, Doppelklick im Feld wählt Werte, "
+                                  "Rechtsklick öffnet das Spaltenmenü.", section_rect(header, tag_col))
+    f.mark(view.viewport(), "Zellen markieren", "Wie in Excel ziehen; Strg+C kopiert, Strg+V fügt in Review-Spalten ein.",
+           QRect(0, 0, 320, 4 * view.rowHeight(0)))
+    f.mark(page.tags.admin, "Ansicht speichern", "Save / Load / Reset Layout.")
+    step("tables", "Mit Tabellen arbeiten", "Diese Bedienung gilt für alle Tabellen des Tools.", [f.save(out)])
+    return steps
+
+
 def main() -> None:
     from PySide6.QtCore import QRect, Qt
     from PySide6.QtWidgets import QApplication, QMenu
@@ -117,7 +305,8 @@ def main() -> None:
     out = HELP / "img"
     out.mkdir(parents=True, exist_ok=True)
     w = mw.MainWindow(app, "help")
-    w.resize(1900, 1060)
+    w.setAttribute(Qt.WA_DontShowOnScreen)
+    w.resize(2300, 1180)
     w.show()
     for g in w.ribbon_fold.groups:                     # alle Gruppen aufklappen
         w.ribbon_fold.set_collapsed(g, False)
@@ -135,6 +324,10 @@ def main() -> None:
         for t in r.tags:
             if t.type in ("Instrument", "Armatur"):
                 rows.append([r.drawing_no, f"203-17-{t.tag}", t.type.upper(), f"Beispiel {t.tag}", "203-3-11B"])
+    # doppelt angelegte Tags wie in Plant 3D („?“ am Ende, auf einer anderen Zeichnung) fuer 2TAG und Multi-Tag-PDF
+    first = [r for r in rows if r[0] == w.results[0].drawing_no and r[2] == "INSTRUMENT"][:4]
+    other = w.results[-1].drawing_no
+    rows += [[other, r[1] + "?", *r[2:]] for r in first]
     table = ImportTable(source="Instrumentation_Gesamtliste_Beispiel.xlsx", sheet="Gesamtliste",
                         headers=["P&ID No.", "Tag", "Instrumententyp", "Service", "Location"], rows=rows,
                         link1="P&ID No.", link2="Tag")
@@ -182,7 +375,7 @@ def main() -> None:
                         ("Web", "Web-Server für Kollegen, Offline-Bericht."),
                         ("Hilfe", "Dieses Handbuch, Info und Sprache.")):
         f.mark(titles[title].title, f"Menüband: {title.replace('  ', ' ')}", text)
-    f.mark(page.header.band, "Kopfband", "Projekt, Quelle, Anzahl PDFs, Tags, Fehler und (Projektmodus) Abweichungen.")
+    f.mark(page.header, "Kopfband", "Projekt, Quelle, Anzahl PDFs, Tags, Fehler und (Projektmodus) Abweichungen.")
     f.mark(page.files, "Tabelle 1 – Dateien", "Eine Zeile je PDF mit Schriftfeld-Werten. Auswahl einer Zeile lädt "
                                               "Tags und PDF.")
     f.mark(page.tags, "Tabelle 2 – Tags der gewählten PDF", "Alle Tags mit Anzahl, Seiten, Review-Spalten und – mit "
@@ -226,7 +419,7 @@ def main() -> None:
     ft = page.files.table
     r = united([page.files], w).adjusted(-4, -4, 4, 4)
     f = Figure("files", w, r, "Tabelle 1 – Dateien nach dem Einlesen")
-    f.mark(page.files.filter, "Blattfilter", "Sucht in allen Spalten der Tabelle.")
+    f.mark(page.files.filter, "Blattfilter", "Sucht in allen Spalten der Dateiliste.")
     strip = page.files.layout().itemAt(1).widget()
     f.mark(strip.buttons["mark_all"], "Alle markieren", "Alle PDFs markieren, z. B. für den Review.")
     f.mark(strip.buttons["review"], "Review markierte …", "Redline und Review-Excel für die markierten PDFs (Schritt 6).")
@@ -235,7 +428,8 @@ def main() -> None:
     f.mark(ft.viewport(), "PDF wählen", "Zeile anklicken: Tag-Tabelle und Viewer zeigen diese PDF. Mehrere mit Strg- "
                                         "oder Umschalt-Klick markieren.",
            QRect(0, 0, ft.viewport().width(), min(ft.viewport().height(), 3 * ft.rowHeight(0) + 2)))
-    f.mark(page.files.admin, "Tabellenansicht", "Ansicht speichern, laden, zurücksetzen; der Regler daneben zoomt.")
+    f.mark(page.files.admin, "Tabellenansicht", "Ansicht speichern, laden, zurücksetzen; der Regler rechts zoomt.")
+    f.mark(page.tag_filter_box, "Filter der Tag-Tabelle", "Sucht in allen Spalten der Tags der gewählten PDF.")
     figs.append(f.save(out))
     steps.append({"id": "read", "title": "PDFs einlesen",
                   "intro": "PDF-Plots einlesen. Danach steht je PDF eine Zeile in Tabelle 1; die erste PDF wird "
@@ -245,6 +439,7 @@ def main() -> None:
     dlg_table = ImportTable(**json.loads(json.dumps(table.__dict__)))
     dlg = TileEditorWindow(dlg_table, w, maximized=False)
     dlg.setWindowModality(Qt.NonModal)
+    dlg.setAttribute(Qt.WA_DontShowOnScreen)
     dlg.resize(1600, 900)
     dlg.open()
     wait(app, 0.8)
@@ -291,10 +486,6 @@ def main() -> None:
     files_headers, tag_headers = page.files.headers, page.tags.headers
     f.mark(fh, "Datenlink-Feld Tabelle 1", "Rechtsklick auf „Zeichnungsnr.“ › „als Datenlink-Feld setzen“ – der Kopf "
                                            "wird dunkelgrün.", section_rect(fh, files_headers.index("Zeichnungsnr.")))
-    hits = files_headers.index("Datenlink-Treffer")
-    fh_pos = section_rect(fh, hits)
-    if fh_pos.left() < fh.viewport().width():
-        f.mark(fh, "Datenlink-Treffer (Dateien)", "Anzahl der Listenzeilen zu dieser Zeichnung.", fh_pos)
     f.mark(th, "Datenlink-Feld Tabelle 2", "Rechtsklick auf „Tag“ › „als Datenlink-Feld setzen“.",
            section_rect(th, tag_headers.index("Tag")))
     f.mark(th, "Spalten aus der Liste", "„Datenlink-Treffer“ (0 = Tag fehlt in der Liste) und alle übergebenen "
@@ -306,6 +497,7 @@ def main() -> None:
     menu = QMenu()
     page.tags.table._shared_header_menu_hook(menu, tag_headers.index("Tag"))
     page.tags.table._shared_header_menu_hook(menu, tag_headers.index("Typ"))
+    menu.setAttribute(Qt.WA_DontShowOnScreen)
     menu.adjustSize()
     menu.show()
     wait(app, 0.2)
@@ -351,7 +543,8 @@ def main() -> None:
             ("duplicates", "Nur doppelte", "Nur Tags, die mehrfach in der PDF stehen."),
             ("filter_reset", "Filter zurücksetzen", "Alle Filter der Tag-Tabelle aufheben."),
             ("next", "Fundstelle", "Zur nächsten Fundstelle springen (◀ zurück)."),
-            ("excel_tags", "Excel", "Tag-Tabelle als Excel sichern (mit Listenspalten).")):
+            ("excel_tags", "Excel", "Tag-Tabelle als Excel sichern (mit Listenspalten)."),
+            ("preview_tags", "Vorschau", "Excel-Export vorher ansehen.")):
         f.mark(b[key], title, text)
     tv = page.tags.table.viewport()
     f.mark(tv, "Tag anklicken", "Markiert den Tag im Viewer und zoomt hin; gelbe Zeilen = doppelte Tags.",
@@ -375,13 +568,16 @@ def main() -> None:
             ("review_xlsx", "Review-Excel gewählte PDF", "Excel mit einer Zeile je Fundstelle und Prüfstatus.")):
         f.mark(rb[key], title, text)
     figs.append(f.save(out))
-    rd = ReviewDialog(1, len(w.results), w)
+    rd = ReviewDialog(1, len(w.results), w, linked=True)
+    rd.setAttribute(Qt.WA_DontShowOnScreen)
+    rd.cb_multitag.setChecked(True)
     rd.folder.setText(r"…\Exporte")
     rd.show()
     wait(app, 0.3)
     f = Figure("review_dialog", rd, caption="Review Auswahl/Bulk …")
     f.mark(rd.rb_marked.parentWidget(), "PDFs", "Markierte oder alle gescannten PDFs.")
     f.mark(rd.cb_redline, "Redline-PDF je PDF", "Farben wie im Viewer.")
+    f.mark(rd.cb_multitag, "Multi-Tag-PDF je PDF", "Roter Eintrag über jedem doppelten Tag (braucht Datenlink 2).")
     f.mark(rd.cb_excel_each, "Review-Excel je PDF", "Pos.-Nr., Kommentar, Prüfstatus, Bemerkung.")
     f.mark(rd.cb_excel_total, "Review-Excel gesamt", "Eine Mappe über alle gewählten PDFs.")
     f.mark(rd.folder, "Zielordner", "Wohin geschrieben wird; optional Unterordner mit Zeitstempel.")
@@ -409,6 +605,11 @@ def main() -> None:
                   "intro": "Gesamtlisten exportieren oder die Ergebnisse über Web-Server bzw. Offline-Bericht "
                            "teilen. Jede Tabelle hat zusätzlich das Excel-Symbol in ihrer Ecke.",
                   "figs": [f.save(out)]})
+
+    steps += topic_steps(app, w, out, group_fig)
+    order = ["overview", "project", "paths", "read", "import", "link", "listcheck", "types", "check", "twotag",
+             "multitag", "review", "preview", "export", "tables"]
+    steps.sort(key=lambda s: order.index(s["id"]))
 
     w.page.store = None
     w.close()

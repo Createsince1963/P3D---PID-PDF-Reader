@@ -425,3 +425,305 @@ def test_main_window_project_save_and_load(app, tmp_path, monkeypatch):
     assert w.load_project_settings(ask=False)
     assert w.links.table is not None and w.links.fields == {"tags": "Tag"}
     w.close()
+
+
+def _two_tag_table() -> ImportTable:
+    """Plant 3D: doppelt angelegte Tags mit „?“ - Kopie auf anderer PID (QI-001) bzw. gleicher PID (PI-002)."""
+    rows = [["PID-A", "201-18-050-QI-001"], ["PID-B", "201-18-050-QI-001?"], ["PID-A", "201-18-050-PI-002"],
+            ["PID-A", "201-18-050-PI-002?"], ["PID-A", "301-30-010-QI-001"], ["PID-A", "100-08-010-CKV?"]]
+    return ImportTable(headers=["P&ID No.", "Tag"], rows=rows, link1="P&ID No.", link2="Tag")
+
+
+def test_two_tag_matching_and_note():
+    from p3d_pdfreader.core.data_link import MULTI_NOTE, review_rows
+    fields = {"files": "Zeichnungsnr.", "tags": "Tag"}
+    off = DataLink(_two_tag_table(), fields)
+    assert off.tag_rows("QI-001", "PID-B") == [] and off.multi_note("QI-001", "PID-A") == ""
+    on = DataLink(_two_tag_table(), fields, two_tag=True)
+    assert on.tag_rows("QI-001", "PID-B") == [1]
+    assert on.multi_note("QI-001", "PID-B") == f"{MULTI_NOTE} (auch in PID-A)"
+    # Original auf PID-A wird ebenfalls gemeldet; das andere Gebiet 301-... mit gleicher Endung zaehlt nicht mit
+    assert on.multi_note("201-18-050-QI-001", "PID-A") == f"{MULTI_NOTE} (auch in PID-B)"
+    assert on.multi_note("301-30-010-QI-001", "PID-A") == ""
+    assert on.tag_rows("PI-002", "PID-A") == [2, 3] and on.multi_note("PI-002", "PID-A") == MULTI_NOTE
+    assert on.tag_rows("CKV", "PID-A") == []                       # „?“ = fehlende Nummer, kein Doppel-Kennzeichen
+    head, rows = review_rows(on, [("b.pdf", "PID-B", [("Instrument", "QI-001", 1, "1", "QI-001")])])
+    assert head[-1] == "2TAG-Hinweis" and all(len(r) == len(head) for r in rows)
+    assert rows[0][0] == "OK" and rows[0][-1].startswith(MULTI_NOTE)
+
+
+def test_two_tag_button_marks_tag_cell(app, tmp_path, monkeypatch):
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path))
+    from p3d_pdfreader import paths
+    from p3d_pdfreader.core.data_link import MULTI_NOTE
+    from p3d_pdfreader.core.extract import PdfResult, Tag
+    from p3d_pdfreader.gui import main_window
+    _two_tag_table().save(paths.config_dir())
+    w = main_window.MainWindow(app, "test")
+    b = PdfResult(path=tmp_path / "b.pdf", drawing_no="PID-B", tags=[Tag(tag="QI-001", type="Instrument")])
+    w.results = [b]
+    w._refresh()
+    page = w.page
+    page.files.table.setCurrentIndex(page.files.proxy.index(0, 0))
+    assert not page.two_tag_button.isEnabled()
+    w.links.set_field("files", "Zeichnungsnr.")
+    w.links.set_field("tags", "Tag")
+    hits = page.tags.headers.index("Datenlink-Treffer")
+    model = page.tags.proxy.sourceModel()
+    assert page.two_tag_button.isEnabled() and not page.two_tag_button.isChecked()
+    assert page.tags.rows()[0][hits] == 0 and model.data(model.index(0, 1), Qt.ToolTipRole) != MULTI_NOTE
+    page.two_tag_button.setChecked(True)
+    model = page.tags.proxy.sourceModel()
+    assert page.tags.rows()[0][hits] == 1
+    assert model.data(model.index(0, 1), Qt.ToolTipRole).startswith(MULTI_NOTE)
+    assert model.data(model.index(0, 1), Qt.BackgroundRole) is not None
+    page.two_tag_button.setChecked(False)
+    assert page.tags.rows()[0][hits] == 0
+    w.close()
+
+
+def test_multitag_pdf(app, tmp_path, monkeypatch):
+    """Kopie mit rotem Eintrag je Fundstelle: „?“-Tag und mehrfaches Tag, uebrige frei, Original unveraendert."""
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path))
+    import pymupdf
+    from p3d_pdfreader.core import multitag
+    from p3d_pdfreader.core.extract import PdfResult, Tag
+    src = tmp_path / "b.pdf"
+    with pymupdf.open() as doc:
+        doc.new_page(width=600, height=400)
+        doc.save(src)
+    before = src.read_bytes()
+
+    def tag(name, *rects):
+        return Tag(tag=name, type="Instrument", count=len(rects), rect=rects[0], hits=[(0, r) for r in rects])
+
+    result = PdfResult(path=src, drawing_no="PID-B", tags=[
+        tag("QI-001", (100, 100, 140, 110)), tag("XV-1", (200, 100, 230, 110), (200, 200, 230, 210)),
+        tag("TI-9", (300, 300, 330, 310))])
+    link = DataLink(_two_tag_table(), {"files": "Zeichnungsnr.", "tags": "Tag"}, two_tag=True)
+    assert link.entries("QI-001", "PID-B") == ([("201-18-050-QI-001", "PID-A"), ("201-18-050-QI-001?", "PID-B")], True)
+    out = tmp_path / "out.pdf"
+    assert multitag.write_multitag_pdf(result, out, link, "PID-B", layer=True) == 3
+    with pymupdf.open(out) as doc:
+        texts = [a.info["content"] for a in doc[0].annots() if a.type[1] == "FreeText"]
+    assert len(texts) == 3
+    assert "201-18-050-QI-001   PID-A\n201-18-050-QI-001?   PID-B" in [t.replace("\r", "\n") for t in texts]
+    assert any("XV-1: 2× in dieser PDF" in t for t in texts) and src.read_bytes() == before
+    result.tags = [result.tags[2]]
+    assert multitag.write_multitag_pdf(result, tmp_path / "none.pdf", link, "PID-B") is None
+    assert not (tmp_path / "none.pdf").exists()
+
+
+def test_run_multitag_from_window(app, tmp_path, monkeypatch):
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path))
+    import pymupdf
+    from p3d_pdfreader import paths
+    from p3d_pdfreader.core.extract import PdfResult, Tag
+    from p3d_pdfreader.gui import main_window
+    _two_tag_table().save(paths.config_dir())
+    src = tmp_path / "b.pdf"
+    with pymupdf.open() as doc:
+        doc.new_page()
+        doc.save(src)
+    w = main_window.MainWindow(app, "test")
+    result = PdfResult(path=src, drawing_no="PID-B",
+                       tags=[Tag(tag="QI-001", type="Instrument", rect=(100, 100, 140, 110))])
+    w.results = [result]
+    w._refresh()
+    w.links.set_field("files", "Zeichnungsnr.")
+    w.links.set_field("tags", "Tag")
+    assert not w.links.two_tag                                     # wirkt auch ohne den Knopf 2TAG
+    assert w.run_multitag([(result, tmp_path / "x" / "b_MultiTag.pdf")]) == (1, 1, [])
+    assert (tmp_path / "x" / "b_MultiTag.pdf").exists()
+    w.close()
+
+
+def test_note_positions_and_review_table(app, tmp_path, monkeypatch):
+    """Verschobene Eintraege (Viewer -> PDF mit Linie) und angehaengte Reviewtabelle."""
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path))
+    import pymupdf
+    from p3d_pdfreader import paths
+    from p3d_pdfreader.core.extract import PdfResult, Tag
+    from p3d_pdfreader.gui import main_window
+    _two_tag_table().save(paths.config_dir())
+    src = tmp_path / "b.pdf"
+    with pymupdf.open() as doc:
+        doc.new_page()
+        doc.save(src)
+    w = main_window.MainWindow(app, "test")
+    result = PdfResult(path=src, drawing_no="PID-B",
+                       tags=[Tag(tag="QI-001", type="Instrument", rect=(100, 100, 140, 110))])
+    w.results = [result]
+    w._refresh()
+    w.links.set_field("files", "Zeichnungsnr.")
+    w.links.set_field("tags", "Tag")
+    page = w.page
+    page.files.table.setCurrentIndex(page.files.proxy.index(0, 0))
+    page.viewer.notes_button.setChecked(True)
+    note = page.preview._notes[0]
+    assert not note.moved and note.rect[3] < 100
+    page.note_moved(note.key, 300.0, 400.0)
+    page.refresh_notes()
+    moved = page.preview._notes[0]
+    assert moved.moved and moved.rect[:2] == (300.0, 400.0) and page.preview._note_items
+    page.review_table_button.setChecked(True)
+    out = tmp_path / "m.pdf"
+    assert w.run_multitag([(result, out)]) == (1, 1, [])
+    with pymupdf.open(out) as doc:
+        kinds = sorted(a.type[1] for a in doc[0].annots())
+        assert kinds == ["FreeText", "Line", "Square"] and doc.page_count == 2
+        text = doc[1].get_text()
+        assert "Reviewpunkte" in text and "QI-001" in text and "201-18-050-QI-001?" in text
+    page.note_reset("")
+    page.refresh_notes()
+    assert not page.preview._notes[0].moved
+    page.viewer.notes_button.setChecked(False)
+    assert not page.preview._note_items
+    w.close()
+
+
+def test_monochrome_stream():
+    from p3d_pdfreader.core.mono import recolor_stream
+    data = b"1 0 0 RG 0 1 1 rg 1 1 1 rg 0 0 0 0 k (1 0 0 rg) Tj /CS0 cs 1 0 0 scn 0.4 scn BI /W 1 ID 1 0 0 rg EI Q"
+    out = recolor_stream(data)
+    assert out.startswith(b"0 0 0 RG 0 0 0 rg 1 1 1 rg 0 0 0 0 k (1 0 0 rg) Tj")
+    assert b"/CS0 cs 0 0 0 scn 0.4 scn" in out and out.endswith(b"ID 1 0 0 rg EI Q")
+
+
+def test_bulk_multitag_view_table_monochrome(app, tmp_path, monkeypatch):
+    """Review-Bulk mit Multi-Tag-PDF; Reviewtabelle mit den Spalten der Tag-Tabelle; Zeichnung monochrom,
+    Kommentare farbig."""
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path))
+    import pymupdf
+    from PySide6.QtWidgets import QMessageBox
+    from p3d_pdfreader import paths
+    from p3d_pdfreader.core.extract import PdfResult, Tag
+    from p3d_pdfreader.gui import main_window
+    from p3d_pdfreader.gui.review_dialog import ReviewOptions
+    _two_tag_table().save(paths.config_dir())
+    src = tmp_path / "b.pdf"
+    with pymupdf.open() as doc:
+        doc.new_page().draw_rect(pymupdf.Rect(300, 300, 400, 400), color=(0, 0, 1), fill=(0, 1, 1))
+        doc.save(src)
+    w = main_window.MainWindow(app, "test")
+    result = PdfResult(path=src, drawing_no="PID-B",
+                       tags=[Tag(tag="QI-001", type="Instrument", rect=(100, 100, 140, 110))])
+    w.results = [result]
+    w._refresh()
+    w.links.set_field("files", "Zeichnungsnr.")
+    w.links.set_field("tags", "Tag")
+    page = w.page
+    page.files.table.setCurrentIndex(page.files.proxy.index(0, 0))
+    page.review_table_button.setChecked(True)
+    page.viewer.mono_button.setChecked(True)
+    page.tags.table.setColumnHidden(main_window.TAG_COLS.index("Anzahl"), True)
+    view = w.table_option(result)
+    assert "Anzahl" not in view.headers and "Tag" in view.headers and "Datenlink-Treffer" in view.headers
+    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.No)
+    folder = w.run_review([result], ReviewOptions(redline=True, multitag=True, excel_total=False, subfolder=False,
+                                                  folder=str(tmp_path / "out")))
+    names = sorted(p.name.split("_")[1] for p in folder.glob("*.pdf"))
+    assert names == ["MultiTag", "Redline"]
+    with pymupdf.open(next(folder.glob("*_MultiTag_*.pdf"))) as doc:
+        pix = doc[0].get_pixmap(annots=False)
+        assert pix.pixel(350, 350) == (0, 0, 0)                       # Cyan -> schwarz
+        red = next(a for a in doc[0].annots() if a.type[1] == "Square").colors["stroke"]
+        assert red[0] > red[1]                                       # Kommentar bleibt rot
+        text = doc[1].get_text()
+        assert "Datenlink-Treffer" in text and "Anzahl" not in text and "201-18-050-QI-001?" in text
+    page.viewer.mono_button.setChecked(False)
+    page.review_table_button.setChecked(False)
+    w.close()
+
+
+def test_compact_header_and_filter_rows(app, tmp_path, monkeypatch):
+    """1.0.56: ohne Reiterzeile, Blattkopf einzeilig, Filter verschoben."""
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path))
+    from PySide6.QtWidgets import QWidget
+    from p3d_pdfreader.gui import main_window
+    w = main_window.MainWindow(app, "test")
+    w.resize(1800, 950)
+    w.show()
+    page = w.page
+    assert w.ribbon.findChild(QWidget, "RibbonTabBar").isHidden()
+    assert page.header.band.isHidden() and "PID-Tags" in page.header.text_box.itemAt(0).widget().text()
+    strip = page.files.layout().itemAt(1).widget()
+    assert page.files.filter.parentWidget() is strip
+    app.processEvents()
+    page.align_files_filter()
+    assert page.files.filter.maximumWidth() >= 160
+    assert page.tags.filter.parentWidget() is page.tag_filter_box
+    page.fold_button.setChecked(True)
+    assert page.tag_filter_box.isVisible() and not page.files.table.isVisible()
+    page.fold_button.setChecked(False)
+    w.close()
+
+
+def test_hyphen_between_code_and_number():
+    """1.0.57: Liste ``FV501`` passt zum PDF-Tag ``FV-501`` (auch mit „?“ und Volltag), Zeichnung bleibt streng."""
+    rows = [["PID-A", "203-17-112-FV501"], ["PID-A", "203-17-145-LV110?"], ["PID-A", "203-17-112-BD-102"]]
+    table = ImportTable(headers=["P&ID No.", "Tag"], rows=rows, link1="P&ID No.", link2="Tag")
+    link = DataLink(table, {"files": "Zeichnungsnr.", "tags": "Tag"})
+    assert link.tag_rows("FV-501", "PID-A") == [0] and link.tag_rows("203-17-112-FV-501", "PID-A") == [0]
+    assert link.tag_rows("BD-102", "PID-A") == [2] and link.tag_rows("BD102", "PID-A") == [2]
+    assert link.tag_rows("BDI-102", "PID-A") == [] and link.tag_rows("LV-110", "PID-A") == []
+    two = DataLink(table, {"files": "Zeichnungsnr.", "tags": "Tag"}, two_tag=True)
+    assert two.tag_rows("LV-110", "PID-A") == [1] and two.multi_note("LV-110", "PID-A")
+    assert not two.multi_note("FV-501", "PID-A")
+
+
+def test_excel_preview_dialog(app):
+    from PySide6.QtGui import QStandardItem, QStandardItemModel
+    from PySide6.QtWidgets import QTableView
+    from p3d_pdfreader.gui.table_export import PreviewDialog
+    model = QStandardItemModel(2, 2)
+    model.setHorizontalHeaderLabels(["Tag", "Anzahl"])
+    for r in range(2):
+        model.setItem(r, 0, QStandardItem(f"XV-{r}"))
+    view = QTableView()
+    view.setModel(model)
+    view.setColumnHidden(1, True)
+    dlg = PreviewDialog(view, "Tags")
+    assert dlg.view.columnCount() == 1 and dlg.view.rowCount() == 2 and dlg.view.item(1, 0).text() == "XV-1"
+
+
+def test_check_types_prefilter(app, tmp_path, monkeypatch):
+    """1.0.58: abgewaehlte Typen fehlen in Tabellen und Review; ihre Importzeilen gelten nicht als fehlend."""
+    monkeypatch.setenv("P3D_PDFREADER_HOME", str(tmp_path))
+    from p3d_pdfreader import paths
+    from p3d_pdfreader.core import data_link, type_filter
+    from p3d_pdfreader.core.extract import PdfResult, Tag
+    from p3d_pdfreader.gui import last_paths, main_window
+    from p3d_pdfreader.gui.type_dialog import TypeDialog
+    _two_tag_table().save(paths.config_dir())
+    w = main_window.MainWindow(app, "test")
+    a = PdfResult(path=tmp_path / "a.pdf", drawing_no="PID-A",
+                  tags=[Tag(tag="201-18-050-QI-001", type="Instrument"), Tag(tag="P-100", type="Equipment")])
+    w.results = [a]
+    w._refresh()
+    w.links.set_field("files", "Zeichnungsnr.")
+    w.links.set_field("tags", "Tag")
+    page = w.page
+    page.files.table.setCurrentIndex(page.files.proxy.index(0, 0))
+    assert len(page.tags.rows()) == 2
+    dlg = TypeDialog(w.results, [], w)
+    dlg.only("Equipment")
+    assert "Instrument" in dlg.excluded() and "Equipment" not in dlg.excluded()
+    w.set_check_types(dlg.excluded())
+    try:
+        assert [r[1] for r in page.tags.rows()] == ["P-100"]
+        assert [r[3] for r in w.all_page.tags.rows()] == ["P-100"]
+        assert "Equipment" in page.header.text_box.itemAt(0).widget().text()
+        assert last_paths.get_value("check_types_excluded")
+        skip = w.dropped_link_rows(a)
+        _h, rows = data_link.review_rows(w.links.link, w._review_input(), skip)
+        assert skip == {0} and not any("QI-001" == str(r[4])[-6:] for r in rows)
+        w.links.set_join_mode("both")
+        page._only_duplicates()
+        assert not any(str(r).count("201-18-050-QI-001'") for r in page.tags.rows())
+        w.links.set_join_mode("pdf")
+        w.set_check_types([])
+        assert len(page.tags.rows()) == 2
+    finally:
+        type_filter.activate([])
+    w.close()

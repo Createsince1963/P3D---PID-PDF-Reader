@@ -27,6 +27,7 @@ FIELDS_KEY = "data_link_fields"                # config/state.json: {"files": Sp
 IMPORT_DIR = "last_data_link_dir"              # config/state.json: zuletzt gewaehlter Ordner der Importliste
 JOIN_KEY = "data_link_join"                    # config/state.json: Abgleich der Tag-Tabelle (pdf / list / both)
 SHOWN_KEY = "data_link_tags_shown"             # config/state.json: Importspalten in der Tag-Tabelle ein/aus (1.0.43)
+TWO_TAG_KEY = "data_link_two_tag"              # config/state.json: 2TAG – „?“ am Listen-Tag zaehlt nicht (1.0.55)
 HITS = "Datenlink-Treffer"
 TABLE_NAMES = {1: "Tabelle 1 – Dateien", 2: "Tabelle 2 – Tags"}
 PREFERRED_SHEET = "Gesamtliste"                # Gesamtliste aus P3D InstrumentationList
@@ -200,7 +201,17 @@ class LinkController:
         self._build()
 
     def _build(self) -> None:
-        self.link = DataLink(self.table, self.fields) if self.table is not None else None
+        self.link = DataLink(self.table, self.fields, self.two_tag) if self.table is not None else None
+
+    # --- 2TAG (1.0.55) ---------------------------------------------------------------------------------------------
+    @property
+    def two_tag(self) -> bool:
+        return bool(last_paths.get_value(TWO_TAG_KEY, False))
+
+    def set_two_tag(self, on: bool) -> None:
+        last_paths.set_value(TWO_TAG_KEY, bool(on))
+        self._build()
+        self.on_change()
 
     # --- Spalten ---------------------------------------------------------------------------------------------------
     def active(self, n: int) -> bool:
@@ -258,11 +269,11 @@ class LinkController:
     def set_join_mode(self, mode: str) -> None:
         last_paths.set_value(JOIN_KEY, mode if mode in JOIN_MODES else JOIN_PDF)
 
-    def tag_join(self, values: list, file_value=None) -> list[tuple[int | None, list[int]]]:
+    def tag_join(self, values: list, file_value=None, skip: set = frozenset()) -> list[tuple[int | None, list[int]]]:
         """Zeilen der Tag-Tabelle nach gewaehltem Abgleich (``DataLink.tag_join``)."""
         if not self.active(2):
             return [(i, []) for i in range(len(values))]
-        return self.link.tag_join(values, file_value if self.active(1) else None, self.join_mode)
+        return self.link.tag_join(values, file_value if self.active(1) else None, self.join_mode, skip)
 
     def join_values(self, rows: list[int]) -> list:
         """Treffer + Listenspalten einer Zeile; ohne Importzeile „n.a.“."""

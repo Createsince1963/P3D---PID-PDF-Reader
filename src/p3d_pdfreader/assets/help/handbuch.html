@@ -85,6 +85,8 @@ details > div{padding:0 12px 8px}
 .wf .ah{fill:var(--subtle)}
 .wf .lb{fill:var(--subtle);font-size:10px}
 /* Workflow Schritt fuer Schritt: Bildschirmfotos mit Nummern (Daten aus workflow.js) */
+.wfref .wfbox{border:1px solid var(--border);border-radius:3px;padding:4px 10px;margin:10px 0;background:var(--card)}
+.wfref h4{margin:6px 0;color:var(--head);font-size:14px}
 .wfnav{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
 .wfnav a{display:flex;align-items:center;gap:6px;padding:4px 10px 4px 4px;border:1px solid var(--border);border-radius:14px;background:var(--card);color:var(--txt);text-decoration:none;font-size:12.5px}
 .wfnav a:hover{border-color:var(--accent)}
@@ -95,7 +97,7 @@ details > div{padding:0 12px 8px}
 .wffig .cap{font-size:12px;color:var(--subtle);margin:2px 0 4px}
 .shotbox{overflow:auto;border:1px solid var(--border);border-radius:3px;background:var(--band);max-height:78vh}
 .shotwrap{position:relative;width:100%;line-height:0}
-.shotwrap.big{width:var(--bigw)}
+.shotwrap.big{width:var(--bigw);max-width:none!important}
 .shotwrap img{width:100%;height:auto;display:block;cursor:zoom-in}
 .shotwrap.big img{cursor:zoom-out}
 .pin{position:absolute;transform:translate(-45%,-45%);min-width:22px;height:22px;padding:0 5px;border-radius:11px;background:var(--accent);color:#fff;font:600 12px/22px "Segoe UI",Arial,sans-serif;text-align:center;cursor:pointer;box-shadow:0 0 0 2px #fff,0 1px 4px rgba(27,43,74,.35);z-index:2;user-select:none}
@@ -114,7 +116,7 @@ ol.pins li b{display:block}
 </head>
 <body>
 <header>
-  <h1>P3D PDF Reader – Handbuch</h1><span class="ver">Stand Version 1.0.43</span>
+  <h1>P3D PDF Reader – Handbuch</h1><span class="ver">Stand Version 1.0.59</span>
   <input id="q" type="search" placeholder="Im Handbuch suchen … (z. B. Redline, F3, Filter)" aria-label="Suchen">
 </header>
 <div class="wrap">
@@ -133,6 +135,7 @@ ol.pins li b{display:block}
   <div class="step" data-go="redline"><b>4 · Review / Redline</b><img src="img/redline.png" alt="">Redline-PDF und Review-Excel für die gewählte PDF oder im Bulk.</div>
   <div class="step" data-go="xlsx"><b>5 · Export</b><img src="img/xlsx.png" alt="">Alle Dateien und Tags als Excel oder CSV.</div>
 </div>
+<div class="wfref" data-wf="overview"></div>
 </section>
 
 <section id="workflow" data-title="Workflow Schritt für Schritt">
@@ -193,8 +196,9 @@ ol.pins li b{display:block}
 <div class="detail" id="det"><div class="note">Knopf im Menüband anklicken …</div></div>
 <h3>Leisten über den Bereichen</h3>
 <ul>
-  <li><b>Dateien:</b> Alle markieren, Review markierte …, Excel, rechts <b>Einklappen / Aufklappen</b> (Dateiliste ein-/ausklappen; die Tag-Tabelle bekommt den Platz, wird gemerkt)</li>
-  <li><b>Tags:</b> Aus PDF-Scan übernehmen (Schriftfeld-Spalten Ersteller, Checked, Rev, Rev-Datum, Rev-Text hinten anfügen), Autofill OK (OK-Werte: Review, User, Datum ohne Uhrzeit, WPO = Checked; bleibt blau bis gespeichert), Bearbeiten, Speichern, Nur doppelte, Nur Abweichungen, Filter zurücksetzen, <b>Importspalten</b> (Spalten der Importliste ein/aus), <b>Importliste</b> (Link aufheben, neu einlesen, bearbeiten, entfernen), <b>Abgleich</b> (Richtung des Abgleichs mit der Importliste, siehe Kapitel „Datenlink“), ◀ ▶ Fundstelle, Excel, Redline</li>
+  <li><b>Dateien:</b> Alle markieren, Review markierte …, Excel, <b>Filterfeld</b> der Dateiliste, rechts <b>Einklappen / Aufklappen</b> (Dateiliste ein-/ausklappen; die Tag-Tabelle bekommt den Platz, wird gemerkt)</li>
+  <li><b>Tags:</b> Aus PDF-Scan übernehmen (Schriftfeld-Spalten Ersteller, Checked, Rev, Rev-Datum, Rev-Text hinten anfügen), Autofill OK (OK-Werte: Review, User, Datum ohne Uhrzeit, WPO = Checked; bleibt blau bis gespeichert), Bearbeiten, Speichern, Nur doppelte, Nur Abweichungen, Filter zurücksetzen, <b>Importspalten</b> (Spalten der Importliste ein/aus), <b>Importliste</b> (Link aufheben, neu einlesen, bearbeiten, entfernen), <b>Abgleich</b> (Richtung des Abgleichs mit der Importliste, siehe Kapitel „Datenlink“), ◀ ▶ Fundstelle, Excel, <b>Vorschau</b>, Redline</li>
+  <li><b>Multi Tag</b> (zweite Zeile): 2TAG, Multi-Tag-PDF, Reviewtabelle; über dem Viewer: Kommentare bearbeiten</li>
   <li><b>PDF-Viewer:</b> Einpassen, Zoom ±, Drehen, Seite ◀ ▶, ◀ ▶ Fundstelle, Redline, Öffnen (Standardprogramm), 2. Monitor</li>
 </ul>
 </section>
@@ -206,6 +210,7 @@ ol.pins li b{display:block}
   <li><b>Tags der gewählten PDF</b> – Typ, Tag, Anzahl, Seiten und Review-Spalten (im Projektmodus Projekt-Prüfung und -Hinweis, mit Datenlink 2 die Spalten der Importliste). Zeilen mit Anzahl &gt; 1 (doppelte Tags) sind <mark>gelb</mark> hinterlegt.</li>
   <li><b>PDF-Viewer</b> – Fundstellen doppelter Tags sind gelb hinterlegt.</li>
 </ol>
+<p>Der Blattkopf (Titel, Projekt, Quelle, Anzahl PDFs, Tags, Fehler, Prüftypen) steht in einer Zeile. Filter und Zeilenzahl der Tag-Tabelle stehen unter der Dateiliste hinter „Reset Layout“.</p>
 <h3>Andere PDF wählen</h3>
 <ul>
   <li>Gibt es ungespeicherte Review-Einträge, fragt das Tool: <b>Speichern</b>, <b>Verwerfen</b> (gespeicherten Stand wieder laden) oder <b>Abbrechen</b> (bei der bisherigen PDF bleiben).</li>
@@ -220,6 +225,9 @@ ol.pins li b{display:block}
 <h3>Viewer</h3>
 <p>Mausrad zoomt, Ziehen verschiebt, Doppelklick zeigt die ganze Seite. Plots mit Seitendrehung erscheinen automatisch richtig herum, „Drehen“ dreht zusätzlich in 90°-Schritten. <b>2. Monitor</b> setzt den Viewer in ein eigenes Fenster; „Viewer zurückholen“ holt ihn zurück.</p>
 <p>Das Blatt <b>„Alle Tags“</b> zeigt die Tags aller eingelesenen PDFs in einer Tabelle.</p>
+<h3>So gehst du vor</h3>
+<div class="wfref" data-wf="read"></div>
+<div class="wfref" data-wf="check"></div>
 </section>
 
 <section id="tables" data-title="Tabellen &amp; Rechtsklick">
@@ -246,10 +254,12 @@ ol.pins li b{display:block}
   <tbody>
     <tr><td>Zelle</td><td>Kopieren (<kbd>Strg</kbd>+<kbd>C</kbd>), Zeile kopieren, Zeile mit Überschriften kopieren, Nur „Wert“ in „Spalte“ zeigen, Filter der Spalte zurücksetzen, Alle Filter zurücksetzen, Spalten …, Nach Excel …</td></tr>
     <tr><td>Spaltenkopf</td><td>Spalte ausblenden, alle Spalten zeigen, Spalte an den Anfang/ans Ende, mehrere markierte Spalten verschieben (<kbd>Strg</kbd>+Klick), Ausrichtung, Ansicht zurücksetzen, Teilreiter aus dieser Spalte erstellen / entfernen, <b>als Datenlink-Feld setzen / entfernen</b> (Kopf dunkelgrün)</td></tr>
-    <tr><td><img src="img/excel.png" alt="" style="width:16px;vertical-align:middle"> Excel-Symbol (Tabellenecke)</td><td>Klick: Tabelle wie angezeigt als Excel sichern (sichtbare und hinzugefügte Spalten, ohne ausgeblendete; Filter, Sortierung, Farben, Spaltenbreiten) oder als CSV · Rechtsklick: <b>Spalten …</b> (Reihenfolge, Ein-/Ausblenden, „Standard“ = wie eingelesen)</td></tr>
+    <tr><td><img src="img/excel.png" alt="" style="width:16px;vertical-align:middle"> Excel-Symbol (Tabellenecke)</td><td>Rechtsklick: Vorschau ansehen oder sichern · Klick: Tabelle wie angezeigt als Excel sichern (sichtbare und hinzugefügte Spalten, ohne ausgeblendete; Filter, Sortierung, Farben, Spaltenbreiten) oder als CSV · Rechtsklick: <b>Spalten …</b> (Reihenfolge, Ein-/Ausblenden, „Standard“ = wie eingelesen)</td></tr>
     <tr><td>Teilreiter-Leiste</td><td>Teilreiter aus (zurück zur Gesamttabelle)</td></tr>
   </tbody>
 </table>
+<div class="wfref" data-wf="tables"></div>
+<div class="wfref" data-wf="preview"></div>
 </section>
 
 <section id="datalink" data-title="Datenlink (Excel-Liste)">
@@ -268,9 +278,9 @@ ol.pins li b{display:block}
   <li>Im Tool je Tabelle das <b>Datenlink-Feld</b> setzen: Rechtsklick auf den Spaltenkopf (z. B. „Zeichnungsnr.“ bzw. „Tag“) › <i>als Datenlink-Feld setzen</i>. Der Kopf wird <b>dunkelgrün</b>. Entfernen ebenso per Rechtsklick.</li>
 </ol>
 <ul>
-  <li><b>Dateien</b> bekommt die Spalte „Datenlink-Treffer“ (Zeilen der Liste zu dieser Zeichnung).</li>
+  <li>Die <b>Dateiliste</b> zeigt keine Listenspalten; ihr Datenlink-Feld bestimmt, welche Listenzeilen zu einer Zeichnung gehören.</li>
   <li><b>Tags</b> bekommt „Datenlink-Treffer“ und alle übergebenen Spalten der Liste (gleichnamige mit „ (Liste)“). 0 Treffer = Tag fehlt in der Liste; die Listenspalten stehen dann auf <b>„n.a.“</b>.</li>
-  <li><b>Abgleich:</b> ohne Groß-/Kleinschreibung und Leerzeichen; ohne exakten Treffer zählt die Endung ab einem Bindestrich – „301-30-149-<b>TI-300</b>“ passt zum Tag „TI-300“. Beim Zeichnungsabgleich zählen „.pdf“ und ein Kopie-Zusatz wie „ (2)“ nicht – das Datenlink-Feld darf also auch „PDF“ (Dateiname) sein. Sind beide Datenlinks aktiv, zählen für einen Tag nur Listenzeilen <b>derselben Zeichnung</b>: erst muss die Zeichnung passen, dann der Tag. Mehrere Treffer: verschiedene Werte mit „ | “ verbunden.</li>
+  <li><b>Abgleich:</b> ohne Groß-/Kleinschreibung und Leerzeichen; beim Tag zählt auch der Bindestrich zwischen Kürzel und Nummer nicht („FV-501“ = „FV501“); ohne exakten Treffer zählt die Endung ab einem Bindestrich – „301-30-149-<b>TI-300</b>“ passt zum Tag „TI-300“. Beim Zeichnungsabgleich zählen „.pdf“ und ein Kopie-Zusatz wie „ (2)“ nicht – das Datenlink-Feld darf also auch „PDF“ (Dateiname) sein. Sind beide Datenlinks aktiv, zählen für einen Tag nur Listenzeilen <b>derselben Zeichnung</b>: erst muss die Zeichnung passen, dann der Tag. Mehrere Treffer: verschiedene Werte mit „ | “ verbunden.</li>
   <li><b>Findet ein Tag keinen Treffer, obwohl er in der Liste steht?</b> Zuerst in der Dateiliste „Datenlink-Treffer“ der PDF prüfen: steht dort 0, passt die Zeichnung nicht zur Spalte der Liste (Datenlink-Feld bzw. Datenlink 1 prüfen).</li>
 </ul>
 <h3>Abgleich-Richtung der Tag-Tabelle</h3>
@@ -288,6 +298,61 @@ ol.pins li b{display:block}
 </ul>
 <h3>Review Importliste</h3>
 <p>„3 Prüfen › Review Importliste“ öffnet ein eigenes Blatt mit einem <b>Prüfergebnis</b> je Zeile über alle PDFs: <b>OK</b> (Tag im PDF und in der Liste), <b>Nicht in Liste</b>, <b>Fehlt im PDF</b> (Zeile der Liste zu einer gescannten Zeichnung) und <b>Zeichnung nicht gescannt</b>. Rechts die exportierten Spalten der Liste, „Importzeilen“ nennt die Zeilennummern. Zählung je Ergebnis im Blattkopf, Excel über das Symbol in der Tabellenecke.</p>
+<h3>So gehst du vor</h3>
+<div class="wfref" data-wf="import"></div>
+<div class="wfref" data-wf="link"></div>
+<div class="wfref" data-wf="listcheck"></div>
+</section>
+
+<section id="types" data-title="Prüftypen (Vorfilter)">
+<h2>Prüftypen (Vorfilter)</h2>
+<p>Lege fest, <b>welche Tag-Typen geprüft werden</b> – zum Beispiel nur Equipment oder nur Instrument.</p>
+<ol>
+  <li>PDFs einlesen.</li>
+  <li>Menüband <b>3 Prüfen › Prüftypen</b> öffnen.</li>
+  <li>Haken setzen, oder <b>Doppelklick auf eine Zeile</b> = nur dieser Typ. „Alle“ / „Keine“ setzen alle Haken.</li>
+  <li><b>OK</b>: Die Kopfzeile nennt die geprüften Typen („PRÜFTYPEN …“), der Knopf zeigt „gefiltert“.</li>
+  <li>Zum Aufheben: Prüftypen › <b>Alle</b> › OK.</li>
+</ol>
+<ul>
+  <li>Gilt für Tag-Tabelle, Alle Tags, Review Importliste, Viewer-Rahmen, Redline, Multi-Tag-PDF, Review-Excel, Bulk, Export und Offline-Bericht. Wird gemerkt.</li>
+  <li>Listenzeilen abgewählter Typen gelten nicht als „fehlt im PDF“.</li>
+  <li><b>Pos.-Nr.</b> werden über die gefilterten Tags vergeben: Redline und Review-Excel nur bei gleichem Filter vergleichen.</li>
+  <li>Die Dateiliste zeigt unter „Anzahl Tags“ weiter alle gefundenen Tags; die Web-Version prüft immer alle Typen.</li>
+</ul>
+<div class="wfref" data-wf="types"></div>
+</section>
+
+<section id="twotag" data-title="Doppelte Tags: 2TAG">
+<h2>Doppelt angelegte Tags: 2TAG</h2>
+<p>Plant 3D hängt bei doppelt angelegten Tags in der Datenbank ein <b>„?“</b> an. In der PDF steht <code>PI-100</code>, in der Liste <code>PI-100?</code> – ohne 2TAG fehlt dann die Verknüpfung.</p>
+<ol>
+  <li>Liste importieren und die Datenlink-Felder setzen (Kapitel „Datenlink“).</li>
+  <li>Leiste „Multi Tag“ über der Tag-Tabelle: <b>2TAG</b> einschalten (wird gemerkt).</li>
+  <li>Betroffene <b>Tag-Zellen sind hellgelb</b>. Tooltip: „Multi Tag Eintrag in Projekt“ und die andere PID.</li>
+  <li>Im Projektmodus steht der Hinweis in „Projekt-Hinweis“, die Zeilen zählen unter „Nur Abweichungen“.</li>
+  <li>In Plant 3D prüfen, ob das Tag wirklich doppelt sein soll (oft durch Kopieren und Einfügen entstanden).</li>
+</ol>
+<ul><li>Nur Tags mit Nummer: <code>…-CKV?</code> oder <code>…-PT-?</code> (Nummer fehlt) bleiben unverändert.</li></ul>
+<div class="wfref" data-wf="twotag"></div>
+</section>
+
+<section id="multitag" data-title="Multi-Tag-PDF &amp; Kommentare">
+<h2>Multi-Tag-PDF und Kommentare verschieben</h2>
+<p>Eine <b>Kopie der PDF mit rotem Eintrag an jedem doppelten Tag</b>: komplettes Tag und PID-Nummer aus der Liste, auch von anderen PIDs.</p>
+<ol>
+  <li>Liste importieren, Datenlink-Felder setzen, PDF wählen.</li>
+  <li>Optional im Viewer <b>Kommentare bearbeiten</b>: Einträge mit der Maus verschieben (Rechtsklick: Position zurücksetzen).</li>
+  <li>Optional <b>Reviewtabelle</b> einschalten (Seiten mit allen Reviewpunkten, Spalten wie in der Tag-Tabelle) und <b>Monochrom</b> (Zeichnung schwarz-weiß).</li>
+  <li><b>Multi-Tag-PDF</b> klicken, „Nur gewählte PDF“ oder „Alle PDFs“ wählen, Speicherort angeben.</li>
+  <li>Für viele PDFs auch über <b>Review Auswahl/Bulk</b> › Haken „Multi-Tag-PDF je PDF“.</li>
+</ol>
+<ul>
+  <li>Markiert werden Tags mit „?“-Eintrag in der Liste und Tags, die mehrfach in der PDF stehen; Zeichnungsverweise nicht.</li>
+  <li>Sichtbar höchstens 6 Datenbankzeilen, alle stehen im PDF-Kommentar. Benachbarte Einträge weichen aus; verschobene bekommen eine rote Linie zum Tag.</li>
+  <li>Die Original-PDF bleibt unverändert.</li>
+</ul>
+<div class="wfref" data-wf="multitag"></div>
 </section>
 
 <section id="review" data-title="Review / Redline">
@@ -299,10 +364,14 @@ ol.pins li b{display:block}
   <li>Jede Fundstelle trägt einen PDF-Kommentar (Pos., Typ, Tag, „Fundstelle n / m“) – sichtbar in Acrobat, Bluebeam, PDF-XChange.</li>
   <li>Es gilt der Tabellenfilter: mit „Nur doppelte“ entsteht ein Redline nur mit den doppelten Tags.</li>
 </ul>
+<ul>
+  <li><b>Reviewtabelle</b> (Leiste „Multi Tag“): hängt Seiten mit allen Reviewpunkten an, mit den Spalten wie in der Tag-Tabelle eingestellt.</li>
+  <li><b>Monochrom</b> im Viewer: auch die Zeichnung in der ausgegebenen PDF wird schwarz-weiß; Rahmen und Kommentare bleiben farbig (Rasterbilder bleiben farbig).</li>
+</ul>
 <h3>Review-Excel</h3>
 <p>Blatt „Review“ mit einer Zeile je Fundstelle: Pos.-Nr. (wie im Redline; im Bulk <code>&lt;PDF-Nr&gt;.&lt;Pos&gt;</code>), PDF, Zeichnungsnr., Rev, Typ, Tag, Seite, Fundstelle, Anzahl auf Seite, Doppelt, im Projektmodus Projekt-Prüfung und -Hinweis, Review-Kommentar, dann die Review-Spalten der Tag-Tabelle: <b>Review</b> und <b>Änderung</b> (Auswahllisten), Neuer Wert, Bemerkung, WPO, Datum, User. Keine X/Y-Koordinaten. Dazu Blätter „Dateien“ und „Info“.</p>
 <h3>Review Auswahl/Bulk</h3>
-<p>Markierte oder alle PDFs; Ausgaben ankreuzen (Redline je PDF, Review-Excel je PDF, Review-Excel gesamt); Zielordner, optional Unterordner <code>Review_&lt;Zeitstempel&gt;</code>.</p>
+<p>Markierte oder alle PDFs; Ausgaben ankreuzen (Redline je PDF, <b>Multi-Tag-PDF je PDF</b>, Review-Excel je PDF, Review-Excel gesamt); die Prüftypen gelten auch hier; vorher speichern, ungespeicherte Einträge fehlen im Bulk; Zielordner, optional Unterordner <code>Review_&lt;Zeitstempel&gt;</code>.</p>
 <h3>Tabelle bearbeiten</h3>
 <p>„Tabelle bearbeiten“ schaltet die Review-Spalten der Tag-Tabelle zum Bearbeiten frei; „Review speichern“ (<kbd>Strg</kbd>+<kbd>S</kbd>) sichert sie.</p>
 <h3>Rechtsklick in der Review-Tabelle</h3>
@@ -312,6 +381,7 @@ ol.pins li b{display:block}
   <li><b>„Wert“ in markierte Zeilen übernehmen</b> und <b>Zellen leeren</b> (<kbd>Entf</kbd>).</li>
   <li><b>Zeile(n) aus Review nehmen:</b> für Tags, die nicht in den Review gehören (z. B. Fehlerkennung). Sie fehlen danach in Tabelle, Viewer-Rahmen, Redline, Review-Excel, Export, Alle Tags, Tabellen-Vorschau und Review Importliste. <b>Aus dem Review genommene zeigen</b> blendet sie grau ein, <b>Zeile(n) wiederherstellen</b> holt sie zurück. Wirksam nach „Speichern“; die PDF bleibt unverändert.</li>
 </ul>
+<div class="wfref" data-wf="review"></div>
 </section>
 
 <section id="project" data-title="Projektmodus">
@@ -322,16 +392,19 @@ ol.pins li b{display:block}
   <li><b>Projekt wählen:</b> aus P3D Tag Compliance übernehmen (<code>pidtag_project.db</code>, nur lesend), öffnen oder neu anlegen.</li>
   <li><b>Befunde</b> (kombinierbar mit „ + “): Regelfehler Projektdefinition, Code fehlt in Projektdefinition, Code unvollständig (Platzhalter <code>?</code>, <code>XXX</code>), mehrfach vorhanden.</li>
 </ul>
+<div class="wfref" data-wf="project"></div>
 </section>
 
 <section id="export" data-title="Export">
 <h2>Export</h2>
 <ul>
   <li><b>Export Excel:</b> Blätter „Dateien“ und „Tags“ über alle PDFs (Tags: PDF, Zeichnungsnr., Typ, Tag, Anzahl, Seiten, Review-Spalten, im Projektmodus die Prüfspalten – ohne X/Y).</li>
+  <li><b>Vorschau:</b> Knopf „Vorschau“ in der Leiste der Tag-Tabelle oder Rechtsklick auf das Excel-Symbol jeder Tabelle: Export vorher ansehen (höchstens 500 Zeilen) und dann speichern.</li>
   <li><b>Export CSV:</b> Tags plus <code>_Dateien.csv</code>, Trennzeichen <code>;</code>, UTF-8 mit BOM.</li>
   <li><b>Excel-Symbol</b> in jeder Tabelle: sichtbare Ansicht, Dateiname mit PDF-/Tabellenname und Zeitstempel.</li>
   <li><b>Tabellen-Vorschau</b> („2 Ansicht“): Tags aller PDFs genau mit den Spalten, wie die Tag-Tabelle eingestellt ist (inkl. Datenlink-Spalten und Abgleich), dann über das Excel-Symbol sichern.</li>
 </ul>
+<div class="wfref" data-wf="export"></div>
 </section>
 
 <section id="keys" data-title="Tastenkürzel">
@@ -363,6 +436,7 @@ ol.pins li b{display:block}
 <p>Projekt › <b>Pfade</b>: Quellordner hinzufügen/entfernen, Exportordner wählen. Projekt › <b>Tag-Muster</b>: Regex und Ausschlussliste anpassen.</p></div></details>
 <details><summary>Warum erscheint Equipment doppelt?</summary><div>
 <p>Equipment steht oft zusätzlich in der Equipment-Tabelle am Blattfuß und zählt dann als doppelter Tag – das kann gewollt sein.</p></div></details>
+<div class="wfref" data-wf="paths"></div>
 </section>
 </main>
 </div>
@@ -373,17 +447,8 @@ ol.pins li b{display:block}
   if (typeof WF === "undefined") return;
   const nav = document.getElementById("wfnav"), host = document.getElementById("wfsteps");
   const esc = t => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  host.innerHTML = "";
-  let stepNo = 0;
-  for (const st of WF) {
-    const label = st.id === "overview" ? "Ü" : String(++stepNo);
-    const a = document.createElement("a");
-    a.href = "#wf-" + st.id;
-    a.innerHTML = `<span class="snum">${label}</span>${esc(st.title)}`;
-    nav.appendChild(a);
-    const box = document.createElement("div");
-    box.className = "wfstep"; box.id = "wf-" + st.id;
-    box.innerHTML = `<h3><span class="snum">${label}</span>${st.id === "overview" ? "" : "Schritt " + label + " · "}${esc(st.title)}</h3><p>${esc(st.intro)}</p>`;
+  function figures(st) {                       // Bilder eines Schritts; Nummern laufen ueber alle Bilder weiter
+    const out = document.createDocumentFragment();
     let n = 0;
     for (const f of st.figs) {
       const fig = document.createElement("div"); fig.className = "wffig";
@@ -397,18 +462,41 @@ ol.pins li b{display:block}
         items += `<li data-n="${n}"><span class="snum">${n}</span><span><b>${esc(m.title)}</b>${esc(m.text)}</span></li>`;
       }
       fig.innerHTML = (f.caption ? `<div class="cap">${esc(f.caption)}</div>` : "") +
-        `<div class="shotbox"><div class="shotwrap" style="--bigw:${bigw}%"><img src="${f.img}" alt="${esc(f.caption || st.title)}" width="${f.w}" height="${f.h}" loading="lazy">${frames}${pins}</div></div>` +
+        `<div class="shotbox"><div class="shotwrap" style="--bigw:${bigw}%;max-width:${Math.max(f.w, 420)}px"><img src="${f.img}" alt="${esc(f.caption || st.title)}" width="${f.w}" height="${f.h}" loading="lazy">${frames}${pins}</div></div>` +
         `<ol class="pins">${items}</ol>`;
-      box.appendChild(fig);
+      out.appendChild(fig);
     }
+    return out;
+  }
+  host.innerHTML = "";
+  let stepNo = 0;
+  for (const st of WF) {
+    const label = st.id === "overview" ? "Ü" : String(++stepNo);
+    const a = document.createElement("a");
+    a.href = "#wf-" + st.id;
+    a.innerHTML = `<span class="snum">${label}</span>${esc(st.title)}`;
+    nav.appendChild(a);
+    const box = document.createElement("div");
+    box.className = "wfstep wfbox"; box.id = "wf-" + st.id;
+    box.innerHTML = `<h3><span class="snum">${label}</span>${st.id === "overview" ? "" : "Schritt " + label + " · "}${esc(st.title)}</h3><p>${esc(st.intro)}</p>`;
+    box.appendChild(figures(st));
     host.appendChild(box);
+  }
+  for (const slot of document.querySelectorAll(".wfref")) {      // dieselben Ansichten beim jeweiligen Thema
+    const st = WF.find(s => s.id === slot.dataset.wf);
+    if (!st) continue;
+    const box = document.createElement("div");
+    box.className = "wfbox";
+    box.innerHTML = `<h4>${esc(st.title)}</h4><p>${esc(st.intro)}</p>`;
+    box.appendChild(figures(st));
+    slot.appendChild(box);
   }
   function select(step, n) {
     step.querySelectorAll(".on").forEach(e => e.classList.remove("on"));
     step.querySelectorAll(`[data-n="${n}"]`).forEach(e => e.classList.add("on"));
   }
-  host.addEventListener("click", e => {
-    const step = e.target.closest(".wfstep"); if (!step) return;
+  document.addEventListener("click", e => {
+    const step = e.target.closest && e.target.closest(".wfbox"); if (!step) return;
     const hit = e.target.closest(".pin, ol.pins li");
     if (hit) {
       select(step, hit.dataset.n);
@@ -416,14 +504,14 @@ ol.pins li b{display:block}
       (hit.classList.contains("pin") ? li : pin).scrollIntoView({behavior: "smooth", block: "nearest", inline: "center"});
       return;
     }
-    if (e.target.tagName === "IMG") e.target.parentElement.classList.toggle("big");
+    if (e.target.tagName === "IMG" && e.target.parentElement.classList.contains("shotwrap")) e.target.parentElement.classList.toggle("big");
   });
-  host.addEventListener("mouseover", e => {
-    const hit = e.target.closest(".pin, ol.pins li"), step = e.target.closest(".wfstep");
+  document.addEventListener("mouseover", e => {
+    const hit = e.target.closest(".pin, ol.pins li"), step = e.target.closest(".wfbox");
     if (hit && step) step.querySelectorAll(`.frame[data-n="${hit.dataset.n}"]`).forEach(f => f.classList.add("on"));
   });
-  host.addEventListener("mouseout", e => {
-    const hit = e.target.closest(".pin, ol.pins li"), step = e.target.closest(".wfstep");
+  document.addEventListener("mouseout", e => {
+    const hit = e.target.closest(".pin, ol.pins li"), step = e.target.closest(".wfbox");
     if (hit && step) step.querySelectorAll(`.frame[data-n="${hit.dataset.n}"]:not(.keep)`).forEach(f => {
       if (!step.querySelector(`li.on[data-n="${hit.dataset.n}"]`)) f.classList.remove("on");
     });
@@ -451,6 +539,7 @@ const R = [
   ["preview","Tabellen-\nVorschau …","Eigenes Blatt mit den Tags aller PDFs: vorne PDF und Zeichnungsnr., dann die Spalten der Tag-Tabelle in der eingestellten Reihenfolge und Sichtbarkeit, ohne X/Y. Excel über das Symbol in der Tabellenecke."],
   ["table_profile","Tabellen-\nprofil","Ansicht aller Tabellen (Spalten, Breiten, Sortierung, Zoom) als Datei speichern oder laden."]]],
  ["3  Prüfen", [
+  ["check_types","Prüftypen","Vorfilter für die gesamte Prüfung: welche Tag-Typen geprüft und ausgegeben werden. Siehe Kapitel „Prüftypen“."],
   ["prev","Fundstelle\nzurück","Vorherige Fundstelle des gewählten Tags. Umschalt+F3."],
   ["next","Fundstelle\nweiter","Nächste Fundstelle des gewählten Tags; nach der letzten die Übersicht. F3."],
   ["dups","Nur doppelte\nTags","Zeigt nur Tags, die mehrfach in der PDF stehen."],

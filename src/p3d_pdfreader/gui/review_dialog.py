@@ -25,10 +25,11 @@ class ReviewOptions:
     excel_total: bool = True
     subfolder: bool = True
     folder: str = ""
+    multitag: bool = False
 
 
 class ReviewDialog(QDialog):
-    def __init__(self, marked: int, total: int, parent=None):
+    def __init__(self, marked: int, total: int, parent=None, linked: bool = False):
         super().__init__(parent)
         self.setWindowTitle("Review / Audit")
         self.setMinimumWidth(560)
@@ -57,11 +58,17 @@ class ReviewDialog(QDialog):
         self.cb_redline = QCheckBox("Redline-PDF je PDF (Rahmen wie im Viewer: grün korrekt, rot fehlerhaft, doppelte gelb)")
         self.cb_excel_each = QCheckBox("Review-Excel je PDF (Pos.-Nr., Review-Kommentar, Prüfstatus, Bemerkung)")
         self.cb_excel_total = QCheckBox("Review-Excel gesamt über alle gewählten PDFs")
+        self.cb_multitag = QCheckBox("Multi-Tag-PDF je PDF (roter Eintrag über jedem doppelten Tag)")
+        self.cb_multitag.setEnabled(linked)
+        if not linked:
+            self.cb_multitag.setToolTip("Braucht eine Importliste mit Datenlink 2.")
+        self.cb_multitag.setChecked(bool(opts.multitag) and linked)
         self.cb_subfolder = QCheckBox("Eigenen Unterordner „Review_<Zeitstempel>“ anlegen")
         for cb, value in ((self.cb_redline, opts.redline), (self.cb_excel_each, opts.excel_each),
                           (self.cb_excel_total, opts.excel_total), (self.cb_subfolder, opts.subfolder)):
             cb.setChecked(bool(value))
             lay.addWidget(cb)
+        lay.insertWidget(1, self.cb_multitag)
         row = QHBoxLayout()
         self.folder = QLineEdit(opts.folder if opts.folder and Path(opts.folder).is_dir() else str(paths.exports_dir()))
         pick = action_button("…", ButtonKind.NEUTRAL)
@@ -85,11 +92,12 @@ class ReviewDialog(QDialog):
 
     def options(self) -> ReviewOptions:
         return ReviewOptions(self.rb_marked.isChecked(), self.cb_redline.isChecked(), self.cb_excel_each.isChecked(),
-                             self.cb_excel_total.isChecked(), self.cb_subfolder.isChecked(), self.folder.text().strip())
+                             self.cb_excel_total.isChecked(), self.cb_subfolder.isChecked(), self.folder.text().strip(),
+                             self.cb_multitag.isChecked())
 
     def _accept(self) -> None:
         o = self.options()
-        if not (o.redline or o.excel_each or o.excel_total):
+        if not (o.redline or o.multitag or o.excel_each or o.excel_total):
             self.cb_redline.setFocus()
             return
         if not o.folder:

@@ -6,14 +6,17 @@ from __future__ import annotations
 
 from PySide6.QtCore import QEvent, QObject, Qt
 from PySide6.QtGui import QBrush, QColor
-from PySide6.QtWidgets import QMessageBox, QTableView, QToolButton
+from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QLabel, QMenu, QMessageBox, QTableView, QTableWidget,
+                               QTableWidgetItem, QToolButton, QVBoxLayout)
 
 from ..core.export import write_csv
 from ..paths import display_path, exports_dir, file_timestamp
 from . import appearance, last_paths
+from .design import NOTE_QSS
 from .icons import excel_icon
 
 
+PREVIEW_ROWS = 500          # Vorschau zeigt hoechstens so viele Zeilen, exportiert werden alle
 VIEW_TABLE_STYLE = "TableStyleLight1"                       # zurueckhaltend, damit die Farben der Ansicht wirken
 
 
@@ -130,6 +133,51 @@ def export_table_view(table: QTableView, title: str = "Tabelle") -> None:
     QMessageBox.information(table, "Export", f"Gespeichert:\n{display_path(path)}\n\n{len(rows)} Zeile(n).")
 
 
+class PreviewDialog(QDialog):
+    """Vorschau des Excel-Exports: Spalten, Reihenfolge, Breiten und Farben wie in der Datei."""
+
+    def __init__(self, table: QTableView, title: str, parent=None):
+        super().__init__(parent or table.window())
+        self.setWindowTitle(f"Vorschau – {title}")
+        self.resize(1100, 640)
+        headers, rows = visible_table(table)
+        style = view_style(table)
+        lay = QVBoxLayout(self)
+        shown = rows[:PREVIEW_ROWS]
+        note = QLabel(f"{len(rows)} Zeile(n), {len(headers)} Spalte(n)"
+                      + (f" – Vorschau der ersten {PREVIEW_ROWS}" if len(rows) > PREVIEW_ROWS else ""))
+        note.setStyleSheet(NOTE_QSS)
+        lay.addWidget(note)
+        view = self.view = QTableWidget(len(shown), len(headers))
+        view.setHorizontalHeaderLabels(headers)
+        view.setEditTriggers(QTableWidget.NoEditTriggers)
+        view.horizontalHeader().setStyleSheet(appearance.plain_header_qss())
+        for r, row in enumerate(shown):
+            for c, value in enumerate(row):
+                item = QTableWidgetItem("" if value is None else str(value))
+                fill, font, _align = style["cells"].get((r, c), (None, None, ""))
+                if fill:
+                    item.setBackground(QColor(f"#{fill}"))
+                if font:
+                    item.setForeground(QColor(f"#{font}"))
+                view.setItem(r, c, item)
+        for c, width in enumerate(style["widths"]):
+            view.setColumnWidth(c, max(40, width))
+        lay.addWidget(view, 1)
+        buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Close)
+        buttons.button(QDialogButtonBox.Save).setText("Als Excel sichern …")
+        buttons.button(QDialogButtonBox.Close).setText("Schließen")
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        lay.addWidget(buttons)
+
+
+def preview_table_view(table: QTableView, title: str = "Tabelle") -> None:
+    """Vorschau zeigen; „Als Excel sichern“ fuehrt in den normalen Export."""
+    if visible_table(table)[0] and PreviewDialog(table, title).exec() == QDialog.Accepted:
+        export_table_view(table, title)
+
+
 class _CornerPlacer(QObject):
     def __init__(self, table: QTableView, button: QToolButton):
         super().__init__(button)
@@ -156,7 +204,16 @@ def install_excel_corner(table: QTableView, title: str) -> QToolButton:
     button.setAutoRaise(True)
     button.setCursor(Qt.PointingHandCursor)
     button.setToolTip("Tabelle als Excel sichern - wie angezeigt (sichtbare Spalten, Filter, Sortierung, Farben)\n"
-                      "Dateiname: PDF-Name bzw. Tabellenname + Zeitstempel")
+                      "Dateiname: PDF-Name bzw. Tabellenname + Zeitstempel\nRechtsklick: Vorschau ansehen")
+    button.setContextMenuPolicy(Qt.CustomContextMenu)
+
+    def menu(pos) -> None:
+        m = QMenu(button)
+        m.addAction("Vorschau ansehen …", lambda: preview_table_view(table, title))
+        m.addAction("Als Excel sichern …", lambda: export_table_view(table, title))
+        m.exec(button.mapToGlobal(pos))
+
+    button.customContextMenuRequested.connect(menu)
     button.clicked.connect(lambda _c=False: export_table_view(table, title))
     _CornerPlacer(table, button)
     return button

@@ -37,6 +37,9 @@
   "Dateiliste einklappen bzw. wieder aufklappen – die Tag-Tabelle bekommt den Platz": {
    "en": "Collapse or expand the file list – the tag table gets the space",
    "fr": "Réduire ou développer la liste des fichiers – le tableau des tags prend la place"
-  }
+  },
+  "Multi-Tag-PDF": {"en": "Multi tag PDF", "fr": "PDF multi-tags"},
+  "Reviewtabelle": {"en": "Review table", "fr": "Tableau de revue"},
+  "Kommentare bearbeiten": {"en": "Edit comments", "fr": "Modifier les commentaires"}
  }
 }

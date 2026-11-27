@@ -20,6 +20,7 @@ import pymupdf
 from main_gui_kit.theme import LIGHT
 
 from ..paths import config_dir
+from . import mono, review_table, type_filter
 from .extract import PdfResult, Tag
 from .review import positions
 from .review_store import ReviewStore, is_faulty, marked_tags
@@ -50,11 +51,12 @@ def _rgb(hex_color: str) -> tuple[float, float, float]:
 
 
 def write_redline(result: PdfResult, out_path: str | Path, tags: list[Tag] | None = None,
-                  store: ReviewStore | None = None, checker=None, layer: bool | None = None) -> int:
+                  store: ReviewStore | None = None, checker=None, layer: bool | None = None,
+                  table: bool | review_table.View = False, monochrome: bool = False) -> int:
     """Redline-PDF schreiben. ``tags`` = Auswahl (z. B. gefilterte Tabelle), sonst alle Tags. ``store`` = Review-Eintraege
     der PDF (sonst der gespeicherte Stand), ``checker`` = Projektpruefung (Projektmodus). ``layer`` = Kommentare auf die
     Ebene ``Review_TT.MM.JJJJ`` legen (``None`` = Einstellung). Rueckgabe: Anzahl Rahmen."""
-    tags = result.tags if tags is None else tags
+    tags = type_filter.apply(result.tags if tags is None else tags)
     out_path = Path(out_path)
     if store is None:
         try:
@@ -63,6 +65,8 @@ def write_redline(result: PdfResult, out_path: str | Path, tags: list[Tag] | Non
             store = None
     if callable(getattr(store, "visible", None)):
         tags = store.visible(tags)                   # aus dem Review genommene Tags nicht markieren (1.0.43)
+    review = review_table.build(result, tags, store, view=table if isinstance(table, review_table.View)
+                                else None) if table else None          # vor „No Tag“ weglassen
     ok, bad, dirty = _rgb(LIGHT.ok), _rgb(LIGHT.err), _rgb(DIRTY)
     marked = marked_tags(tags, store)                # Review "No Tag": nicht kennzeichnen
     shown = {(t.type, t.tag) for t in marked}
@@ -73,6 +77,8 @@ def write_redline(result: PdfResult, out_path: str | Path, tags: list[Tag] | Non
     tags = marked
     layer = review_layer_enabled() if layer is None else layer
     with pymupdf.open(result.path) as doc:
+        if monochrome:
+            mono.make_monochrome(doc)                    # vor den Kommentaren: diese behalten ihre Farben
         ocg = doc.add_ocg(review_layer_name(), on=True) if layer else 0
 
         def done(annot) -> None:
@@ -119,5 +125,6 @@ def write_redline(result: PdfResult, out_path: str | Path, tags: list[Tag] | Non
         note = page.add_text_annot(pymupdf.Point(20, 20) * page.derotation_matrix, summary, icon="Note")
         note.set_info(title=AUTHOR, subject="Übersicht")
         done(note)
+        review_table.append(doc, result.name, review, ocg)
         doc.save(out_path, garbage=3, deflate=True)
     return len(items)

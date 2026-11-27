@@ -10,10 +10,11 @@ from pathlib import Path
 
 import pymupdf
 from PySide6.QtCore import QRectF, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QImage, QPainter, QPen, QPixmap
-from PySide6.QtWidgets import (QGraphicsItem, QGraphicsRectItem, QGraphicsScene, QGraphicsSimpleTextItem,
-                               QGraphicsView, QLabel)
+from PySide6.QtGui import QColor, QFont, QImage, QPainter, QPen, QPixmap
+from PySide6.QtWidgets import (QGraphicsItem, QGraphicsLineItem, QGraphicsRectItem, QGraphicsScene,
+                               QGraphicsSimpleTextItem, QGraphicsView, QLabel, QMenu)
 
+from ..core import multitag
 from ..core.render import page_pixmap
 from main_gui_kit.theme import LIGHT
 
@@ -30,8 +31,79 @@ def _qimage(pix) -> QImage:
     return QImage(pix.samples, pix.width, pix.height, pix.stride, fmt).copy()
 
 
+class NoteItem(QGraphicsRectItem):
+    """Verschiebbarer roter Eintrag (Multi Tag) mit Linie zum Tag; Koordinaten in Szene-Pixeln."""
+
+    def __init__(self, view: "PdfPreview", note):
+        s = view._scale
+        r = note.rect
+        super().__init__(0, 0, (r[2] - r[0]) * s, (r[3] - r[1]) * s)
+        self.view, self.note, self.scale_px = view, note, s
+        red = QColor(LIGHT.err)
+        pen = QPen(red, 1, Qt.DashLine)
+        pen.setCosmetic(True)
+        self.setPen(pen)
+        fill = QColor("white")
+        fill.setAlpha(215)
+        self.setBrush(fill)
+        font = QFont("Arial")
+        font.setPixelSize(max(1, round(multitag.FONT_SIZE * s)))
+        for n, line in enumerate(note.lines):
+            text = QGraphicsSimpleTextItem(line, self)
+            text.setFont(font)
+            text.setBrush(red)
+            text.setPos(2 * s, (1 + n * multitag.LINE) * s)
+        self.line = QGraphicsLineItem()
+        link_pen = QPen(red, 1.5)
+        link_pen.setCosmetic(True)
+        self.line.setPen(link_pen)
+        self.line.setZValue(2.4)
+        self.setZValue(2.5)
+        self.setPos(r[0] * s, r[1] * s)
+        self.setFlags(QGraphicsItem.ItemIsMovable | QGraphicsItem.ItemSendsGeometryChanges)
+        self.setCursor(Qt.SizeAllCursor)
+        self.setToolTip("Ziehen = verschieben · Rechtsklick = Position zurücksetzen")
+        self.update_line()
+
+    def point_position(self) -> tuple[float, float]:
+        return round(self.pos().x() / self.scale_px, 2), round(self.pos().y() / self.scale_px, 2)
+
+    def update_line(self) -> None:
+        s, note = self.scale_px, self.note
+        x, y = self.pos().x() / s, self.pos().y() / s
+        note.rect = (x, y, x + note.rect[2] - note.rect[0], y + note.rect[3] - note.rect[1])
+        start, end = multitag.leader(note)
+        self.line.setLine(start[0] * s, start[1] * s, end[0] * s, end[1] * s)
+
+    def itemChange(self, change, value):  # noqa: N802
+        if change == QGraphicsItem.ItemPositionHasChanged and hasattr(self, "line"):
+            self.update_line()
+        return super().itemChange(change, value)
+
+    def mousePressEvent(self, event) -> None:
+        self._start = self.pos()
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:
+        super().mouseReleaseEvent(event)
+        if event.button() == Qt.LeftButton and self.pos() != getattr(self, "_start", self.pos()):
+            self.view.note_moved.emit(self.note.key, *self.point_position())
+
+    def contextMenuEvent(self, event) -> None:
+        menu = QMenu()
+        one = menu.addAction("Position zurücksetzen")
+        every = menu.addAction("Alle Positionen dieser PDF zurücksetzen")
+        chosen = menu.exec(event.screenPos())
+        if chosen is one:
+            self.view.note_reset.emit(self.note.key)
+        elif chosen is every:
+            self.view.note_reset.emit("")
+
+
 class PdfPreview(QGraphicsView):
     page_changed = Signal(int, int)        # (Seite 0-basiert, Seitenzahl)
+    note_moved = Signal(str, float, float) # Eintrag verschoben: Schluessel, x, y in PDF-Punkten
+    note_reset = Signal(str)               # Schluessel, "" = alle
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -53,6 +125,8 @@ class PdfPreview(QGraphicsView):
         self._status_groups: tuple = ([], [])    # (korrekt, fehlerhaft) je Tag [(Seite, Rechteck)]
         self._status_items: list = []
         self._detail = None
+        self._notes: list = []                   # Multi-Tag-Eintraege (Modus „Kommentare bearbeiten“)
+        self._note_items: list = []
         self._info = QLabel(self.viewport())             # Hinweis oben links: "Fundstelle 2 / 4 ..."
         self._info.setObjectName("PreviewInfo")
         self._info.setStyleSheet(f"#PreviewInfo {{ background: {BAND}; color: {TEXT}; border: 1px solid {BORDER}; "
@@ -72,6 +146,7 @@ class PdfPreview(QGraphicsView):
             self._doc.close()
             self._doc = None
         self._path, self._dup_groups, self._status_groups = path, [], ([], [])
+        self._notes = []
         self._page = -1
         self._clear_scene()
         if not path:
@@ -93,6 +168,7 @@ class PdfPreview(QGraphicsView):
 
     def _clear_scene(self) -> None:
         self._detail, self._base, self._marks, self._dup_items, self._status_items = None, None, [], [], []
+        self._note_items = []
         self.set_info("")
         self.scene().clear()
 
@@ -116,6 +192,7 @@ class PdfPreview(QGraphicsView):
         self.scene().setSceneRect(QRectF(0, 0, pix.width, pix.height))
         self._draw_duplicates()
         self._draw_status()
+        self._draw_notes()
         if fit:
             self.fit()
         self.page_changed.emit(number, self._doc.page_count)
@@ -260,6 +337,36 @@ class PdfPreview(QGraphicsView):
                     item.setZValue(1.7)
                     item.setToolTip(tip)
                     self._status_items.append(item)
+
+    @property
+    def path(self) -> Path | None:
+        return self._path
+
+    def show_notes(self, notes: list) -> None:
+        """Verschiebbare Multi-Tag-Eintraege zeigen (leer = keine)."""
+        self._notes = list(notes)
+        self._draw_notes()
+
+    def _draw_notes(self) -> None:
+        for item in self._note_items:
+            if item.scene() is self.scene():
+                self.scene().removeItem(item)
+        self._note_items = []
+        if self._doc is None:
+            return
+        pen = QPen(QColor(LIGHT.err), 2)
+        pen.setCosmetic(True)
+        for note in self._notes:
+            if note.page != self._page:
+                continue
+            s = self._scale
+            frame = self.scene().addRect(QRectF(note.box[0] * s, note.box[1] * s, (note.box[2] - note.box[0]) * s,
+                                                (note.box[3] - note.box[1]) * s), pen)
+            frame.setZValue(2.3)
+            item = NoteItem(self, note)
+            self.scene().addItem(item.line)
+            self.scene().addItem(item)
+            self._note_items += [frame, item.line, item]
 
     def clear_marks(self) -> None:
         for item in self._marks:

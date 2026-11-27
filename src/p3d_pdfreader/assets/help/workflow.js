@@ -7,174 +7,174 @@ const WF = [
   "figs": [
    {
     "img": "img/wf_overview.png",
-    "w": 2843,
-    "h": 1060,
+    "w": 3086,
+    "h": 1180,
     "caption": "Hauptfenster mit Beispiel-PDFs",
     "marks": [
      {
       "rect": [
-       0.28,
-       6.7,
-       21.03,
-       1.79
+       0.26,
+       4.07,
+       19.38,
+       1.61
       ],
       "pin": [
-       0.28,
-       6.7
+       0.26,
+       4.07
       ],
       "title": "Menüband: Projekt",
       "text": "Projekt wählen, Projektmodus, Rohrleitungen, Projektdefinitionen, Pfade, Einstellungen."
      },
      {
       "rect": [
-       21.63,
-       6.7,
-       10.94,
-       1.79
+       19.93,
+       4.07,
+       10.08,
+       1.61
       ],
       "pin": [
-       21.63,
-       6.7
+       19.93,
+       4.07
       ],
       "title": "Menüband: 1 Einlesen",
       "text": "PDFs einlesen und Excel-Liste für den Datenlink importieren."
      },
      {
       "rect": [
-       32.89,
-       6.7,
-       10.59,
-       1.79
+       30.3,
+       4.07,
+       12.09,
+       1.61
       ],
       "pin": [
-       32.89,
-       6.7
+       30.3,
+       4.07
       ],
       "title": "Menüband: 2 Ansicht",
       "text": "Blätter wechseln, Viewer auf den 2. Monitor, Tabellen-Vorschau."
      },
      {
       "rect": [
-       43.79,
-       6.7,
-       21.07,
-       1.79
+       42.68,
+       4.07,
+       24.95,
+       1.61
       ],
       "pin": [
-       43.79,
-       6.7
+       42.68,
+       4.07
       ],
       "title": "Menüband: 3 Prüfen",
       "text": "Fundstellen, Filter, Tabelle bearbeiten, Review speichern."
      },
      {
       "rect": [
-       65.18,
-       6.7,
-       10.45,
-       1.79
+       67.92,
+       4.07,
+       9.62,
+       1.61
       ],
       "pin": [
-       65.18,
-       6.7
+       67.92,
+       4.07
       ],
       "title": "Menüband: 4 Review / Redline",
       "text": "Redline-PDF und Review-Excel erzeugen."
      },
      {
       "rect": [
-       75.94,
-       6.7,
-       6.89,
-       1.79
+       77.84,
+       4.07,
+       6.35,
+       1.61
       ],
       "pin": [
-       75.94,
-       6.7
+       77.84,
+       4.07
       ],
       "title": "Menüband: 5 Export",
       "text": "Alle Dateien und Tags als Excel oder CSV."
      },
      {
       "rect": [
-       83.15,
-       6.7,
-       8.44,
-       1.79
+       84.48,
+       4.07,
+       7.78,
+       1.61
       ],
       "pin": [
-       83.15,
-       6.7
+       84.48,
+       4.07
       ],
       "title": "Menüband: Web",
       "text": "Web-Server für Kollegen, Offline-Bericht."
      },
      {
       "rect": [
-       91.91,
-       6.7,
-       7.35,
-       1.79
+       92.55,
+       4.07,
+       6.77,
+       1.61
       ],
       "pin": [
-       91.91,
-       6.7
+       92.55,
+       4.07
       ],
       "title": "Menüband: Hilfe",
       "text": "Dieses Handbuch, Info und Sprache."
      },
      {
       "rect": [
-       0.04,
-       23.49,
-       99.93,
-       2.64
+       0.03,
+       14.49,
+       99.94,
+       3.64
       ],
       "pin": [
-       0.04,
-       23.49
+       0.03,
+       14.49
       ],
       "title": "Kopfband",
       "text": "Projekt, Quelle, Anzahl PDFs, Tags, Fehler und (Projektmodus) Abweichungen."
      },
      {
       "rect": [
-       0.39,
-       27.17,
-       99.23,
-       30.0
+       0.36,
+       18.81,
+       99.29,
+       28.73
       ],
       "pin": [
-       2.93,
-       27.17
+       2.9,
+       18.81
       ],
       "title": "Tabelle 1 – Dateien",
       "text": "Eine Zeile je PDF mit Schriftfeld-Werten. Auswahl einer Zeile lädt Tags und PDF."
      },
      {
       "rect": [
-       0.39,
-       57.64,
-       60.64,
-       39.81
+       0.36,
+       47.97,
+       65.17,
+       49.75
       ],
       "pin": [
-       0.39,
-       57.64
+       0.36,
+       47.97
       ],
       "title": "Tabelle 2 – Tags der gewählten PDF",
       "text": "Alle Tags mit Anzahl, Seiten, Review-Spalten und – mit Datenlink – Spalten aus der Excel-Liste."
      },
      {
       "rect": [
-       61.2,
-       57.64,
-       38.41,
-       39.81
+       65.68,
+       47.97,
+       33.96,
+       49.75
       ],
       "pin": [
-       61.2,
-       57.64
+       65.68,
+       47.97
       ],
       "title": "PDF-Viewer",
       "text": "Seite mit farbigen Rahmen an den Fundstellen; Klick auf einen Tag zoomt hin."
@@ -297,6 +297,35 @@ const WF = [
   ]
  },
  {
+  "id": "paths",
+  "title": "Pfade festlegen",
+  "intro": "Einmal einstellen: wo die PDFs liegen und wohin die Ausgaben gehen.",
+  "figs": [
+   {
+    "img": "img/wf_paths.png",
+    "w": 720,
+    "h": 460,
+    "caption": "Projekt › Pfade",
+    "marks": [
+     {
+      "rect": [
+       0.0,
+       0.0,
+       100.0,
+       50.0
+      ],
+      "pin": [
+       0.0,
+       0.0
+      ],
+      "title": "Quell- und Exportordner",
+      "text": "Quellordner hinzufügen oder entfernen und den Exportordner wählen. „Quellordner scannen“ (F5) liest die Quellordner ein."
+     }
+    ]
+   }
+  ]
+ },
+ {
   "id": "read",
   "title": "PDFs einlesen",
   "intro": "PDF-Plots einlesen. Danach steht je PDF eine Zeile in Tabelle 1; die erste PDF wird gewählt und angezeigt.",
@@ -367,93 +396,107 @@ const WF = [
    },
    {
     "img": "img/wf_files.png",
-    "w": 2829,
-    "h": 326,
+    "w": 3072,
+    "h": 347,
     "caption": "Tabelle 1 – Dateien nach dem Einlesen",
     "marks": [
      {
       "rect": [
-       1.66,
-       1.23,
-       96.29,
-       8.28
+       13.22,
+       2.31,
+       13.9,
+       7.78
       ],
       "pin": [
-       1.66,
-       1.23
+       13.22,
+       2.31
       ],
       "title": "Blattfilter",
-      "text": "Sucht in allen Spalten der Tabelle."
+      "text": "Sucht in allen Spalten der Dateiliste."
      },
      {
       "rect": [
-       2.26,
-       11.96,
-       4.14,
-       7.67
+       2.08,
+       2.59,
+       3.81,
+       7.2
       ],
       "pin": [
-       4.81,
-       11.96
+       2.08,
+       2.59
       ],
       "title": "Alle markieren",
       "text": "Alle PDFs markieren, z. B. für den Review."
      },
      {
       "rect": [
-       6.54,
-       11.96,
-       4.98,
-       7.67
+       6.02,
+       2.59,
+       4.59,
+       7.2
       ],
       "pin": [
-       9.08,
-       11.96
+       6.02,
+       2.59
       ],
       "title": "Review markierte …",
       "text": "Redline und Review-Excel für die markierten PDFs (Schritt 6)."
      },
      {
       "rect": [
-       1.2,
-       22.7,
-       98.59,
-       23.01
+       1.11,
+       12.97,
+       98.7,
+       21.61
       ],
       "pin": [
-       13.93,
-       22.7
+       8.74,
+       12.97
       ],
       "title": "Spaltenkopf mit Filterzeile",
       "text": "Klick sortiert, Feld darunter filtert, Doppelklick im Feld wählt Werte. Rechtsklick: Spaltenmenü."
      },
      {
       "rect": [
-       1.2,
-       45.71,
-       98.59,
-       21.78
+       1.11,
+       34.58,
+       98.7,
+       20.46
       ],
       "pin": [
-       1.2,
-       45.71
+       1.11,
+       34.58
       ],
       "title": "PDF wählen",
       "text": "Zeile anklicken: Tag-Tabelle und Viewer zeigen diese PDF. Mehrere mit Strg- oder Umschalt-Klick markieren."
      },
      {
       "rect": [
-       0.14,
-       90.8,
-       92.86,
-       7.98
+       0.13,
+       91.07,
+       13.22,
+       7.78
       ],
       "pin": [
-       0.14,
-       90.8
+       0.13,
+       91.07
       ],
       "title": "Tabellenansicht",
-      "text": "Ansicht speichern, laden, zurücksetzen; der Regler daneben zoomt."
+      "text": "Ansicht speichern, laden, zurücksetzen; der Regler rechts zoomt."
+     },
+     {
+      "rect": [
+       13.48,
+       91.07,
+       16.15,
+       7.78
+      ],
+      "pin": [
+       13.48,
+       91.07
+      ],
+      "title": "Filter der Tag-Tabelle",
+      "text": "Sucht in allen Spalten der Tags der gewählten PDF."
      }
     ]
    }
@@ -598,13 +641,13 @@ const WF = [
      },
      {
       "rect": [
-       2.15,
+       2.21,
        49.67,
-       16.92,
-       3.67
+       17.38,
+       8.33
       ],
       "pin": [
-       2.15,
+       2.21,
        49.67
       ],
       "title": "Bereich 3: Datentabelle",
@@ -635,62 +678,48 @@ const WF = [
   "figs": [
    {
     "img": "img/wf_link_fields.png",
-    "w": 2829,
-    "h": 555,
+    "w": 3072,
+    "h": 582,
     "caption": "Datenlink-Felder gesetzt: Köpfe dunkelgrün, Listenspalten angefügt",
     "marks": [
      {
       "rect": [
-       4.03,
-       13.33,
-       4.45,
-       13.51
+       7.81,
+       7.73,
+       6.02,
+       12.89
       ],
       "pin": [
-       4.03,
-       13.33
+       7.81,
+       7.73
       ],
       "title": "Datenlink-Feld Tabelle 1",
       "text": "Rechtsklick auf „Zeichnungsnr.“ › „als Datenlink-Feld setzen“ – der Kopf wird dunkelgrün."
      },
      {
       "rect": [
-       69.67,
-       13.33,
-       30.12,
-       13.51
+       4.62,
+       72.85,
+       6.18,
+       12.89
       ],
       "pin": [
-       69.67,
-       13.33
-      ],
-      "title": "Datenlink-Treffer (Dateien)",
-      "text": "Anzahl der Listenzeilen zu dieser Zeichnung."
-     },
-     {
-      "rect": [
-       5.2,
-       71.53,
-       6.72,
-       13.51
-      ],
-      "pin": [
-       5.2,
-       71.53
+       4.62,
+       72.85
       ],
       "title": "Datenlink-Feld Tabelle 2",
       "text": "Rechtsklick auf „Tag“ › „als Datenlink-Feld setzen“."
      },
      {
       "rect": [
-       17.82,
-       71.53,
-       29.02,
-       13.51
+       16.24,
+       72.85,
+       29.98,
+       12.89
       ],
       "pin": [
-       17.82,
-       71.53
+       16.24,
+       72.85
       ],
       "title": "Spalten aus der Liste",
       "text": "„Datenlink-Treffer“ (0 = Tag fehlt in der Liste) und alle übergebenen Spalten der Liste; gleichnamige mit „ (Liste)“. Spalten bei Bedarf über Rechtsklick › Spalten … nach vorne holen."
@@ -700,19 +729,19 @@ const WF = [
    {
     "img": "img/wf_link_menu.png",
     "w": 237,
-    "h": 101,
+    "h": 150,
     "caption": "Rechtsklick auf einen Spaltenkopf (Ausschnitt mit den Datenlink-Einträgen)",
     "marks": [
      {
       "rect": [
        1.27,
-       2.97,
+       2.0,
        97.05,
-       22.77
+       15.33
       ],
       "pin": [
        1.27,
-       2.97
+       2.0
       ],
       "title": "Datenlink-Feld entfernen",
       "text": "Erscheint auf dem gesetzten Feld."
@@ -720,13 +749,13 @@ const WF = [
      {
       "rect": [
        1.27,
-       51.49,
+       34.67,
        97.05,
-       22.77
+       15.33
       ],
       "pin": [
        1.27,
-       51.49
+       34.67
       ],
       "title": "Als Datenlink-Feld setzen",
       "text": "Auf einer anderen Grundspalte: macht sie zum Datenlink-Feld."
@@ -734,16 +763,238 @@ const WF = [
      {
       "rect": [
        1.27,
-       25.74,
+       17.33,
        97.05,
-       22.77
+       15.33
       ],
       "pin": [
        13.08,
-       25.74
+       17.33
       ],
       "title": "Datenlink: Importtabelle …",
       "text": "Öffnet die Importtabelle im Kachel-Editor."
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "listcheck",
+  "title": "PDF-Tags mit der Liste abgleichen",
+  "intro": "Nach dem Setzen der Datenlink-Felder: Treffer ansehen, Richtung wählen und das Prüfblatt öffnen.",
+  "figs": [
+   {
+    "img": "img/wf_listcheck.png",
+    "w": 2019,
+    "h": 520,
+    "caption": "Leisten der Tag-Tabelle: Abgleich mit der Importliste",
+    "marks": [
+     {
+      "rect": [
+       46.9,
+       1.54,
+       5.7,
+       4.81
+      ],
+      "pin": [
+       46.9,
+       1.54
+      ],
+      "title": "Importspalten",
+      "text": "Spalten der Liste ein- oder ausblenden."
+     },
+     {
+      "rect": [
+       52.8,
+       1.54,
+       4.95,
+       4.81
+      ],
+      "pin": [
+       52.8,
+       1.54
+      ],
+      "title": "Importliste",
+      "text": "Link aufheben, Liste neu einlesen, bearbeiten, entfernen."
+     },
+     {
+      "rect": [
+       57.95,
+       1.54,
+       4.46,
+       4.81
+      ],
+      "pin": [
+       57.95,
+       1.54
+      ],
+      "title": "Abgleich",
+      "text": "Richtung wählen: PDF → Liste, Liste → PDF oder beide. Fehlendes = „n.a.“."
+     },
+     {
+      "rect": [
+       24.72,
+       15.38,
+       7.13,
+       14.42
+      ],
+      "pin": [
+       24.72,
+       15.38
+      ],
+      "title": "Datenlink-Treffer",
+      "text": "0 = Tag fehlt in der Liste. Der Bindestrich zwischen Kürzel und Nummer zählt nicht (FV-501 passt zu FV501)."
+     }
+    ]
+   },
+   {
+    "img": "img/wf_listcheck_ribbon.png",
+    "w": 790,
+    "h": 104,
+    "caption": "Menüband, Gruppe „3 Prüfen“",
+    "marks": [
+     {
+      "rect": [
+       57.22,
+       26.92,
+       10.0,
+       65.38
+      ],
+      "pin": [
+       57.22,
+       26.92
+      ],
+      "title": "Review Importliste",
+      "text": "Blatt mit dem Prüfergebnis über alle PDFs."
+     }
+    ]
+   },
+   {
+    "img": "img/wf_listcheck_sheet.png",
+    "w": 1297,
+    "h": 520,
+    "caption": "Blatt „Review Importliste“",
+    "marks": [
+     {
+      "rect": [
+       0.31,
+       0.77,
+       99.69,
+       8.27
+      ],
+      "pin": [
+       0.31,
+       0.77
+      ],
+      "title": "Zählung",
+      "text": "Anzahl je Prüfergebnis."
+     },
+     {
+      "rect": [
+       3.77,
+       31.35,
+       20.0,
+       23.08
+      ],
+      "pin": [
+       3.77,
+       31.35
+      ],
+      "title": "Prüfergebnis je Zeile",
+      "text": "OK, Nicht in Liste, Fehlt im PDF, Zeichnung nicht gescannt."
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "types",
+  "title": "Prüftypen wählen (Vorfilter)",
+  "intro": "Vor der Prüfung festlegen, ob alles oder nur z. B. Equipment oder Instrument geprüft wird. Der Filter gilt auch für Redline, Review-Excel, Bulk und Export.",
+  "figs": [
+   {
+    "img": "img/wf_types_ribbon.png",
+    "w": 790,
+    "h": 104,
+    "caption": "Menüband, Gruppe „3 Prüfen“",
+    "marks": [
+     {
+      "rect": [
+       1.27,
+       26.92,
+       11.14,
+       65.38
+      ],
+      "pin": [
+       1.27,
+       26.92
+      ],
+      "title": "Prüftypen",
+      "text": "Öffnet die Optionstabelle."
+     }
+    ]
+   },
+   {
+    "img": "img/wf_types_dialog.png",
+    "w": 640,
+    "h": 460,
+    "caption": "Optionstabelle „Prüftypen“ (Beispiel: nur Instrument)",
+    "marks": [
+     {
+      "rect": [
+       2.03,
+       14.35,
+       9.38,
+       39.13
+      ],
+      "pin": [
+       2.03,
+       14.35
+      ],
+      "title": "Haken je Typ",
+      "text": "Nur angehakte Typen werden geprüft und ausgegeben."
+     },
+     {
+      "rect": [
+       11.41,
+       14.35,
+       55.31,
+       6.52
+      ],
+      "pin": [
+       11.41,
+       14.35
+      ],
+      "title": "Doppelklick auf eine Zeile",
+      "text": "Prüft nur diesen Typ."
+     },
+     {
+      "rect": [
+       66.72,
+       7.17,
+       15.62,
+       7.17
+      ],
+      "pin": [
+       66.72,
+       7.17
+      ],
+      "title": "Anzahl Tags und PDFs",
+      "text": "Wie oft der Typ in den gescannten PDFs vorkommt."
+     },
+     {
+      "rect": [
+       1.72,
+       91.96,
+       96.56,
+       5.65
+      ],
+      "pin": [
+       1.72,
+       91.96
+      ],
+      "title": "OK",
+      "text": "Übernimmt die Auswahl; die Kopfzeile nennt die geprüften Typen."
      }
     ]
    }
@@ -756,19 +1007,19 @@ const WF = [
   "figs": [
    {
     "img": "img/wf_check_ribbon.png",
-    "w": 929,
+    "w": 1172,
     "h": 104,
     "caption": "Menüband, Gruppen „2 Ansicht“ und „3 Prüfen“",
     "marks": [
      {
       "rect": [
-       8.61,
+       6.83,
        26.92,
-       7.32,
+       5.8,
        65.38
       ],
       "pin": [
-       8.61,
+       6.83,
        26.92
       ],
       "title": "Alle Tags",
@@ -776,13 +1027,13 @@ const WF = [
      },
      {
       "rect": [
-       16.15,
+       12.8,
        26.92,
-       8.29,
+       6.57,
        65.38
       ],
       "pin": [
-       16.15,
+       12.8,
        26.92
       ],
       "title": "Viewer 2. Monitor",
@@ -790,13 +1041,13 @@ const WF = [
      },
      {
       "rect": [
-       42.84,
+       47.78,
        26.92,
-       8.18,
+       6.48,
        65.38
       ],
       "pin": [
-       42.84,
+       47.78,
        26.92
       ],
       "title": "Fundstelle weiter",
@@ -804,13 +1055,13 @@ const WF = [
      },
      {
       "rect": [
-       51.24,
+       54.44,
        26.92,
-       10.01,
+       7.94,
        65.38
       ],
       "pin": [
-       51.24,
+       54.44,
        26.92
       ],
       "title": "Nur doppelte Tags",
@@ -818,13 +1069,13 @@ const WF = [
      },
      {
       "rect": [
-       61.46,
+       62.54,
        26.92,
-       10.66,
+       8.45,
        65.38
       ],
       "pin": [
-       61.46,
+       62.54,
        26.92
       ],
       "title": "Nur Projektabweichungen",
@@ -832,13 +1083,13 @@ const WF = [
      },
      {
       "rect": [
-       82.35,
+       86.01,
        26.92,
-       8.5,
+       6.74,
        65.38
       ],
       "pin": [
-       82.35,
+       86.01,
        26.92
       ],
       "title": "Tabelle bearbeiten",
@@ -846,13 +1097,13 @@ const WF = [
      },
      {
       "rect": [
-       91.07,
+       92.92,
        26.92,
-       7.86,
+       6.23,
        65.38
       ],
       "pin": [
-       91.07,
+       92.92,
        26.92
       ],
       "title": "Review speichern",
@@ -862,163 +1113,327 @@ const WF = [
    },
    {
     "img": "img/wf_check.png",
-    "w": 2829,
-    "h": 430,
+    "w": 3072,
+    "h": 595,
     "caption": "Tag-Tabelle mit Leiste und PDF-Viewer",
     "marks": [
      {
       "rect": [
-       1.7,
-       9.07,
-       6.36,
-       5.81
+       1.56,
+       1.34,
+       5.86,
+       4.2
       ],
       "pin": [
-       1.7,
-       9.07
+       1.56,
+       1.34
       ],
       "title": "Aus PDF-Scan übernehmen",
       "text": "Ersteller, Checked, Rev … aus dem Schriftfeld als Spalten anfügen."
      },
      {
       "rect": [
-       8.2,
-       9.07,
-       3.53,
-       5.81
+       7.55,
+       1.34,
+       3.26,
+       4.2
       ],
       "pin": [
-       8.2,
-       9.07
+       7.55,
+       1.34
       ],
       "title": "Autofill OK",
       "text": "Alle OK-Tags: Review = OK, User, Datum; leeres WPO = Checked."
      },
      {
       "rect": [
-       11.88,
-       9.07,
-       3.5,
-       5.81
+       10.94,
+       1.34,
+       3.22,
+       4.2
       ],
       "pin": [
-       11.88,
-       9.07
+       10.94,
+       1.34
       ],
       "title": "Bearbeiten",
       "text": "Review, Änderung, Neuer Wert, Bemerkung, WPO eintragen (Datum/User automatisch)."
      },
      {
       "rect": [
-       15.52,
-       9.07,
-       3.36,
-       5.81
+       14.29,
+       1.34,
+       3.09,
+       4.2
       ],
       "pin": [
-       15.52,
-       9.07
+       14.29,
+       1.34
       ],
       "title": "Speichern",
       "text": "Review-Einträge dieser PDF speichern."
      },
      {
       "rect": [
-       19.26,
-       9.07,
-       3.96,
-       5.81
+       17.74,
+       1.34,
+       3.65,
+       4.2
       ],
       "pin": [
-       19.26,
-       9.07
+       17.74,
+       1.34
       ],
       "title": "Nur doppelte",
       "text": "Nur Tags, die mehrfach in der PDF stehen."
      },
      {
       "rect": [
-       28.49,
-       9.07,
-       4.84,
-       5.81
+       26.24,
+       1.34,
+       4.46,
+       4.2
       ],
       "pin": [
-       28.49,
-       9.07
+       26.24,
+       1.34
       ],
       "title": "Filter zurücksetzen",
       "text": "Alle Filter der Tag-Tabelle aufheben."
      },
      {
       "rect": [
-       35.17,
-       9.07,
-       3.43,
-       5.81
+       42.71,
+       1.34,
+       3.16,
+       4.2
       ],
       "pin": [
-       35.17,
-       9.07
+       42.71,
+       1.34
       ],
       "title": "Fundstelle",
       "text": "Zur nächsten Fundstelle springen (◀ zurück)."
      },
      {
       "rect": [
-       38.99,
-       9.07,
-       2.55,
-       5.81
+       46.22,
+       1.34,
+       2.34,
+       4.2
       ],
       "pin": [
-       38.99,
-       9.07
+       46.22,
+       1.34
       ],
       "title": "Excel",
       "text": "Tag-Tabelle als Excel sichern (mit Listenspalten)."
      },
      {
       "rect": [
-       1.38,
-       34.65,
-       59.21,
-       16.51
+       48.7,
+       1.34,
+       2.99,
+       4.2
       ],
       "pin": [
-       1.38,
-       34.65
+       51.24,
+       1.34
+      ],
+      "title": "Vorschau",
+      "text": "Excel-Export vorher ansehen."
+     },
+     {
+      "rect": [
+       1.11,
+       26.05,
+       64.03,
+       11.93
+      ],
+      "pin": [
+       1.11,
+       26.05
       ],
       "title": "Tag anklicken",
       "text": "Markiert den Tag im Viewer und zoomt hin; gelbe Zeilen = doppelte Tags."
      },
      {
       "rect": [
-       61.26,
-       0.93,
-       38.6,
-       7.67
+       65.76,
+       0.67,
+       34.11,
+       5.55
       ],
       "pin": [
-       61.26,
-       0.93
+       65.76,
+       0.67
       ],
       "title": "Viewer-Leiste",
       "text": "Einpassen, Zoom, Drehen, Monochrom, Seiten, Fundstellen, Redline, PDF öffnen, 2. Monitor."
      },
      {
       "rect": [
-       61.26,
-       9.53,
-       38.6,
-       89.53
+       65.76,
+       13.11,
+       34.11,
+       86.22
       ],
       "pin": [
-       63.8,
-       9.53
+       70.85,
+       13.11
       ],
       "title": "PDF-Ansicht",
       "text": "Rahmen grün = korrekt, rot = fehlerhaft, gelb = doppelt. Mausrad zoomt, Doppelklick passt ein."
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "twotag",
+  "title": "Doppelt angelegte Tags (2TAG)",
+  "intro": "Wenn ein Tag in Plant 3D zweimal existiert, passt der Wert der Datenbank (PI-100?) nicht zur PDF (PI-100). 2TAG schließt diese Lücke und weist darauf hin.",
+  "figs": [
+   {
+    "img": "img/wf_twotag.png",
+    "w": 2019,
+    "h": 520,
+    "caption": "2TAG eingeschaltet",
+    "marks": [
+     {
+      "rect": [
+       3.52,
+       8.65,
+       3.62,
+       4.81
+      ],
+      "pin": [
+       3.52,
+       8.65
+      ],
+      "title": "2TAG einschalten",
+      "text": "Plant 3D schreibt doppelt angelegte Tags mit „?“ am Ende in die Datenbank. Mit 2TAG werden auch diese Zeilen verknüpft."
+     },
+     {
+      "rect": [
+       7.03,
+       29.81,
+       9.36,
+       4.23
+      ],
+      "pin": [
+       7.03,
+       29.81
+      ],
+      "title": "Hellgelbe Tag-Zelle",
+      "text": "„Multi Tag Eintrag in Projekt“: der Tooltip nennt die andere PID. Zählt unter „Nur Abweichungen“."
+     },
+     {
+      "rect": [
+       24.72,
+       15.38,
+       7.13,
+       14.42
+      ],
+      "pin": [
+       24.72,
+       15.38
+      ],
+      "title": "Treffer",
+      "text": "Zeigt beide Listenzeilen (mit und ohne „?“)."
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "multitag",
+  "title": "Doppelte Tags in der PDF kommentieren",
+  "intro": "Einträge ansehen, bei Bedarf verschieben und die kommentierte Kopie erzeugen. Das Original bleibt unverändert.",
+  "figs": [
+   {
+    "img": "img/wf_multitag_bar.png",
+    "w": 2019,
+    "h": 150,
+    "caption": "Leiste „Multi Tag“ über der Tag-Tabelle",
+    "marks": [
+     {
+      "rect": [
+       7.33,
+       30.0,
+       5.79,
+       16.67
+      ],
+      "pin": [
+       7.33,
+       30.0
+      ],
+      "title": "Multi-Tag-PDF",
+      "text": "Kopie der PDF (gewählte oder alle) mit rotem Eintrag je doppeltem Tag."
+     },
+     {
+      "rect": [
+       13.32,
+       30.0,
+       5.65,
+       16.67
+      ],
+      "pin": [
+       13.32,
+       30.0
+      ],
+      "title": "Reviewtabelle",
+      "text": "Hängt Seiten mit allen Reviewpunkten an (Spalten wie in der Tag-Tabelle)."
+     }
+    ]
+   },
+   {
+    "img": "img/wf_multitag_viewer.png",
+    "w": 1056,
+    "h": 595,
+    "caption": "PDF-Viewer mit „Kommentare bearbeiten“",
+    "marks": [
+     {
+      "rect": [
+       6.72,
+       7.56,
+       15.62,
+       4.2
+      ],
+      "pin": [
+       6.72,
+       7.56
+      ],
+      "title": "Kommentare bearbeiten",
+      "text": "Zeigt die roten Einträge über der PDF."
+     },
+     {
+      "rect": [
+       36.36,
+       30.42,
+       27.46,
+       13.78
+      ],
+      "pin": [
+       36.36,
+       30.42
+      ],
+      "title": "Eintrag ziehen",
+      "text": "Mit der Maus verschieben; Rechtsklick setzt die Position zurück. Gilt für die Multi-Tag-PDF."
+     },
+     {
+      "rect": [
+       33.62,
+       1.34,
+       10.13,
+       4.2
+      ],
+      "pin": [
+       33.62,
+       1.34
+      ],
+      "title": "Monochrom",
+      "text": "Eingeschaltet wird auch die ausgegebene PDF schwarz-weiß; Review-Elemente bleiben farbig."
      }
     ]
    }
@@ -1082,19 +1497,19 @@ const WF = [
    {
     "img": "img/wf_review_dialog.png",
     "w": 560,
-    "h": 309,
+    "h": 333,
     "caption": "Review Auswahl/Bulk …",
     "marks": [
      {
       "rect": [
        1.96,
-       3.56,
+       3.3,
        96.07,
-       30.42
+       28.23
       ],
       "pin": [
        1.96,
-       3.56
+       3.3
       ],
       "title": "PDFs",
       "text": "Markierte oder alle gescannten PDFs."
@@ -1102,13 +1517,13 @@ const WF = [
      {
       "rect": [
        3.75,
-       43.04,
+       39.94,
        92.5,
-       5.83
+       5.41
       ],
       "pin": [
        3.75,
-       43.04
+       39.94
       ],
       "title": "Redline-PDF je PDF",
       "text": "Farben wie im Viewer."
@@ -1116,13 +1531,27 @@ const WF = [
      {
       "rect": [
        3.75,
-       50.81,
+       47.15,
        92.5,
-       5.83
+       5.41
       ],
       "pin": [
        8.75,
-       50.81
+       47.15
+      ],
+      "title": "Multi-Tag-PDF je PDF",
+      "text": "Roter Eintrag über jedem doppelten Tag (braucht Datenlink 2)."
+     },
+     {
+      "rect": [
+       3.75,
+       54.35,
+       92.5,
+       5.41
+      ],
+      "pin": [
+       3.75,
+       54.35
       ],
       "title": "Review-Excel je PDF",
       "text": "Pos.-Nr., Kommentar, Prüfstatus, Bemerkung."
@@ -1130,13 +1559,13 @@ const WF = [
      {
       "rect": [
        3.75,
-       58.58,
+       61.56,
        92.5,
-       5.83
+       5.41
       ],
       "pin": [
-       3.75,
-       58.58
+       8.75,
+       61.56
       ],
       "title": "Review-Excel gesamt",
       "text": "Eine Mappe über alle gewählten PDFs."
@@ -1144,13 +1573,13 @@ const WF = [
      {
       "rect": [
        13.75,
-       74.11,
+       75.98,
        65.71,
-       8.74
+       8.11
       ],
       "pin": [
        13.75,
-       74.11
+       75.98
       ],
       "title": "Zielordner",
       "text": "Wohin geschrieben wird; optional Unterordner mit Zeitstempel."
@@ -1158,16 +1587,95 @@ const WF = [
      {
       "rect": [
        1.96,
-       88.03,
+       88.89,
        96.07,
-       8.41
+       7.81
       ],
       "pin": [
        1.96,
-       88.03
+       88.89
       ],
       "title": "Review starten",
       "text": "Erzeugt die Ausgaben; die Original-PDFs bleiben unverändert."
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "preview",
+  "title": "Excel-Export vorher ansehen",
+  "intro": "Bei allen anderen Tabellen: Rechtsklick auf das Excel-Symbol in der Ecke › „Vorschau ansehen“.",
+  "figs": [
+   {
+    "img": "img/wf_preview_bar.png",
+    "w": 2019,
+    "h": 150,
+    "caption": "Leiste der Tag-Tabelle",
+    "marks": [
+     {
+      "rect": [
+       74.1,
+       5.33,
+       4.56,
+       16.67
+      ],
+      "pin": [
+       74.1,
+       5.33
+      ],
+      "title": "Vorschau",
+      "text": "Zeigt den Excel-Export vorher an."
+     },
+     {
+      "rect": [
+       70.33,
+       5.33,
+       3.57,
+       16.67
+      ],
+      "pin": [
+       70.33,
+       5.33
+      ],
+      "title": "Excel",
+      "text": "Direkt sichern, ohne Vorschau."
+     }
+    ]
+   },
+   {
+    "img": "img/wf_preview_dialog.png",
+    "w": 1100,
+    "h": 520,
+    "caption": "Vorschau des Excel-Exports",
+    "marks": [
+     {
+      "rect": [
+       1.0,
+       5.96,
+       98.0,
+       85.77
+      ],
+      "pin": [
+       1.0,
+       5.96
+      ],
+      "title": "Tabelle wie in der Datei",
+      "text": "Spalten, Reihenfolge, Breiten und Farben der Ansicht."
+     },
+     {
+      "rect": [
+       1.0,
+       92.88,
+       98.0,
+       5.0
+      ],
+      "pin": [
+       1.0,
+       92.88
+      ],
+      "title": "Als Excel sichern …",
+      "text": "Speichert die ganze Tabelle (die Vorschau zeigt höchstens 500 Zeilen)."
      }
     ]
    }
@@ -1267,6 +1775,77 @@ const WF = [
       ],
       "title": "Handbuch",
       "text": "Dieses Handbuch."
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "tables",
+  "title": "Mit Tabellen arbeiten",
+  "intro": "Diese Bedienung gilt für alle Tabellen des Tools.",
+  "figs": [
+   {
+    "img": "img/wf_tables.png",
+    "w": 2019,
+    "h": 595,
+    "caption": "Standardfunktionen jeder Tabelle",
+    "marks": [
+     {
+      "rect": [
+       0.3,
+       13.45,
+       1.39,
+       12.61
+      ],
+      "pin": [
+       0.3,
+       13.45
+      ],
+      "title": "Excel-Symbol",
+      "text": "Klick: sichern. Rechtsklick: Vorschau ansehen."
+     },
+     {
+      "rect": [
+       7.03,
+       13.45,
+       9.41,
+       12.61
+      ],
+      "pin": [
+       7.03,
+       13.45
+      ],
+      "title": "Spaltenkopf",
+      "text": "Klick sortiert, Feld darunter filtert, Doppelklick im Feld wählt Werte, Rechtsklick öffnet das Spaltenmenü."
+     },
+     {
+      "rect": [
+       1.68,
+       26.05,
+       15.85,
+       15.46
+      ],
+      "pin": [
+       1.68,
+       26.05
+      ],
+      "title": "Zellen markieren",
+      "text": "Wie in Excel ziehen; Strg+C kopiert, Strg+V fügt in Review-Spalten ein."
+     },
+     {
+      "rect": [
+       0.2,
+       94.96,
+       90.0,
+       4.37
+      ],
+      "pin": [
+       0.2,
+       94.96
+      ],
+      "title": "Ansicht speichern",
+      "text": "Save / Load / Reset Layout."
      }
     ]
    }

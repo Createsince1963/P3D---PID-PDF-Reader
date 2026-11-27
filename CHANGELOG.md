@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.0.59 – 2026-11-27
+
+- **Handbuch erweitert:** eigene Kapitel „Prüftypen“, „2TAG“ und „Multi-Tag-PDF & Kommentare“ mit nummeriertem Ablauf; zu den Themen stehen jetzt die Ansichten der Oberfläche mit Nummern und Erklärungen (dieselben wie im Kapitel „Workflow Schritt für Schritt“). Alle Bildschirmfotos neu erzeugt, neue Ansichten für Pfade, Listenabgleich, Prüftypen, 2TAG, Multi-Tag, Excel-Vorschau und Tabellenbedienung. Texte auf den Stand 1.0.58 gebracht.
+
+## 1.0.58 – 2026-11-27
+
+- **Neu: Prüftypen** (Menüband „3 Prüfen“, erster Knopf): Optionstabelle mit Haken je Tag-Typ, Anzahl Tags und PDFs; Doppelklick auf eine Zeile = nur dieser Typ. Der Vorfilter gilt für die gesamte Prüfung: Tag-Tabelle, Alle Tags, Review Importliste, Viewer-Rahmen, Redline, Multi-Tag-PDF, Review-Excel, Bulk, Export und Offline-Bericht. Er wird gemerkt und steht vorn in der Kopfzeile. Importzeilen abgewählter Typen gelten nicht als „fehlt im PDF“. Die Dateiliste zeigt weiter alle gefundenen Tags; der Web-Server prüft immer alles.
+
+## 1.0.57 – 2026-11-27
+
+- **Fehler behoben: Tags blieben trotz Eintrag in der Importliste „n.a.“**, wenn die Liste ohne Bindestrich schreibt (`FV501`, `XV509`) und die PDF `FV-501`, `XV-509` liefert. Beim Datenlink 2 zählt der Bindestrich zwischen Buchstaben und Nummer nicht mehr.
+- **Vorschau vor dem Excel-Export:** neuer Knopf „Vorschau“ neben „Excel“ in der Leiste der Tag-Tabelle; bei allen Tabellen per Rechtsklick auf das Excel-Symbol in der Ecke. Zeigt Spalten, Reihenfolge, Breiten und Farben wie in der Datei (höchstens 500 Zeilen) und führt direkt zum Speichern.
+
+## 1.0.56 – 2026-11-27
+
+- Mehr Platz für die Tabellen: Die Reiterzeile „P&ID-PDF-Reader“ entfällt.
+- Der Blattkopf ist einzeilig: Untertitel und Projektzeile (Projekt, Quelle, PDFs, Tags, Fehler) stehen hinter dem Titel.
+- Der Filter der Dateiliste steht hinter dem Excel-Knopf und reicht höchstens bis zum Ende der Spalte „Rev“.
+- Titel und Filter der Tag-Tabelle stehen hinter „Reset Layout“ der Dateiliste (auch bei eingeklappter Dateiliste sichtbar).
+
+## 1.0.55 – 2026-11-27
+
+- **Neuer Knopf „2TAG“** in der Leiste der Tag-Tabelle (wird gemerkt, Standard aus; braucht Datenlink 2). Plant 3D hängt bei doppelt angelegten Tags in der Datenbank ein „?“ an (PDF `PI-100`, Liste `PI-100?`). Eingeschaltet zählt das „?“ am Ende beim Abgleich nicht, beide Listenzeilen werden verknüpft.
+- Betroffene Tags: **Tag-Zelle hellgelb**, Hinweis **„Multi Tag Eintrag in Projekt“** als Tooltip und im Projektmodus in „Projekt-Hinweis“; sie zählen unter „Nur Abweichungen“. Gilt für alle Fundstellen im Projekt, auch wenn die Kopie auf einer anderen PID liegt (diese wird genannt). „Review Importliste“ bekommt die Spalte „2TAG-Hinweis“.
+- Nur Tags mit Nummer: `…-CKV?` oder `…-PT-?` (fehlende Nummer) bleiben unverändert.
+- **Neuer Knopf „Multi-Tag-PDF“:** Kopie der PDF (gewählte oder alle, wird gefragt) mit rotem Rahmen und rotem Eintrag oberhalb jedes doppelten Tags: je Datenbankzeile das komplette Tag und die PID Number, auch von anderen PIDs. Erfasst Tags mit „?“-Eintrag (unabhängig vom Knopf 2TAG) und Tags, die mehrfach in der PDF vorkommen. Sichtbar höchstens 6 Zeilen, alle im PDF-Kommentar; ohne Fundstelle keine Datei. Einträge benachbarter Tags weichen einander aus (dann mit roter Linie zum Tag); Zeichnungsverweise zählen nicht. Das Original bleibt unverändert.
+- **Neuer Knopf „Kommentare bearbeiten“ im PDF-Viewer:** zeigt die roten Multi-Tag-Einträge über der PDF, sie lassen sich mit der Maus frei verschieben (Rechtsklick: Position zurücksetzen). Die Positionen werden je PDF gemerkt und in die Multi-Tag-PDF übernommen; verschobene Einträge bekommen eine rote Linie zum Tag.
+- **Neuer Knopf „Reviewtabelle“:** eingeschaltet bekommen Multi-Tag-PDF und Redline-PDF am Ende zusätzliche Seiten (A3 quer) mit allen Reviewpunkten (Tags mit Review-Eintrag; in der Multi-Tag-PDF auch alle doppelten Tags). Die Spalten entsprechen der Tag-Tabelle, wie sie eingestellt ist (Auswahl, Reihenfolge, Breiten, Importspalten), davor die Pos.-Nr., in der Multi-Tag-PDF dahinter die Datenbankzeilen; bei vielen Spalten wird das Blatt größer (auf A3 gedruckt kleinere Schrift).
+- **Review / Audit (Bulk):** neuer Haken „Multi-Tag-PDF je PDF“ (braucht Datenlink 2).
+- **Monochrome Ausgabe:** steht der Viewer auf „Monochrom“, wird auch die Zeichnung in Redline- und Multi-Tag-PDF schwarz-weiß (weiterhin Vektorgrafik); Review-Elemente behalten ihre Farben. Rasterbilder und Farbverläufe bleiben farbig.
+- „2TAG“, „Multi-Tag-PDF“ und „Reviewtabelle“ stehen in einer zweiten Leiste „Multi Tag“ über der Tag-Tabelle, „Kommentare bearbeiten“ entsprechend über dem Viewer.
+
 ## 1.0.54 – 2026-11-26
 
 - **Fehler behoben: Rechtsklick in den Tabellen öffnete kein Menü** (Dateiliste, Tag-Tabelle, Alle Tags, Prüfblätter, Raster der Projektdefinitionen). Das Menü war vorhanden, hing aber an der falschen Stelle.

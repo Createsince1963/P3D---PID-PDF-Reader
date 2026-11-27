@@ -10,6 +10,9 @@ Abgleich: Gross-/Kleinschreibung und Leerzeichen egal. Zuerst exakt; gibt es kei
 **Endung ab einem Bindestrich** (Importwert „301-30-149-TI-300“ passt zum Tag „TI-300“). Sind beide Datenlinks aktiv,
 zaehlen fuer eine Tag-Zeile nur Importzeilen derselben Zeichnung (Datenlink 1).
 
+**2TAG** (1.0.55): legt Plant 3D ein Tag doppelt an, steht in der Datenbank ``PI-100?``, in der PDF aber ``PI-100``.
+Mit ``two_tag`` zaehlt das „?“ am Ende beim Datenlink 2 nicht, und ``multi_note`` meldet solche Tags projektweit.
+
 Die bearbeitete Importtabelle liegt in ``config/data_link.json``; die Datenlink-Felder der Tool-Tabellen in
 ``config/state.json`` (Schluessel ``data_link_fields``).
 
@@ -48,6 +51,26 @@ def cell_text(value) -> str:
 
 def norm(value) -> str:
     return "".join(str(value or "").split()).casefold()
+
+
+MULTI_NOTE = "Multi Tag Eintrag in Projekt"
+# „?“ am Ende eines Tags mit Nummer = Doppel-Kennzeichen; „…-CKV?“ oder „…-PT-?“ (Nummer fehlt) bleiben unveraendert
+_DUP_MARK = re.compile(r"^(.*\d[a-z]?)\?+$", re.IGNORECASE)
+
+
+def strip_mark(key: str) -> str:
+    """Tag ohne das Doppel-Kennzeichen „?“ am Ende."""
+    found = _DUP_MARK.match(key)
+    return found.group(1) if found else key
+
+
+_CODE_HYPHEN = re.compile(r"(?<=[^\W\d_])-(?=\d)")
+
+
+def tag_key(value: str) -> str:
+    """Schluessel fuer Datenlink 2: der Bindestrich zwischen Buchstaben und Nummer zaehlt nicht (1.0.57). Plant 3D
+    schreibt in der Datenbank oft ``FV501``, die PDF-Blase liefert ``FV-501``."""
+    return _CODE_HYPHEN.sub("", value)
 
 
 def suffixes(value: str) -> list[str]:
@@ -209,19 +232,26 @@ def write_excel(path, headers: list[str], rows: list[list], sheet: str = "Import
 class _KeyIndex:
     """Index einer Spalte: normalisierter Wert -> Zeilen, Endung -> Zeilen."""
 
-    def __init__(self, values: list[str]):
+    def __init__(self, values: list[str], two_tag: bool = False, tags: bool = False):
+        self.two_tag, self.tags = two_tag, tags
         self.exact: dict[str, list[int]] = {}
         self.tail: dict[str, list[int]] = {}
         for i, v in enumerate(values):
-            key = norm(v)
+            key = self._key(v)
             if not key:
                 continue
             self.exact.setdefault(key, []).append(i)
             for s in suffixes(key):
                 self.tail.setdefault(s, []).append(i)
 
-    def find(self, value) -> list[int]:
+    def _key(self, value) -> str:
         key = norm(value)
+        if self.two_tag:
+            key = strip_mark(key)
+        return tag_key(key) if self.tags else key
+
+    def find(self, value) -> list[int]:
+        key = self._key(value)
         if not key:
             return []
         return self.exact.get(key) or self.tail.get(key, [])
@@ -231,7 +261,11 @@ class DataLink:
     """Verknuepfung der Importtabelle mit den Tool-Tabellen. ``fields`` = Datenlink-Feld je Tool-Tabelle
     (``{"files": "Zeichnungsnr.", "tags": "Tag"}``)."""
 
-    def __init__(self, table: ImportTable, fields: dict[str, str]):
+    def __init__(self, table: ImportTable, fields: dict[str, str], two_tag: bool = False):
+        self.two_tag = bool(two_tag)
+        self._groups: dict[str, list[int]] = {}    # 2TAG: Tag ohne „?“ -> alle Importzeilen im Projekt
+        self._keys: dict[int, str] = {}            # Importzeile -> Schluessel in _groups
+        self._marked: set[str] = set()             # Schluessel mit mindestens einem „?“-Eintrag
         self.table = table
         self.fields = dict(fields or {})
         cols = table.headers
@@ -240,10 +274,63 @@ class DataLink:
             name = table.link(n)
             if name in cols:
                 c = cols.index(name)
-                self._idx[n] = _KeyIndex([r[c] if c < len(r) else "" for r in table.rows])
+                values = [r[c] if c < len(r) else "" for r in table.rows]
+                self._idx[n] = _KeyIndex(values, self.two_tag and n == 2, tags=n == 2)
+                if self.two_tag and n == 2:
+                    self._group(values)
         self.columns = table.transfer_columns()
         self._pos = [cols.index(h) for h in self.columns]
         self._same: dict[str, frozenset] = {}      # Zeichnung (Datenlink-1-Wert) -> Importzeilen; je Tag nicht neu bilden
+
+    def _group(self, values: list[str]) -> None:
+        for i, v in enumerate(values):
+            key = norm(v)
+            if not key:
+                continue
+            base = tag_key(strip_mark(key))
+            self._keys[i] = base
+            self._groups.setdefault(base, []).append(i)
+            if strip_mark(key) != key:
+                self._marked.add(base)
+
+    def multi_note(self, value, file_value=None) -> str:
+        """2TAG: Hinweis, wenn das getroffene Tag irgendwo im Projekt (auch auf einer anderen Zeichnung) auch mit „?“
+        eingetragen ist, sonst "". Genannt werden die anderen Zeichnungen (Spalte von Datenlink 1)."""
+        if not self._marked:
+            return ""
+        hits = self.tag_rows(value, file_value)
+        keys = {self._keys[i] for i in hits if i in self._keys} & self._marked
+        if not keys:
+            return ""
+        if self.table.link1 not in self.table.headers:
+            return MULTI_NOTE
+        c = self.table.headers.index(self.table.link1)
+
+        def drawing(i: int) -> str:
+            return self.table.rows[i][c] if c < len(self.table.rows[i]) else ""
+
+        own = {drawing(i) for i in hits}
+        other = sorted({drawing(i) for k in keys for i in self._groups[k]} - own - {""})
+        if not other:
+            return MULTI_NOTE
+        more = ", …" if len(other) > MAX_JOINED else ""
+        return f"{MULTI_NOTE} (auch in {', '.join(other[:MAX_JOINED])}{more})"
+
+    def entries(self, value, file_value=None) -> tuple[list[tuple[str, str]], bool]:
+        """(Datenbankzeilen ``(komplettes Tag, PID-Nummer)`` zum getroffenen Tag aus dem ganzen Projekt, True wenn
+        eine davon ein „?“ traegt). Nur mit ``two_tag``. Trifft die Endung mehrere Tags, zaehlen die mit „?“."""
+        hits = self.tag_rows(value, file_value)
+        keys = {self._keys[i] for i in hits if i in self._keys}
+        marked = keys & self._marked
+        c2 = self.table.headers.index(self.table.link2) if keys else 0
+        c1 = self.table.headers.index(self.table.link1) if self.table.link1 in self.table.headers else None
+
+        def cell(i: int, c) -> str:
+            row = self.table.rows[i]
+            return row[c] if c is not None and c < len(row) else ""
+
+        rows = sorted(i for k in (marked or keys) for i in self._groups[k])
+        return sorted(((cell(i, c2), cell(i, c1)) for i in rows)), bool(marked)
 
     def active(self, n: int) -> bool:
         """Datenlink n aktiv: Spalte in der Importtabelle gesetzt und Feld in der Tool-Tabelle gesetzt."""
@@ -305,7 +392,8 @@ class DataLink:
             return self.file_rows(file_value)
         return list(range(len(self.table.rows)))
 
-    def tag_join(self, values: list, file_value=None, mode: str = None) -> list[tuple[int | None, list[int]]]:
+    def tag_join(self, values: list, file_value=None, mode: str = None,
+                 skip: set = frozenset()) -> list[tuple[int | None, list[int]]]:
         """Abgleich der Tag-Tabelle einer PDF mit der Importtabelle (1.0.38). ``values`` = Wert des Datenlink-Felds je
         Tool-Zeile. Rueckgabe: ``(Index der Tool-Zeile oder None, Importzeilen)`` in Anzeigereihenfolge.
 
@@ -320,7 +408,7 @@ class DataLink:
                                                    if mode != JOIN_LIST or h]
         if mode == JOIN_PDF:
             return out
-        taken = {i for h in hits for i in h}
+        taken = {i for h in hits for i in h} | set(skip)    # skip: Zeilen abgewaehlter Prueftypen
         key = self.table.headers.index(self.table.link(2))
         for i in self.drawing_rows(file_value):
             row = self.table.rows[i]
@@ -354,10 +442,12 @@ STATUS_NOT_IN_LIST = "Nicht in Liste"            # Tag im PDF, keine passende Ze
 STATUS_NOT_IN_PDF = "Fehlt im PDF"               # Zeile der Importtabelle zu einer gescannten Zeichnung, Tag nicht im PDF
 STATUS_NO_PDF = "Zeichnung nicht gescannt"       # Zeile der Importtabelle, deren Zeichnung (Datenlink 1) kein PDF hat
 REVIEW_STATUS = (STATUS_OK, STATUS_NOT_IN_LIST, STATUS_NOT_IN_PDF, STATUS_NO_PDF)
+MULTI_HEAD = "2TAG-Hinweis"                       # nur mit 2TAG: letzte Spalte der Review-Tabelle
 REVIEW_HEAD = ["Prüfergebnis", "PDF", "Zeichnung (Tool)", "Typ", "Tag (PDF)", "Anzahl", "Seiten", "Importzeilen"]
 
 
-def review_rows(link: DataLink, pdfs: list[tuple[str, object, list[tuple]]]) -> tuple[list[str], list[list]]:
+def review_rows(link: DataLink, pdfs: list[tuple[str, object, list[tuple]]],
+                skip: set = frozenset()) -> tuple[list[str], list[list]]:
     """Review-Tabelle aus Datenlink und PDF-Tags. ``pdfs`` = je PDF ``(PDF-Name, Wert des Datenlink-Felds der
     Dateiliste oder None, [(Typ, Tag, Anzahl, Seiten, Wert des Datenlink-Felds der Tag-Tabelle), …])``.
 
@@ -368,6 +458,8 @@ def review_rows(link: DataLink, pdfs: list[tuple[str, object, list[tuple]]]) -> 
     headers = REVIEW_HEAD + unique_names([h if h not in REVIEW_HEAD else h + " (Liste)" for h in link.columns])
     if not link.active(2):
         return headers, []
+    if link.two_tag:
+        headers = unique_names(headers + [MULTI_HEAD])
     empty = [""] * len(link.columns)
     rows: list[list] = []
     hit: set[int] = set()
@@ -383,15 +475,18 @@ def review_rows(link: DataLink, pdfs: list[tuple[str, object, list[tuple]]]) -> 
             rows.append([STATUS_OK if found else STATUS_NOT_IN_LIST, name, cell_text(file_value), typ, tag, count,
                          pages, ", ".join(str(i + 1) for i in found[:MAX_JOINED]),
                          *(link.values(found) if found else empty)])
+            if link.two_tag:
+                rows[-1].append(link.multi_note(value, file_value if use_files else None))
     key = link.table.headers.index(link.table.link(2))      # aktiv(2) -> Spalte vorhanden
     for i, row in enumerate(link.table.rows):
-        if i in hit or not cell_text(row[key] if key < len(row) else ""):
+        if i in hit or i in skip or not cell_text(row[key] if key < len(row) else ""):
             continue                                         # getroffen oder ohne Tag
         if use_files and i not in scanned:
             status, pdf = STATUS_NO_PDF, ""
         else:
             status, pdf = STATUS_NOT_IN_PDF, scanned.get(i, "")
-        rows.append([status, pdf, "", "", "", "", "", str(i + 1), *link.values([i])])
+        rows.append([status, pdf, "", "", "", "", "", str(i + 1), *link.values([i])]
+                    + ([""] if link.two_tag else []))
     return headers, rows
 
 

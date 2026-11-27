@@ -6,13 +6,15 @@ Blatt "Alle Tags": Tags aller gescannten PDFs. Jede Tabelle: Kit-Standard (Spalt
 Ansicht), dunkelblauer Tabellenkopf wie in XCHANGE, TableAdminBar fuer benannte Ansichten, Excel-Symbol in der Ecke."""
 from __future__ import annotations
 
+import html
+
 import os
 from contextlib import nullcontext
 from pathlib import Path
 
-from PySide6.QtCore import QModelIndex, Qt, QThread, QTimer
+from PySide6.QtCore import QModelIndex, QPoint, Qt, QThread, QTimer
 from PySide6.QtGui import QBrush, QColor, QKeySequence, QShortcut
-from PySide6.QtWidgets import (QAbstractItemView, QApplication, QComboBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu,
+from PySide6.QtWidgets import (QSizePolicy, QAbstractItemView, QApplication, QComboBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu,
                                QMessageBox, QSplitter, QStatusBar, QStyledItemDelegate, QTabBar, QTableView,
                                QTabWidget, QToolButton, QVBoxLayout, QWidget)
 
@@ -24,7 +26,7 @@ from main_gui_kit.theme import LIGHT, ThemeManager
 
 from .. import i18n, paths
 from ..constants import APP_NAME
-from ..core import data_link, export, project_settings, project_store, redline, review
+from ..core import data_link, export, multitag, project_settings, project_store, redline, review, review_table, type_filter
 from ..core.extract import PdfResult
 from ..core import tag_edit
 from ..core.project_defs import CHECK_HEADERS, ProjectDB, is_fault_status
@@ -38,13 +40,15 @@ from . import msgbox, project_dialog, table_profiles, web_control
 from .controls import indicator_qss
 from .data_link_ui import LinkController
 from .icons import excel_icon
+from .sheet import label_value_html
 from .progress import ProgressDialog, progress_task
 from .review_dialog import ReviewDialog
+from .type_dialog import TypeDialog
 from .ribbon import Ribbon
 from .ribbon_fold import RibbonFold
 from .ribbon_heads import apply_group_heads
 from .sheet import SheetHeader, configure_subtabs, mark_active_filters, table_header_qss
-from .table_export import export_table_view, install_excel_corner
+from .table_export import export_table_view, install_excel_corner, preview_table_view
 from .table_menu import install_table_menus
 from .toolstrip import ToolStrip
 from .viewer_panel import ViewerPanel
@@ -90,6 +94,11 @@ LINK_COLS_TIP = ("Importspalten ein/aus: Spalten der verlinkten Importliste (Dat
                  "der Review-Spalten nicht.")
 LINK_MENU_TIP = ("Importliste: Link der Tag-Tabelle aufheben, Liste neu einlesen, Importtabelle bearbeiten oder "
                  "entfernen.")
+TWO_TAG_TIP = ("2TAG: Plant 3D hängt bei doppelt angelegten Tags in der Datenbank ein „?“ an (PDF PI-100, Liste "
+               "PI-100?). Eingeschaltet zählt das „?“ beim Datenlink 2 nicht; die Tag-Zelle wird hellgelb mit dem "
+               "Hinweis „Multi Tag Eintrag in Projekt“ (zählt unter „Nur Abweichungen“).")
+REVIEW_TABLE_KEY = "pdf_review_table"      # config/state.json: Reviewtabelle an PDF-Kopien anhaengen (1.0.55)
+NOTE_POS_KEY = "multitag_positions"        # config/state.json: {PDF-Name: {Eintrag: [x, y]}}
 FILES_FOLD_KEY = "files_collapsed"   # config/state.json: Dateiliste eingeklappt (1.0.43)
 PROJECT_MODE_KEY, PROJECT_DB_KEY = "project_mode", "project_db"     # config/state.json
 PROJECT_TIP = ("Projektmodus: Tags werden gegen die Projektdefinitionen geprüft (Codelisten und Tag-Strukturen wie in "
@@ -151,8 +160,10 @@ class ReviewModel(DuplicateModel):
     """Tag-Tabelle mit Review-Spalten. Im Bearbeiten-Modus sind die Spalten ``EDIT_FIELDS`` editierbar; jede Aenderung
     geht in den ``ReviewStore`` der PDF, der Datum und User (letzte zwei Spalten) automatisch setzt."""
 
-    def __init__(self, headers, rows, count_col, parent=None, *, store=None, edit_mode=False, first_field=4):
+    def __init__(self, headers, rows, count_col, parent=None, *, store=None, edit_mode=False, first_field=4,
+                 multi_note=None):
         super().__init__(headers, rows, count_col, parent)
+        self.multi_note = multi_note or (lambda row: "")       # 2TAG-Hinweis je Zeile
         self.store, self.edit_mode, self.first_field = store, edit_mode, first_field
         self._edit_cols = {first_field + i for i in range(len(EDIT_FIELDS))}
         self._edit_brush = QBrush(QColor(appearance.selection_color()))
@@ -202,6 +213,11 @@ class ReviewModel(DuplicateModel):
         if (role == Qt.BackgroundRole and index.isValid() and index.column() == 1 and self.is_rule_fault(index.row())
                 and not self.is_removed(index.row())):
             return self._fault_brush                     # Regelverstoss (Projekt-Pruefung): Tag-Wert hellgelb
+        if (role in (Qt.BackgroundRole, Qt.ToolTipRole) and index.isValid() and index.column() == 1
+                and not self.is_removed(index.row())):
+            note = self.multi_note(self.rows[index.row()])
+            if note:                                     # 2TAG: Tag mehrfach im Projekt, Tag-Zelle hellgelb
+                return self._fault_brush if role == Qt.BackgroundRole else note
         if role == Qt.ToolTipRole and index.isValid() and self.is_removed(index.row()):
             return "Aus dem Review genommen – Rechtsklick › Zeile wiederherstellen"
         if (role == Qt.BackgroundRole and self.edit_mode and index.isValid() and index.column() in self._edit_cols
@@ -369,7 +385,19 @@ class Sheet(QWidget):
         self.set_band("")
 
     def set_band(self, band: str) -> None:
-        self.header.set_lines([i18n.tr(self.title), i18n.tr(self.subtitle)] + ([band] if band else []))
+        """Blattkopf einzeilig (1.0.56): hinter dem Titel Untertitel und Projektzeile in derselben Zeile."""
+        title, subtitle = html.escape(i18n.tr(self.title)), html.escape(i18n.tr(self.subtitle))
+        gap = "&nbsp;" * 6
+        line = f'{title}{gap}<span style="color:{LIGHT.txt_muted}; font-size:8pt; font-weight:400;">{subtitle}</span>'
+        if band:
+            line += f'{gap}<span style="font-weight:400;">{label_value_html(band)}</span>'
+        for i in range(self.header.text_box.count()):          # alte Zeile sofort ausblenden (sonst kurz doppelt)
+            self.header.text_box.itemAt(i).widget().hide()
+        self.header.set_lines([line])
+        label = self.header.text_box.itemAt(self.header.text_box.count() - 1).widget()
+        label.setTextFormat(Qt.RichText)
+        label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)     # lange Quelle macht das Fenster nicht breit
+        label.setMinimumWidth(1)
 
 
 class TagsSheet(Sheet):
@@ -391,6 +419,7 @@ class TagsSheet(Sheet):
                                      "Dateiliste einklappen bzw. wieder aufklappen – die Tag-Tabelle bekommt den Platz",
                                      checkable=True)
         self.files.layout().insertWidget(1, strip)
+        self._place_files_filter(strip)
         vsplit.addWidget(self.files)
         self._vsplit = vsplit
         hsplit = QSplitter(Qt.Horizontal)
@@ -399,7 +428,8 @@ class TagsSheet(Sheet):
         self.edit_mode = False
         self.tags = DataTable("tags", "Tags der gewählten PDF", TAG_COLS, count_col=2, model_factory=lambda h, rows, c, p:
                               ReviewModel(h, rows, c, p, store=self.store, edit_mode=self.edit_mode,
-                                          first_field=FIRST_FIELD))
+                                          first_field=FIRST_FIELD,
+                                          multi_note=lambda row: self.multi_note(row, self._store_result)))
         self.tags.table.setItemDelegateForColumn(FIRST_FIELD, ChoiceDelegate(REVIEW_VALUES, False, self.tags.table))
         self.tags.table.setItemDelegateForColumn(FIRST_FIELD + 1, ChoiceDelegate(CHANGE_VALUES, True, self.tags.table))
         strip = ToolStrip("Tags")
@@ -456,9 +486,26 @@ class TagsSheet(Sheet):
         strip.separator()
         strip.add("excel_tags", "Excel", "excel", lambda: export_table_view(self.tags.table, "Tags"),
                   "Tags der PDF als Excel sichern (Name: PDF + Zeitstempel)", icon=excel_icon(16))
+        strip.add("preview_tags", "Vorschau", "columns", lambda: preview_table_view(self.tags.table, "Tags"),
+                  "Excel-Export der Tag-Tabelle vorher ansehen")
         strip.add("redline", "Redline", "redline", window.redline_current, "Redline-PDF mit den sichtbaren Tags")
         strip.stretch()
         self.tags.layout().insertWidget(1, strip)
+        multi = ToolStrip("Multi Tag")
+        self.two_tag_button = multi.add("two_tag", "2TAG", "two_tag", self.toggle_two_tag, TWO_TAG_TIP,
+                                        checkable=True)
+        multi.add("multitag", "Multi-Tag-PDF", "multitag", window.multitag_pdf,
+                  "Kopie der PDF mit rotem Eintrag über jedem doppelten Tag (mit „?“ in der Importliste oder mehrfach "
+                  "in der PDF): komplettes Tag und PID-Nummer aus der Datenbank")
+        self.review_table_button = multi.add(
+            "review_table", "Reviewtabelle", "review_table",
+            lambda on: last_paths.set_value(REVIEW_TABLE_KEY, bool(on)),
+            "Eingeschaltet bekommen Multi-Tag-PDF und Redline-PDF am Ende zusätzliche Seiten mit allen Reviewpunkten "
+            "(Spalten wie in der Tag-Tabelle eingestellt)",
+            checkable=True)
+        self.review_table_button.setChecked(bool(last_paths.get_value(REVIEW_TABLE_KEY, False)))
+        multi.stretch()
+        self.tags.layout().insertWidget(2, multi)
         hsplit.addWidget(self.tags)
         viewer_host = QWidget()
         host_layout = QVBoxLayout(viewer_host)
@@ -484,6 +531,7 @@ class TagsSheet(Sheet):
         self.viewer_away.hide()
         self.tags.layout().itemAt(0).layout().addWidget(self.viewer_away)
         vsplit.addWidget(hsplit)
+        self._place_tags_filter()
         vsplit.setSizes([300, 520])
         self.body_layout.addWidget(vsplit, 1)
 
@@ -507,6 +555,62 @@ class TagsSheet(Sheet):
         self.viewer.detached_changed.connect(self._viewer_detached)
         self.viewer.install(self._viewer_host_layout)
 
+    # --- Filterfelder (1.0.56) -----------------------------------------------------------------------------------
+    def _place_files_filter(self, strip) -> None:
+        """Dateifilter hinter den Excel-Knopf; er reicht hoechstens bis zum Ende der Spalte „Rev“ der Dateiliste."""
+        files = self.files
+        top = files.layout().itemAt(0).layout()
+        top.itemAt(0).widget().hide()                           # Beschriftung „Dateien“ steht schon in der Leiste
+        top.removeWidget(files.filter)
+        top.removeWidget(files.count)
+        at = strip._layout.indexOf(strip.buttons["excel_files"]) + 1
+        files.filter.setMinimumWidth(120)
+        strip._layout.insertWidget(at, files.filter, 1000)      # waechst bis zur Hoechstbreite, dann der Leerraum
+        strip._layout.insertWidget(at + 1, files.count)
+        header = files.table.horizontalHeader()
+        for signal in (header.sectionResized, header.sectionMoved, header.geometriesChanged,
+                       files.table.horizontalScrollBar().valueChanged):
+            signal.connect(lambda *_a: self._align_timer.start())
+        self._align_timer = QTimer(self)
+        self._align_timer.setSingleShot(True)
+        self._align_timer.timeout.connect(self.align_files_filter)
+
+    def align_files_filter(self) -> None:
+        view, field = self.files.table, self.files.filter
+        header, column = view.horizontalHeader(), FILE_COLS.index("Rev")
+        width = 400                                             # Spalte „Rev“ ausgeblendet
+        if column < header.count() and not view.isColumnHidden(column):
+            end = header.sectionViewportPosition(column) + header.sectionSize(column)
+            right = header.viewport().mapTo(self.files, QPoint(end, 0)).x()
+            width = right - field.mapTo(self.files, QPoint(0, 0)).x()
+        field.setMaximumWidth(max(160, width))
+
+    def _place_tags_filter(self) -> None:
+        """Titel und Filter der Tag-Tabelle hinter „Reset Layout“ der Dateiliste (spart eine Zeile)."""
+        tags = self.tags
+        top = tags.layout().itemAt(0).layout()
+        box = QWidget()
+        row = QHBoxLayout(box)
+        row.setContentsMargins(12, 0, 0, 0)
+        for widget in (top.itemAt(0).widget(), tags.filter, tags.count):
+            top.removeWidget(widget)
+            row.addWidget(widget)
+        tags.filter.setFixedWidth(280)
+        bottom = self.files.layout().itemAt(self.files.layout().count() - 1).layout()
+        bottom.setStretch(0, 0)
+        self.files.admin.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
+        bottom.insertWidget(1, box)
+        bottom.insertStretch(2, 1)
+        self.tag_filter_box = box
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._align_timer.start()
+
+    def showEvent(self, event) -> None:  # noqa: N802
+        super().showEvent(event)
+        self._align_timer.start()
+
     def set_files_collapsed(self, collapsed: bool) -> None:
         """Dateiliste ein-/ausklappen (1.0.43): eingeklappt bleiben Kopfzeile (Blattfilter, Zeilenzahl) und Leiste
         sichtbar, Tabelle und Layout-Leiste verschwinden; die Tag-Tabelle bekommt den Platz. Aufklappen stellt die
@@ -518,7 +622,7 @@ class TagsSheet(Sheet):
         bottom = files.layout().itemAt(files.layout().count() - 1).layout()
         for i in range(bottom.count()):
             widget = bottom.itemAt(i).widget()
-            if widget is not None:
+            if widget is not None and widget is not getattr(self, "tag_filter_box", None):
                 widget.setVisible(not collapsed)
         files.setMaximumHeight(files.minimumSizeHint().height() if collapsed else 16777215)
         if not collapsed and self._files_sizes:
@@ -549,11 +653,16 @@ class TagsSheet(Sheet):
             return []
         checker = self.win.checker
         scan = scan_values(result) if self.scan_button.isChecked() else [""] * len(SCAN_COLS)
-        tags = result.tags if include_removed or store is None else store.visible(result.tags)
+        tags = type_filter.apply(result.tags) if include_removed or store is None else store.visible(result.tags)
         rows = [[t.type, t.tag, t.count, t.pages_text,
                  *(checker.columns(t.type, t.tag, t.count) if checker else ["", ""]),
                  *(store.values(t.type, t.tag) if store else [""] * len(FIELDS)), *scan]
                 for t in tags]
+        if checker:                                    # 2TAG: Hinweis in der Spalte Projekt-Hinweis
+            for row in rows:
+                note = self.multi_note(row, result)
+                if note:
+                    row[CHECK_COL + 1] = "; ".join(v for v in (row[CHECK_COL + 1], note) if v)
         # Datenlink 2: Zusatzspalten aus der Importtabelle (Feld per Rechtsklick auf den Spaltenkopf). Abgleich (1.0.38):
         # PDF-Tags -> Liste, Liste -> PDF-Tags oder beide; was in einer Liste fehlt, steht als „n.a.“ da.
         links = self.win.links
@@ -561,12 +670,78 @@ class TagsSheet(Sheet):
             field = links.fields.get("tags", "")
             c, file_value = TAG_COLS.index(field), self.win.file_link_value(result)
             out = []
+            skip = self.win.dropped_link_rows(result)
             for i, hits in links.tag_join([tag_edit.apply(r[c]) if field == "Tag" else r[c] for r in rows],
-                                          file_value):
+                                          file_value, skip):
                 row = rows[i] if i is not None else na_tag_row()
                 out.append(row + links.join_values(hits))
             rows = out
         return rows
+
+    def multi_note(self, row: list, result: PdfResult | None) -> str:
+        """2TAG: „Multi Tag Eintrag in Projekt“ fuer eine Zeile der Tag-Tabelle, sonst ""."""
+        links = self.win.links
+        field = links.fields.get("tags", "")
+        if not (links.two_tag and links.active(2) and field in TAG_COLS) or result is None or is_na_row(row):
+            return ""
+        value = row[TAG_COLS.index(field)]
+        if field == "Tag":
+            value = tag_edit.apply(value)
+        return links.link.multi_note(value, self.win.file_link_value(result) if links.active(1) else None)
+
+    def toggle_two_tag(self, on: bool) -> None:
+        self.win.links.set_two_tag(on)
+        self.win.statusBar().showMessage("2TAG eingeschaltet: „?“ am Ende eines Listen-Tags zählt beim Abgleich nicht."
+                                         if on else "2TAG ausgeschaltet.", 8000)
+
+    # --- Kommentare im Viewer verschieben (1.0.55) --------------------------------------------------------------
+    def toggle_notes(self, on: bool) -> None:
+        if on and not self.win.links.active(2):
+            self.viewer.notes_button.setChecked(False)
+            self.win.statusBar().showMessage("Kommentare bearbeiten braucht eine Importliste mit Datenlink 2.", 8000)
+            return
+        self.refresh_notes()
+        if on:
+            count = len(self.preview._notes)
+            self.win.statusBar().showMessage(
+                f"{count} Eintrag/Einträge: mit der Maus ziehen, Rechtsklick = Position zurücksetzen." if count
+                else "Keine doppelten Tags in dieser PDF.", 8000)
+
+    def refresh_notes(self) -> None:
+        viewer = getattr(self, "viewer", None)          # waehrend des Aufbaus noch nicht da
+        if viewer is None or not hasattr(viewer, "notes_button"):
+            return
+        result = self._store_result
+        if (not viewer.notes_button.isChecked() or result is None or self.preview.path != result.path
+                or not self.win.links.active(2)):
+            self.preview.show_notes([])
+            return
+        try:
+            notes = multitag.notes_for(result, *self.win.multitag_input(result), self.store,
+                                       self.win.note_positions(result))
+        except Exception as exc:  # noqa: BLE001 - Viewer bleibt benutzbar
+            self.win.statusBar().showMessage(f"Einträge nicht darstellbar: {exc}", 8000)
+            notes = []
+        self.preview.show_notes(notes)
+
+    def note_moved(self, key: str, x: float, y: float) -> None:
+        self._save_positions(lambda placed: placed.__setitem__(key, [x, y]))
+
+    def note_reset(self, key: str) -> None:
+        self._save_positions(lambda placed: placed.pop(key, None) if key else placed.clear())
+
+    def _save_positions(self, change) -> None:
+        result = self._store_result
+        if result is None:
+            return
+        every = dict(last_paths.get_value(NOTE_POS_KEY, {}) or {})
+        placed = dict(every.get(result.name, {}))
+        change(placed)
+        every[result.name] = placed
+        if not placed:
+            every.pop(result.name)
+        last_paths.set_value(NOTE_POS_KEY, every)
+        QTimer.singleShot(0, self.refresh_notes)       # erst nach dem Mausereignis neu zeichnen
 
     def set_join_mode(self, mode: str) -> None:
         self.win.links.set_join_mode(mode)
@@ -613,7 +788,8 @@ class TagsSheet(Sheet):
         """Tag-Tabelle neu fuellen; Filter "Nur doppelte" und (Projektmodus) "Nur Abweichungen"."""
         on = self.dup_button.isChecked() if on is None else on
         faults = self.fault_button.isChecked() and self.win.checker is not None
-        rows = [r for r in self._tag_rows() if (not on or r[2] > 1) and (not faults or is_fault_status(r[CHECK_COL]))]
+        rows = [r for r in self._tag_rows() if (not on or r[2] > 1) and (not faults or is_fault_status(r[CHECK_COL])
+                    or self.multi_note(r, self._store_result))]
         linked = self.win.links.tags_linked(TAG_COLS)
         self.tags.headers = TAG_COLS + (self.win.links.tag_extra(TAG_COLS) if linked else [])
         self._bind_tag_layout(linked)
@@ -622,6 +798,7 @@ class TagsSheet(Sheet):
         self.tags.proxy.sourceModel().dataChanged.connect(self._store_changed)   # neues Modell -> neu verbinden
         self.win.apply_project_columns()
         self._hit = None
+        self.refresh_notes()
 
     def _bind_tag_layout(self, linked: bool) -> None:
         """Getrennt gemerkte Ansichten der Tag-Tabelle (1.0.43, Nutzervorgabe): ohne Importspalten ``tags``, mit
@@ -653,6 +830,10 @@ class TagsSheet(Sheet):
         self.link_cols_button.blockSignals(False)
         self.link_cols_button.setEnabled(active)
         self.join_button.setEnabled(active and links.tags_shown)
+        self.two_tag_button.blockSignals(True)
+        self.two_tag_button.setChecked(active and links.two_tag)
+        self.two_tag_button.blockSignals(False)
+        self.two_tag_button.setEnabled(active)
 
     def _fill_link_menu(self) -> None:
         """Menue „Importliste“ der Tag-Tabelle: Link aufheben, Importtabelle entfernen, neu einlesen, bearbeiten."""
@@ -673,7 +854,7 @@ class TagsSheet(Sheet):
         """Markierungen im Viewer: gruen korrekt, rot Review "Korrektur erforderlich" oder (Projektmodus) Abweichung,
         doppelte gelb; Review "No Tag" bleibt ohne Markierung."""
         result = self._store_result
-        tags = (self.store.visible(result.tags) if self.store else result.tags) if result else []
+        tags = (self.store.visible(result.tags) if self.store else type_filter.apply(result.tags)) if result else []
         self.preview.show_status(*status_hits(tags, self.store, self.win.checker))
         self.preview.show_duplicates([t.hits for t in marked_tags(tags, self.store) if t.duplicate])
 
@@ -900,7 +1081,7 @@ class TagsSheet(Sheet):
             self.preview.show_pdf(None)
         else:
             self._load_with_progress(result)
-        dups = sum(1 for t in result.tags if t.duplicate) if result else 0
+        dups = sum(1 for t in type_filter.apply(result.tags) if t.duplicate) if result else 0
         self.tags.count.setToolTip(i18n.tr(f"{dups} doppelte Tag(s) gelb hinterlegt") if dups else "")
 
     def _load_with_progress(self, result: PdfResult) -> None:
@@ -1026,6 +1207,7 @@ class MainWindow(QMainWindow):
         self.checker = None                            # Projektmodus: Pruefung (project_defs.Checker), sonst None
         self._scan_placeholders = False                # letzter Scan mit Platzhalter-Tags (nur Projektmodus)
         # Datenlink: importierte Excel-Liste, verknuepft ueber Datenlink 1 (Dateien) und 2 (Tags)
+        type_filter.activate(last_paths.get_value(type_filter.STATE_KEY, []))
         self.links = LinkController(self._relink, self.edit_data_link)
 
         central = QWidget()
@@ -1074,6 +1256,7 @@ class MainWindow(QMainWindow):
         -> 3 Pruefen -> 4 Review/Redline -> 5 Export, zuletzt Hilfe (Nutzervorgabe 2026-11-21). Jede Gruppe hat eine
         dunkelblaue Ueberschrift. Jede Funktion als Symbol (Glyphen-Ergaenzung in ``toolstrip``)."""
         r = Ribbon("P&ID-PDF-Reader")
+        r.findChild(QWidget, "RibbonTabBar").hide()           # 1.0.56: Reiterzeile entfaellt (Nutzervorgabe)
         # Projekt: Projekt waehlen, dann die Umschalter 1. Projektmodus 2. Rohrleitungen (Nutzervorgabe 2026-11-22),
         # Verwaltung der Definitionen
         g = r.group("Projekt")
@@ -1125,6 +1308,9 @@ class MainWindow(QMainWindow):
         r.buttons["table_profile"].setToolTip("Ansicht aller Tabellen (Spalten, Breiten, Sortierung, Filter) als Datei "
                                               "speichern oder laden")
         g = r.group("3  Prüfen")
+        g.large("check_types", "Prüftypen:\nalle", "defs", self.choose_check_types)
+        r.buttons["check_types"].setToolTip("Prüftypen wählen: Vorfilter für die gesamte Prüfung (z. B. nur Equipment "
+                                            "oder nur Instrument)")
         g.large("prev", "Fundstelle\nzurück", "prev", self.page.previous_occurrence)
         g.large("next", "Fundstelle\nweiter", "next", self.page.next_occurrence)
         g.large("dups", "Nur doppelte\nTags", "duplicates", self.page.dup_button.toggle)
@@ -1184,7 +1370,8 @@ class MainWindow(QMainWindow):
             return
         with progress_task(self, "Review-Tabelle wird erzeugt", steps=2,
                            message=f"PDF-Tags mit der Importtabelle abgleichen ({len(self.results)} PDFs)") as dlg:
-            headers, rows = data_link.review_rows(self.links.link, self._review_input())
+            headers, rows = data_link.review_rows(self.links.link, self._review_input(),
+                                                  set().union(*map(self.dropped_link_rows, self.results)))
             dlg.update_progress(70, f"Tabelle anzeigen ({len(rows)} Zeilen)", 2)
             self.review_page.tags.headers = headers
             self.review_page.tags.set_rows(rows)
@@ -1193,6 +1380,40 @@ class MainWindow(QMainWindow):
         if self.tabs.indexOf(self.review_page) < 0:
             self.tabs.addTab(self.review_page, "Review Importliste")
         self.tabs.setCurrentWidget(self.review_page)
+
+    def dropped_link_rows(self, result: PdfResult) -> set:
+        """Importzeilen, die zu Tags abgewaehlter Prueftypen gehoeren (gelten nicht als fehlend)."""
+        link = self.links.link
+        dropped = type_filter.dropped(result.tags)
+        if not dropped or link is None or not link.active(2):
+            return set()
+        value = self.file_link_value(result) if link.active(1) else None
+        typed = self.links.fields.get("tags", "") == "Typ"
+        return {i for t in dropped for i in link.tag_rows(t.type if typed else tag_edit.apply(t.tag), value)}
+
+    # --- Prueftypen (1.0.58) ---------------------------------------------------------------------------------------
+    def choose_check_types(self) -> None:
+        dlg = TypeDialog(self.results, type_filter.excluded(), self)
+        if dlg.exec() == TypeDialog.Accepted:
+            self.set_check_types(dlg.excluded())
+
+    def set_check_types(self, excluded: list) -> None:
+        """Abgewaehlte Tag-Typen merken und alle Tabellen, Markierungen und Kopfzeilen neu aufbauen."""
+        last_paths.set_value(type_filter.STATE_KEY, list(excluded))
+        type_filter.activate(excluded)
+        self._refresh_tags()
+        self.page._only_duplicates()
+        self.page.show_status()
+        if self.tabs.indexOf(self.review_page) >= 0 and self.links.active(2):
+            self.show_link_review()
+        self.statusBar().showMessage("Prüftypen: " + (f"ohne {', '.join(excluded)}" if excluded else "alle Typen"), 8000)
+
+    def _check_types_text(self) -> str:
+        """"" ohne Vorfilter, sonst die geprueften Typen der gescannten PDFs."""
+        if not type_filter.excluded():
+            return ""
+        names = sorted({t.type for r in self.results for t in type_filter.apply(r.tags)})
+        return ", ".join(names) or "–"
 
     def _review_input(self) -> list[tuple]:
         """Je PDF: Name, Wert des Datenlink-Felds der Dateiliste, Tags mit dem Wert des Tag-Felds („Tag“/„Typ“)."""
@@ -1227,14 +1448,19 @@ class MainWindow(QMainWindow):
 
     def _update_bands(self) -> None:
         source = "; ".join(self.sources) if self.sources else "–"
-        tags = sum(len(r.tags) for r in self.results)
+        tags = sum(len(type_filter.apply(r.tags)) for r in self.results)
         errors = sum(1 for r in self.results if r.error)
         t = i18n.tr
         band = (f"{t('PROJEKT')}  {self.project_label()}   {t('QUELLE')}  {source}   {t('PDFS')}  "
                 f"{len(self.results)}   {t('TAGS')}  {tags}   {t('FEHLER')}  {errors}")
         if self.checker is not None:
-            faults = sum(1 for r in self.results for x in r.tags if self.checker.is_fault(x.type, x.tag))
+            faults = sum(1 for r in self.results for x in type_filter.apply(r.tags)
+                         if self.checker.is_fault(x.type, x.tag))
             band += f"   {t('ABWEICHUNGEN')}  {faults}"
+        if getattr(self, "ribbon", None) is not None:
+            self.ribbon.set_text("check_types", "Prüftypen:\n" + ("gefiltert" if type_filter.excluded() else "alle"))
+        if type_filter.excluded():                        # vorne, damit der Vorfilter nicht uebersehen wird
+            band = f"{t('PRÜFTYPEN')}  {self._check_types_text()}   {band}"
         self.page.set_band(band)
         self.all_page.set_band(band)
 
@@ -1338,6 +1564,7 @@ class MainWindow(QMainWindow):
 
     def _refresh_tags(self) -> None:
         """Blatt "Alle Tags", Pruefspalten und Kopfband (Dateiliste und Auswahl bleiben)."""
+        type_filter.activate(last_paths.get_value(type_filter.STATE_KEY, []))     # z. B. nach Projektwechsel
         checker = self.checker
         self.all_page.tags.set_rows([r[:5] + (checker.columns(r[2], r[3], r[4]) if checker else ["", ""])
                                      for r in export.tag_rows(self.results)])
@@ -1485,35 +1712,166 @@ class MainWindow(QMainWindow):
             return
         try:
             store = self.page.store if self.page._store_result is result else None   # auch ungespeicherte Eintraege
-            count = redline.write_redline(result, path, tags, store=store, checker=self.checker)
+            count = redline.write_redline(result, path, tags, store=store, checker=self.checker,
+                                          table=self.table_option(result), monochrome=self.monochrome_output)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Redline-PDF", f"Redline-PDF konnte nicht geschrieben werden:\n{exc}")
             return
-        filtered = "" if len(tags) == len(result.tags) else f"\n(Filter aktiv: {len(tags)} von {len(result.tags)} Tags)"
+        total = len(type_filter.apply(result.tags))
+        filtered = "" if len(tags) == total else f"\n(Filter aktiv: {len(tags)} von {total} Tags)"
         answer = QMessageBox.question(self, "Redline-PDF", f"Gespeichert:\n{paths.display_path(path)}\n\n{count} "
                                       f"Kommentar(e){filtered}\n\nPDF öffnen?", QMessageBox.Yes | QMessageBox.No)
         if answer == QMessageBox.Yes:
             os.startfile(path)  # noqa: S606
 
+    # --- Multi-Tag-PDF (1.0.55) ------------------------------------------------------------------------------------
+    def multitag_pdf(self) -> None:
+        """Kommentierte Kopie mit allen doppelten Tags: fuer die gewaehlte oder alle gescannten PDFs."""
+        title = "Multi-Tag-PDF"
+        if self.links.link is None or not self.links.active(2):
+            QMessageBox.information(self, title, "Zuerst eine Excel-Liste importieren und in der Tag-Tabelle per "
+                                    "Rechtsklick auf den Spaltenkopf das Datenlink-Feld setzen (Datenlink 2).")
+            return
+        todo = [r for r in self.results if not r.error]
+        current = self.page.current_result()
+        if not todo:
+            QMessageBox.information(self, title, "Noch keine PDFs eingelesen.")
+            return
+        if current is not None and len(todo) > 1:
+            box = QMessageBox(QMessageBox.Question, title, "Für welche PDFs die kommentierte Kopie erzeugen?",
+                              parent=self)
+            one = box.addButton("Nur gewählte PDF", QMessageBox.AcceptRole)
+            every = box.addButton(f"Alle PDFs ({len(todo)})", QMessageBox.AcceptRole)
+            box.addButton(QMessageBox.Cancel)
+            box.exec()
+            choice = msgbox.clicked(box, one, every)
+            if choice is None:
+                return
+            if choice is one:
+                todo = [current]
+        stamp = paths.file_timestamp()
+        if len(todo) == 1:
+            path = last_paths.save_file(self, "Multi-Tag-PDF speichern",
+                                        f"{todo[0].path.stem}_MultiTag_{stamp}.pdf", "PDF (*.pdf)", paths.exports_dir())
+            if not path:
+                return
+            targets, folder = [(todo[0], Path(path))], None
+        else:
+            chosen = last_paths.open_dir(self, "Ordner für die Multi-Tag-PDFs", paths.exports_dir(),
+                                         kind=last_paths.EXPORT)
+            if not chosen:
+                return
+            folder = Path(chosen) / f"MultiTag_{stamp}"
+            targets = [(r, folder / f"{r.path.stem}_MultiTag_{stamp}.pdf") for r in todo]
+        try:
+            files, count, failed = self.run_multitag(targets)
+        except OSError as exc:
+            QMessageBox.warning(self, title, f"Ausgabe nicht möglich:\n{exc}")
+            return
+        errors = "\n\nFehler:\n" + "\n".join(failed[:10]) if failed else ""
+        if not files:
+            QMessageBox.information(self, title, "Nichts zu markieren – keine Datei erzeugt." + errors)
+            return
+        where = paths.display_path(folder if folder else targets[0][1])
+        answer = QMessageBox.question(self, title, f"{files} Datei(en), {count} Fundstelle(n) markiert:\n{where}"
+                                      f"{errors}\n\n{'Ordner' if folder else 'PDF'} öffnen?",
+                                      QMessageBox.Yes | QMessageBox.No)
+        if answer == QMessageBox.Yes:
+            open_in_explorer(folder) if folder else os.startfile(targets[0][1])  # noqa: S606
+
+    def multitag_input(self, result: PdfResult) -> tuple:
+        """(Datenlink mit „?“, Dateiwert, Wert je Tag) fuer Multi-Tag-Eintraege - unabhaengig vom Knopf 2TAG."""
+        links = self.links
+        link = data_link.DataLink(links.table, links.fields, two_tag=True)
+        field = links.fields.get("tags", "")
+
+        def value_of(tag) -> str:
+            return tag.type if field == "Typ" else tag_edit.apply(tag.tag)
+
+        return link, self.file_link_value(result) if link.active(1) else None, value_of
+
+    def note_positions(self, result: PdfResult) -> dict:
+        return dict((last_paths.get_value(NOTE_POS_KEY, {}) or {}).get(result.name, {}))
+
+    @property
+    def monochrome_output(self) -> bool:
+        """PDF-Kopien schwarz-weiss ausgeben, solange der Viewer auf „Monochrom“ steht."""
+        return self.page.viewer.mono_button.isChecked()
+
+    def table_option(self, result: PdfResult):
+        """``False`` ohne Reviewtabelle, sonst die Spalten der Tag-Tabelle wie eingestellt."""
+        page = self.page
+        if not page.review_table_button.isChecked():
+            return False
+        columns = self.preview_columns()
+        header = page.tags.table
+        headers = [page.tags.headers[c] for c in columns]
+        widths = [max(30, header.columnWidth(c)) for c in columns]
+
+        def cells() -> dict:
+            store = page.store if result is page._store_result else ReviewStore(result.path)
+            out: dict = {}
+            for row in page.tag_rows_for(result, store):
+                if is_na_row(row):
+                    continue
+                shown = [row[c] if c < len(row) else "" for c in columns]
+                if 1 in columns:
+                    shown[columns.index(1)] = tag_edit.apply(str(row[1]))     # wie angezeigt
+                out.setdefault((row[0], row[1]), shown)
+            return out
+
+        return review_table.View(headers, widths, cells)
+
+    def write_multitag(self, result: PdfResult, target: Path) -> int | None:
+        link, file_value, value_of = self.multitag_input(result)
+        store = self.page.store if self.page._store_result is result else None       # auch ungespeicherte
+        return multitag.write_multitag_pdf(result, target, link, file_value, value_of, store,
+                                           placed=self.note_positions(result), table=self.table_option(result),
+                                           monochrome=self.monochrome_output)
+
+    def run_multitag(self, targets: list[tuple[PdfResult, Path]]) -> tuple[int, int, list[str]]:
+        """Schreibt die Multi-Tag-PDFs. Rueckgabe: (Dateien, Fundstellen, Fehler)."""
+        files, count, failed = 0, 0, []
+        for _result, target in targets:
+            target.parent.mkdir(parents=True, exist_ok=True)
+        with progress_task(self, "Multi-Tag-PDF wird erzeugt", steps=max(1, len(targets))) as dlg:
+            for n, (result, target) in enumerate(targets, start=1):
+                dlg.update_progress(100 * (n - 1) / len(targets), f"„{result.name}“ ({n} von {len(targets)})", n)
+                try:
+                    found = self.write_multitag(result, target)
+                except Exception as exc:  # noqa: BLE001 - eine Datei darf den Lauf nicht abbrechen
+                    failed.append(f"{result.name}: {exc}")
+                    continue
+                if found is not None:
+                    files += 1
+                    count += found
+        if len(targets) > 1 and not files:
+            try:
+                targets[0][1].parent.rmdir()          # leerer Ausgabeordner
+            except OSError:
+                pass
+        return files, count, failed
+
     def _visible_tags(self, result: PdfResult) -> list:
         proxy = self.page.tags.proxy
         visible = {(proxy.index(r, 0).data(), proxy.index(r, 1).data()) for r in range(proxy.rowCount())}
-        return [t for t in result.tags if (t.type, t.tag) in visible]
+        return [t for t in type_filter.apply(result.tags) if (t.type, t.tag) in visible]
 
     def _choose_tags(self, result: PdfResult, title: str) -> list | None:
         """Tags fuer Redline/Review-Excel. Ist ein Filter aktiv (z. B. "Nur doppelte"), fragen: nur gefilterte oder alle.
         ``None`` = abgebrochen."""
         visible = self._visible_tags(result)
-        if len(visible) == len(result.tags):
+        total = type_filter.apply(result.tags)
+        if len(visible) == len(total):
             return visible
         box = QMessageBox(QMessageBox.Question, title,
-                          f"In der Tag-Tabelle ist ein Filter aktiv: {len(visible)} von {len(result.tags)} Tags sichtbar"
+                          f"In der Tag-Tabelle ist ein Filter aktiv: {len(visible)} von {len(total)} Tags sichtbar"
                           + (" (Nur doppelte)" if self.page.dup_button.isChecked() else "")
                           + (" (Nur Abweichungen)" if self.page.fault_button.isChecked() else "")
                           + ".\n\nWelche Tags ausgeben?",
                           parent=self)
         only = box.addButton(f"Nur gefilterte ({len(visible)})", QMessageBox.AcceptRole)
-        every = box.addButton(f"Alle Tags ({len(result.tags)})", QMessageBox.AcceptRole)
+        every = box.addButton(f"Alle Tags ({len(total)})", QMessageBox.AcceptRole)
         box.addButton(QMessageBox.Cancel)
         box.setDefaultButton(every)
         box.exec()
@@ -1521,7 +1879,7 @@ class MainWindow(QMainWindow):
         if choice is only:
             return visible
         if choice is every:
-            return list(result.tags)
+            return list(total)
         return None
 
     def review_excel_current(self) -> None:
@@ -1561,7 +1919,7 @@ class MainWindow(QMainWindow):
                                     "Dateien öffnen).")
             return
         marked = self.marked_results()
-        dlg = ReviewDialog(len(marked), len(self.results), self)
+        dlg = ReviewDialog(len(marked), len(self.results), self, linked=self.links.active(2))
         if dlg.exec() != ReviewDialog.Accepted:
             return
         self.run_review(marked if dlg.options().only_marked else list(self.results), dlg.options())
@@ -1573,7 +1931,8 @@ class MainWindow(QMainWindow):
         stamp = paths.file_timestamp()
         folder = Path(opts.folder) / (f"Review_{stamp}" if opts.subfolder else "")
         folder.mkdir(parents=True, exist_ok=True)
-        steps = len(todo) * (int(opts.redline) + int(opts.excel_each)) + int(opts.excel_total)
+        with_multi = opts.multitag and self.links.active(2)
+        steps = len(todo) * (int(opts.redline) + int(with_multi) + int(opts.excel_each)) + int(opts.excel_total)
         done, failed, comments, files = 0, [], 0, 0
         dlg = ProgressDialog("Review / Audit", self).open()
         QApplication.setOverrideCursor(Qt.WaitCursor)
@@ -1588,14 +1947,17 @@ class MainWindow(QMainWindow):
                 label = f"„{result.name}“ ({i} von {len(todo)})"
                 for enabled, kind, write in (
                         (opts.redline, "Redline", lambda r=result: redline.write_redline(
-                            r, folder / f"{r.path.stem}_Redline_{stamp}.pdf", checker=self.checker)),
+                            r, folder / f"{r.path.stem}_Redline_{stamp}.pdf", checker=self.checker,
+                            table=self.table_option(r), monochrome=self.monochrome_output)),
+                        (with_multi, "Multi-Tag-PDF", lambda r=result: self.write_multitag(
+                            r, folder / f"{r.path.stem}_MultiTag_{stamp}.pdf")),
                         (opts.excel_each, "Review-Excel", lambda r=result: review.write_review_xlsx(
                             folder / f"{r.path.stem}_Review_{stamp}.xlsx", [r], checker=self.checker))):
                     if not enabled:
                         continue
                     try:
                         value = write()
-                        files += 1
+                        files += not (kind == "Multi-Tag-PDF" and value is None)     # nichts zu markieren
                         comments += value if isinstance(value, int) else 0
                     except Exception as exc:  # noqa: BLE001 - eine Datei darf den Lauf nicht abbrechen
                         failed.append(f"{result.name} ({kind}): {exc}")
@@ -1612,9 +1974,9 @@ class MainWindow(QMainWindow):
             QApplication.restoreOverrideCursor()
             dlg.close()
             dlg.deleteLater()
-        dups = sum(1 for r in todo for t in r.tags if t.duplicate)
+        dups = sum(1 for r in todo for t in type_filter.apply(r.tags) if t.duplicate)
         text = (f"{len(todo)} PDF(s) geprüft, {files} Datei(en) erzeugt"
-                + (f", {comments} Kommentare" if opts.redline else "") + f"\nDoppelte Tags: {dups}\nOrdner: {folder}")
+                + (f", {comments} Kommentare" if opts.redline or with_multi else "") + f"\nDoppelte Tags: {dups}\nOrdner: {folder}")
         if failed:
             text += "\n\nFehler:\n" + "\n".join(failed[:10])
         self.statusBar().showMessage(f"Review: {len(todo)} PDF(s), {files} Datei(en) – {folder}")
